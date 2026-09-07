@@ -25,6 +25,9 @@ public final class FreeRdpLocator {
         "wlfreerdp"
     );
 
+    private static final java.util.regex.Pattern VERSION_PATTERN =
+        java.util.regex.Pattern.compile("(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
     private FreeRdpLocator() {
     }
 
@@ -35,14 +38,19 @@ public final class FreeRdpLocator {
      * @return Optional containing FreeRdpInfo if found
      */
     public static Optional<FreeRdpInfo> locate(String customPath) {
-        // 1. Check custom configured path
+        // 1. Check custom configured path (supports explicit "flatpak" keyword)
         if (customPath != null && !customPath.isBlank()) {
+            if (customPath.equalsIgnoreCase("flatpak") || customPath.contains("com.freerdp.FreeRDP")) {
+                Optional<FreeRdpInfo> flatpak = checkFlatpak();
+                if (flatpak.isPresent()) {
+                    return flatpak;
+                }
+            }
             Path p = Paths.get(customPath);
             if (Files.isExecutable(p)) {
                 return Optional.of(inspectBinary(p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
             }
         }
-
         // 2. Check environment variable JW365_FREERDP
         String envPath = System.getenv("JW365_FREERDP");
         if (envPath != null && !envPath.isBlank()) {
@@ -119,15 +127,18 @@ public final class FreeRdpLocator {
             Process p = new ProcessBuilder("flatpak", "info", "com.freerdp.FreeRDP").start();
             boolean finished = p.waitFor(3, TimeUnit.SECONDS);
             if (finished && p.exitValue() == 0) {
-                return Optional.of(new FreeRdpInfo(null, FreeRdpFlavor.FLATPAK, "FreeRDP Flatpak", true, "com.freerdp.FreeRDP"));
+                String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                String version = "v3.31.1";
+                var matcher = VERSION_PATTERN.matcher(out);
+                if (matcher.find()) {
+                    version = "v" + matcher.group(1);
+                }
+                return Optional.of(new FreeRdpInfo(null, FreeRdpFlavor.FLATPAK, version, true, "com.freerdp.FreeRDP"));
             }
         } catch (Exception ignored) {
         }
         return Optional.empty();
     }
-
-    private static final java.util.regex.Pattern VERSION_PATTERN =
-        java.util.regex.Pattern.compile("(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     private static String extractVersion(List<String> command) {
         try {

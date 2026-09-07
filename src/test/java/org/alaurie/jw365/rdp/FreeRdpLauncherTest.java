@@ -83,8 +83,9 @@ class FreeRdpLauncherTest {
 
         assertThat(cmd.get(0)).isEqualTo("flatpak");
         assertThat(cmd.get(1)).isEqualTo("run");
-        assertThat(cmd.get(2)).isEqualTo("com.freerdp.FreeRDP");
-        assertThat(cmd).contains("/gateway:type:arm");
+        assertThat(cmd.get(2)).isEqualTo("--file-forwarding");
+        assertThat(cmd.get(3)).isEqualTo("com.freerdp.FreeRDP");
+        assertThat(cmd).contains("@@");
         assertThat(cmd).contains("/sec:aad");
         assertThat(cmd).contains("/u:user@tenant.onmicrosoft.com");
     }

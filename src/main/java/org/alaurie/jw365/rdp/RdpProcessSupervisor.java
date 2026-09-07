@@ -57,16 +57,18 @@ public final class RdpProcessSupervisor {
         if (freeRdp.isFlatpak()) {
             cmd.add("flatpak");
             cmd.add("run");
+            cmd.add("--file-forwarding");
             cmd.add(freeRdp.flatpakAppId() != null ? freeRdp.flatpakAppId() : "com.freerdp.FreeRDP");
+            cmd.add("@@");
+            cmd.add(config.rdpFile().toAbsolutePath().toString());
+            cmd.add("@@");
         } else if (freeRdp.binaryPath() != null) {
             cmd.add(freeRdp.binaryPath().toString());
+            cmd.add(config.rdpFile().toAbsolutePath().toString());
         } else {
-            cmd.add("sdl-freerdp");
+            cmd.add("sdl-freerdp3");
+            cmd.add(config.rdpFile().toAbsolutePath().toString());
         }
-
-        // RDP file path
-        cmd.add(config.rdpFile().toAbsolutePath().toString());
-
         // AVD Gateway and Entra ID (AAD) authentication flags
         cmd.add("/gateway:type:arm");
         cmd.add("/sec:aad");
@@ -368,28 +370,41 @@ public final class RdpProcessSupervisor {
      * Ensures FreeRDP SDL client configuration disables hazardous default hotkeys (such as Right Shift + D = Disconnect).
      */
     public static void ensureSdlConfig() {
+        String safeConfig = """
+            {
+              "SDL_KeyModMask": ["KMOD_RCTRL"],
+              "SDL_Disconnect": ["SDL_SCANCODE_F12"],
+              "SDL_Minimize": ["SDL_SCANCODE_F11"],
+              "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
+            }
+            """;
+
+        // 1. Native config path (~/.config/freerdp/sdl-freerdp.json)
         try {
             String configHome = System.getenv("XDG_CONFIG_HOME");
             Path base = (configHome != null && !configHome.isBlank())
                 ? Path.of(configHome)
                 : Path.of(System.getProperty("user.home"), ".config");
-            Path freerdpDir = base.resolve("freerdp");
-            Path configFile = freerdpDir.resolve("sdl-freerdp.json");
-
+            Path configFile = base.resolve("freerdp").resolve("sdl-freerdp.json");
             if (!Files.exists(configFile)) {
-                Files.createDirectories(freerdpDir);
-                String safeConfig = """
-                    {
-                      "SDL_KeyModMask": ["KMOD_RCTRL"],
-                      "SDL_Disconnect": ["SDL_SCANCODE_F12"],
-                      "SDL_Minimize": ["SDL_SCANCODE_F11"],
-                      "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
-                    }
-                    """;
+                Files.createDirectories(configFile.getParent());
                 Files.writeString(configFile, safeConfig, StandardCharsets.UTF_8);
             }
         } catch (Exception e) {
-            System.err.println("Warning: Could not configure sdl-freerdp.json: " + e.getMessage());
+            System.err.println("Warning: Could not configure native sdl-freerdp.json: " + e.getMessage());
+        }
+
+        // 2. Flatpak sandbox config path (~/.var/app/com.freerdp.FreeRDP/config/freerdp/sdl-freerdp.json)
+        try {
+            Path flatpakDir = Path.of(System.getProperty("user.home"), ".var", "app", "com.freerdp.FreeRDP", "config", "freerdp");
+            if (Files.exists(flatpakDir.getParent())) {
+                Path flatpakConfig = flatpakDir.resolve("sdl-freerdp.json");
+                if (!Files.exists(flatpakConfig)) {
+                    Files.createDirectories(flatpakDir);
+                    Files.writeString(flatpakConfig, safeConfig, StandardCharsets.UTF_8);
+                }
+            }
+        } catch (Exception ignored) {
         }
     }
 }
