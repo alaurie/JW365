@@ -23,16 +23,26 @@ Microsoft does not provide an official Windows 365 desktop app for Linux. JW365 
 
 ## Prerequisites
 
-JW365 uses the open-source **FreeRDP 3** engine to render the remote Windows session:
+JW365 uses the open-source **FreeRDP 3** engine to render the remote Windows session. You can install it either through your Linux distribution's package manager or via **Flathub** (recommended for the newest upstream version):
 
+### Option A: Via Flathub (Recommended for the Latest FreeRDP 3.31+)
+Install directly without `sudo`:
+```bash
+flatpak install --user flathub com.freerdp.FreeRDP
+```
+*JW365 automatically detects and integrates with the Flathub package using secure sandbox file-forwarding.*
+
+### Option B: Via Native Package Manager
 ```bash
 # Ubuntu / Debian
 sudo apt update && sudo apt install freerdp3-sdl freerdp3-x11
 
 # Fedora / RHEL
 sudo dnf install freerdp
-```
 
+# Arch Linux
+sudo pacman -S freerdp
+```
 ---
 
 ## Quick Install
