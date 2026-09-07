@@ -285,8 +285,8 @@ public final class RdpProcessSupervisor {
                 logWriter.write("\n=== Process exited with code " + exitCode + " at " + Instant.now() + " ===\n");
                 logWriter.flush();
 
-                if (exitCode == 0) {
-                    updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session ended normally");
+                if (session.isUserInitiatedStop() || exitCode == 0 || exitCode == 143 || exitCode == 130 || exitCode == 129) {
+                    updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
                 } else {
                     updateStatus(session, listener, SessionStatus.FAILED, "Session exited with error code " + exitCode);
                 }
@@ -326,6 +326,7 @@ public final class RdpProcessSupervisor {
         ActiveSession session = activeSessions.remove(resourceId);
         if (session != null) {
             session.stop();
+            updateStatus(session, null, SessionStatus.DISCONNECTED, "Session disconnected");
         }
     }
 

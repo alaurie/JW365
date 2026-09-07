@@ -18,6 +18,7 @@ public final class ActiveSession {
     private final Path logFile;
     private final Instant startTime;
     private final AtomicReference<SessionStatus> status;
+    private final java.util.concurrent.atomic.AtomicBoolean userInitiatedStop = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     public ActiveSession(
         String sessionId,
@@ -82,10 +83,16 @@ public final class ActiveSession {
     }
 
 
+    public boolean isUserInitiatedStop() {
+        return userInitiatedStop.get();
+    }
+
     /**
      * Terminates the session gracefully, falling back to forceful kill after 3 seconds.
      */
     public void stop() {
+        userInitiatedStop.set(true);
+        setStatus(SessionStatus.DISCONNECTED);
         if (!process.isAlive()) {
             return;
         }
