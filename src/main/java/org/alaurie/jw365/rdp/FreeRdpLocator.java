@@ -126,6 +126,9 @@ public final class FreeRdpLocator {
         return Optional.empty();
     }
 
+    private static final java.util.regex.Pattern VERSION_PATTERN =
+        java.util.regex.Pattern.compile("(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
     private static String extractVersion(List<String> command) {
         try {
             Process process = new ProcessBuilder(command).start();
@@ -135,8 +138,14 @@ public final class FreeRdpLocator {
                 if (out.isBlank()) {
                     out = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
                 }
+                for (String line : out.lines().toList()) {
+                    var matcher = VERSION_PATTERN.matcher(line);
+                    if (matcher.find()) {
+                        return "v" + matcher.group(1);
+                    }
+                }
                 if (!out.isBlank()) {
-                    return out.lines().findFirst().orElse(out);
+                    return out.lines().findFirst().orElse(null);
                 }
             } else {
                 process.destroyForcibly();

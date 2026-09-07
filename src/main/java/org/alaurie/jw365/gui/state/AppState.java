@@ -164,17 +164,12 @@ public final class AppState {
                 runOnFxThread(() -> {
                     currentUser.set(claims);
                     authenticated.set(true);
-                });
-
-                // Schedule background refresh
-                Thread.ofVirtual().name("jw365-init-refresh").start(() -> {
                     refreshWorkspacesAsync(tokens.isExpiringSoon());
                 });
             } catch (Exception e) {
                 System.err.println("Warning: Invalid cached token: " + e.getMessage());
             }
         }
-
         // 4. Setup periodic auto-refresh
         int refreshMin = Math.max(config.autoRefreshMinutes(), 5);
         scheduler.scheduleAtFixedRate(() -> {
@@ -206,8 +201,8 @@ public final class AppState {
                             if (onSuccess != null) {
                                 onSuccess.run();
                             }
+                            refreshWorkspacesAsync(false);
                         });
-                        refreshWorkspacesAsync(false);
                     }
                     case AuthResult.Failure(var code, var msg, var cause) -> {
                         runOnFxThread(() -> {
