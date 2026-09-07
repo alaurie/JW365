@@ -134,7 +134,7 @@ public final class AppState {
         }
         try {
             org.alaurie.jw365.gui.view.SessionAuthDialog dialog = new org.alaurie.jw365.gui.view.SessionAuthDialog(null, title, ar);
-            dialog.show();
+            dialog.startSilentOrShow();
         } catch (Exception e) {
             System.err.println("Warning: Could not open SessionAuthDialog: " + e.getMessage());
         }
