@@ -59,8 +59,14 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("/cert:ignore");
         assertThat(cmd).contains("+clipboard");
         assertThat(cmd).contains("+dynamic-resolution");
-        assertThat(cmd).contains("/log-level:info");
+        assertThat(cmd).contains("/network:auto");
+        assertThat(cmd).contains("+async-update");
+        assertThat(cmd).contains("+async-channels");
+        assertThat(cmd).contains("+auto-reconnect");
+        assertThat(cmd).contains("/gfx:progressive");
+        assertThat(cmd).contains("/gdi:hw");
         assertThat(cmd).contains("/bpp:32");
+        assertThat(cmd).contains("/log-level:info");
     }
     @Test
     @DisplayName("buildCommandLine handles Flatpak FreeRDP invocation")

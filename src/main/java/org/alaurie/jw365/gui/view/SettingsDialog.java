@@ -15,7 +15,6 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -31,7 +30,7 @@ import java.util.List;
 
 /**
  * Settings configuration dialog for FreeRDP parameters, display scaling, browser preferences,
- * shared folder redirection, and Entra ID tenant preferences.
+ * and Entra ID tenant preferences.
  */
 public final class SettingsDialog extends Stage {
 
@@ -52,8 +51,6 @@ public final class SettingsDialog extends Stage {
     private final CheckBox asyncUpdateCheck;
     private final CheckBox autoReconnectCheck;
 
-    private final CheckBox shareFolderCheck;
-    private final TextField sharedFolderPathField;
     private final CheckBox autoConnectCheck;
 
     private final TextField autoRefreshField;
@@ -66,7 +63,7 @@ public final class SettingsDialog extends Stage {
         initModality(Modality.WINDOW_MODAL);
         setTitle("JW365 Settings");
         setMinWidth(580);
-        setMinHeight(720);
+        setMinHeight(680);
 
         ClientConfig currentConfig = state.getConfigManager().get();
 
@@ -179,33 +176,7 @@ public final class SettingsDialog extends Stage {
         ignoreCertCheck = new CheckBox("Ignore SSL Certificate Warnings (/cert:ignore)");
         ignoreCertCheck.setSelected(currentConfig.ignoreCert());
 
-        // 4. Productivity & Shared Folders
-        Label folderSection = new Label("Shared Folders & File Exchange");
-        folderSection.getStyleClass().add("brand-title");
-
-        shareFolderCheck = new CheckBox("Redirect Local Folder into Cloud PC (\\\\tsclient\\Share)");
-        shareFolderCheck.setSelected(currentConfig.shareFolder());
-
-        HBox folderBox = new HBox(8);
-        sharedFolderPathField = new TextField(currentConfig.sharedFolderPath());
-        sharedFolderPathField.setPromptText("Path to local folder, e.g. /home/user/CloudPC-Share");
-        HBox.setHgrow(sharedFolderPathField, Priority.ALWAYS);
-        sharedFolderPathField.disableProperty().bind(shareFolderCheck.selectedProperty().not());
-
-        Button browseFolderBtn = new Button("Browse...");
-        browseFolderBtn.getStyleClass().add("btn-secondary");
-        browseFolderBtn.disableProperty().bind(shareFolderCheck.selectedProperty().not());
-        browseFolderBtn.setOnAction(e -> {
-            DirectoryChooser chooser = new DirectoryChooser();
-            chooser.setTitle("Select Local Folder to Share with Cloud PC");
-            File f = chooser.showDialog(this);
-            if (f != null) {
-                sharedFolderPathField.setText(f.getAbsolutePath());
-            }
-        });
-        folderBox.getChildren().addAll(sharedFolderPathField, browseFolderBtn);
-
-        // 5. Automation Section
+        // 4. Automation Section
         Label advancedSection = new Label("Automation & Preferences");
         advancedSection.getStyleClass().add("brand-title");
 
@@ -239,8 +210,6 @@ public final class SettingsDialog extends Stage {
             displaySection, displayGrid,
             fullscreenCheck, multiMonCheck, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
             new Separator(),
-            folderSection, shareFolderCheck, folderBox,
-            new Separator(),
             advancedSection, autoConnectCheck, advGrid
         );
 
@@ -265,7 +234,7 @@ public final class SettingsDialog extends Stage {
         buttonBar.getChildren().addAll(cancelBtn, saveBtn);
         root.setBottom(buttonBar);
 
-        Scene scene = new Scene(root, 620, 720);
+        Scene scene = new Scene(root, 600, 700);
         scene.getStylesheets().add(getClass().getResource("/org/alaurie/jw365/gui/styles.css").toExternalForm());
         setScene(scene);
     }
@@ -308,8 +277,6 @@ public final class SettingsDialog extends Stage {
             gfxProgressiveCheck.isSelected(),
             asyncUpdateCheck.isSelected(),
             autoReconnectCheck.isSelected(),
-            shareFolderCheck.isSelected(),
-            sharedFolderPathField.getText().trim(),
             autoConnectCheck.isSelected(),
             autoRefresh,
             extraArgs

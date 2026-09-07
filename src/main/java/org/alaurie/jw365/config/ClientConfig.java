@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.alaurie.jw365.auth.OAuthClient;
 
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 
@@ -27,8 +26,6 @@ public record ClientConfig(
     @JsonProperty("gfxProgressive") boolean gfxProgressive,
     @JsonProperty("asyncUpdate") boolean asyncUpdate,
     @JsonProperty("autoReconnect") boolean autoReconnect,
-    @JsonProperty("shareFolder") boolean shareFolder,
-    @JsonProperty("sharedFolderPath") String sharedFolderPath,
     @JsonProperty("autoConnect") boolean autoConnect,
     @JsonProperty("autoRefreshMinutes") int autoRefreshMinutes,
     @JsonProperty("extraArgs") List<String> extraArgs
@@ -40,10 +37,6 @@ public record ClientConfig(
         }
         if (autoRefreshMinutes <= 0) {
             autoRefreshMinutes = 15;
-        }
-        if (sharedFolderPath == null || sharedFolderPath.isBlank()) {
-            String userHome = System.getProperty("user.home", ".");
-            sharedFolderPath = Paths.get(userHome, "CloudPC-Share").toString();
         }
         extraArgs = extraArgs != null ? List.copyOf(extraArgs) : Collections.emptyList();
     }
@@ -61,12 +54,10 @@ public record ClientConfig(
         int autoRefreshMinutes,
         List<String> extraArgs
     ) {
-        this(defaultTenant, preferredFreeRdpPath, preferredBrowser, scalePercent, fullscreen, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, null, false, autoRefreshMinutes, extraArgs);
+        this(defaultTenant, preferredFreeRdpPath, preferredBrowser, scalePercent, fullscreen, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, autoRefreshMinutes, extraArgs);
     }
 
     public static ClientConfig defaultConfig() {
-        String userHome = System.getProperty("user.home", ".");
-        String defaultShare = Paths.get(userHome, "CloudPC-Share").toString();
         return new ClientConfig(
             OAuthClient.DEFAULT_TENANT,
             null,
@@ -82,8 +73,6 @@ public record ClientConfig(
             true,
             true,
             true,
-            false,
-            defaultShare,
             false,
             15,
             Collections.emptyList()

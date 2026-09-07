@@ -127,18 +127,9 @@ public final class RdpProcessSupervisor {
             cmd.add("/gfx:progressive");
         }
 
-        // Shared folder redirection
-        if (config.shareFolder() && config.sharedFolderPath() != null && !config.sharedFolderPath().isBlank()) {
-            Path shareDir = Path.of(config.sharedFolderPath());
-            try {
-                if (!Files.exists(shareDir)) {
-                    Files.createDirectories(shareDir);
-                }
-                cmd.add("/drive:Share," + shareDir.toAbsolutePath());
-            } catch (Exception e) {
-                System.err.println("Warning: Could not create shared folder " + shareDir + ": " + e.getMessage());
-            }
-        }
+        // Hardware accelerated GDI and true color
+        cmd.add("/gdi:hw");
+        cmd.add("/bpp:32");
 
         // Log level
         cmd.add("/log-level:info");

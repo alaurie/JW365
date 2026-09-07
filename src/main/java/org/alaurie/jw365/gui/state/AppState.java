@@ -431,8 +431,6 @@ public final class AppState {
                     config.gfxProgressive(),
                     config.asyncUpdate(),
                     config.autoReconnect(),
-                    config.shareFolder(),
-                    config.sharedFolderPath(),
                     config.extraArgs()
                 );
 
