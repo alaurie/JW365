@@ -411,10 +411,11 @@ public final class AppState {
                 String username = claims != null ? claims.rdpUsername() : "";
 
                 DisplayMode effectiveMode = displayMode != null ? displayMode : DisplayMode.DEFAULT;
-                boolean fullscreen = (effectiveMode == DisplayMode.FULLSCREEN) || (effectiveMode == DisplayMode.DEFAULT && config.fullscreen());
                 boolean multiMon = (effectiveMode == DisplayMode.MULTIMON) || (effectiveMode == DisplayMode.DEFAULT && config.multiMonitor());
+                boolean fullscreen = (effectiveMode == DisplayMode.FULLSCREEN) || (effectiveMode == DisplayMode.DEFAULT && config.fullscreen()) || multiMon;
                 if (effectiveMode == DisplayMode.WINDOWED) {
                     fullscreen = false;
+                    multiMon = false;
                 }
 
                 RdpSessionConfig sessionConfig = new RdpSessionConfig(

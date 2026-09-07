@@ -89,14 +89,14 @@ public final class RdpProcessSupervisor {
         cmd.add("/usb:auto");
         cmd.add("/smartcard");
         // Display settings
-        if (config.fullscreen()) {
+        if (config.multiMonitor()) {
+            cmd.add("/f");
+            cmd.add("/multimon:force");
+        } else if (config.fullscreen()) {
             cmd.add("/f");
         }
         if (config.scalePercent() > 0) {
             cmd.add("/scale-desktop:" + config.scalePercent());
-        }
-        if (config.multiMonitor()) {
-            cmd.add("/multimon");
         }
         if (config.ignoreCert()) {
             cmd.add("/cert:ignore");

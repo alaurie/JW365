@@ -57,7 +57,7 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("/smartcard");
         assertThat(cmd).contains("/f");
         assertThat(cmd).contains("/scale-desktop:150");
-        assertThat(cmd).contains("/multimon");
+        assertThat(cmd).contains("/multimon:force");
         assertThat(cmd).contains("/cert:ignore");
         assertThat(cmd).contains("+clipboard");
         assertThat(cmd).contains("+dynamic-resolution");

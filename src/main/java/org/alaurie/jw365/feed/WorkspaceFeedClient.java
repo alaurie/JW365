@@ -167,6 +167,17 @@ public final class WorkspaceFeedClient {
             throw new IOException("Failed to download RDP file from " + rdpUrl + " (HTTP " + response.statusCode() + ")");
         }
 
+        // Ensure singlemoninwindowedmode does not force single monitor locks
+        try {
+            String content = Files.readString(tempFile, StandardCharsets.UTF_8);
+            String updated = content.replace("singlemoninwindowedmode:i:1", "singlemoninwindowedmode:i:0");
+            if (!updated.contains("use multimon")) {
+                updated += "\nuse multimon:i:1\n";
+            }
+            Files.writeString(tempFile, updated, StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+
         Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         return targetPath;
     }
