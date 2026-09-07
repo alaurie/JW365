@@ -1,0 +1,325 @@
+/* ==========================================================================
+   JW365 Modern JavaFX UI Theme
+   ========================================================================== */
+
+.root {
+    -fx-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -fx-font-size: 13px;
+    -fx-base: #1e1e2e;
+    -fx-background: #11111b;
+    -fx-control-inner-background: #181825;
+    -fx-text-base-color: #cdd6f4;
+    -fx-accent: #0078d4;
+
+    /* Semantic Palette */
+    -color-bg-canvas: #0f111a;
+    -color-bg-surface: #181a26;
+    -color-bg-card: #202436;
+    -color-bg-card-hover: #2a2f47;
+    -color-border-subtle: #31364f;
+    -color-border-focus: #0078d4;
+    -color-text-primary: #f8fafc;
+    -color-text-secondary: #94a3b8;
+    -color-text-muted: #64748b;
+    -color-brand-blue: #0078d4;
+    -color-brand-blue-hover: #106ebe;
+    -color-status-green: #10b981;
+    -color-status-yellow: #f59e0b;
+    -color-status-red: #ef4444;
+}
+
+/* Backgrounds */
+.main-window-bg {
+    -fx-background-color: -color-bg-canvas;
+}
+
+/* Header Bar */
+.header-bar {
+    -fx-background-color: -color-bg-surface;
+    -fx-border-color: transparent transparent -color-border-subtle transparent;
+    -fx-border-width: 1;
+    -fx-padding: 12 20 12 20;
+    -fx-alignment: center-left;
+    -fx-spacing: 14;
+}
+
+.brand-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text-primary;
+}
+
+.brand-badge {
+    -fx-background-color: #0078d422;
+    -fx-border-color: #0078d488;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-text-fill: #38bdf8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 6 2 6;
+}
+
+/* Search Bar */
+.search-field {
+    -fx-background-color: -color-bg-card;
+    -fx-text-fill: -color-text-primary;
+    -fx-prompt-text-fill: -color-text-muted;
+    -fx-background-radius: 6;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 6;
+    -fx-padding: 6 12 6 12;
+    -fx-pref-width: 260;
+}
+
+.search-field:focused {
+    -fx-border-color: -color-border-focus;
+    -fx-background-color: -color-bg-surface;
+}
+
+/* Buttons */
+.btn-primary {
+    -fx-background-color: -color-brand-blue;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+    -fx-padding: 8 16 8 16;
+    -fx-cursor: hand;
+}
+
+.btn-primary:hover {
+    -fx-background-color: -color-brand-blue-hover;
+}
+
+.btn-primary:pressed {
+    -fx-background-color: #005a9e;
+}
+
+.btn-secondary {
+    -fx-background-color: -color-bg-card;
+    -fx-text-fill: -color-text-primary;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: -color-bg-card-hover;
+    -fx-border-color: -color-text-secondary;
+}
+
+.btn-icon {
+    -fx-background-color: transparent;
+    -fx-text-fill: -color-text-secondary;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+    -fx-cursor: hand;
+}
+
+.btn-icon:hover {
+    -fx-background-color: -color-bg-card;
+    -fx-text-fill: -color-text-primary;
+}
+
+/* User Pill */
+.user-pill {
+    -fx-background-color: -color-bg-card;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 16;
+    -fx-background-radius: 16;
+    -fx-padding: 4 12 4 10;
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+}
+
+.user-pill-text {
+    -fx-text-fill: -color-text-primary;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+/* Workspace Section Headers */
+.workspace-heading {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text-primary;
+    -fx-padding: 16 0 8 4;
+}
+
+.workspace-subheading {
+    -fx-font-size: 12px;
+    -fx-text-fill: -color-text-muted;
+}
+
+/* Resource Card */
+.resource-card {
+    -fx-background-color: -color-bg-card;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-padding: 16;
+    -fx-pref-width: 240;
+    -fx-pref-height: 200;
+    -fx-cursor: hand;
+    -fx-spacing: 10;
+    -fx-alignment: top-center;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.25), 6, 0, 0, 2);
+}
+
+.resource-card:hover {
+    -fx-background-color: -color-bg-card-hover;
+    -fx-border-color: -color-border-focus;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 120, 212, 0.25), 12, 0, 0, 4);
+}
+
+.resource-card-selected {
+    -fx-border-color: -color-brand-blue;
+    -fx-border-width: 2;
+}
+
+.resource-icon-container {
+    -fx-background-color: -color-bg-surface;
+    -fx-background-radius: 10;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 10;
+    -fx-padding: 10;
+    -fx-alignment: center;
+}
+
+.resource-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text-primary;
+    -fx-alignment: center;
+    -fx-text-alignment: center;
+}
+
+.resource-subtitle {
+    -fx-font-size: 11px;
+    -fx-text-fill: -color-text-secondary;
+    -fx-alignment: center;
+}
+
+/* Status Badges */
+.badge-type {
+    -fx-background-color: #3b82f622;
+    -fx-text-fill: #60a5fa;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6 2 6;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.badge-status-idle {
+    -fx-background-color: #64748b22;
+    -fx-text-fill: #94a3b8;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6 2 6;
+    -fx-font-size: 10px;
+}
+
+.badge-status-connecting {
+    -fx-background-color: #f59e0b22;
+    -fx-text-fill: #fbbf24;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6 2 6;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.badge-status-connected {
+    -fx-background-color: #10b98122;
+    -fx-text-fill: #34d399;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6 2 6;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.badge-status-failed {
+    -fx-background-color: #ef444422;
+    -fx-text-fill: #f87171;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6 2 6;
+    -fx-font-size: 10px;
+}
+
+/* Status Bar Footer */
+.status-bar {
+    -fx-background-color: -color-bg-surface;
+    -fx-border-color: -color-border-subtle transparent transparent transparent;
+    -fx-border-width: 1;
+    -fx-padding: 8 20 8 20;
+    -fx-alignment: center-left;
+    -fx-spacing: 16;
+}
+
+.status-bar-text {
+    -fx-text-fill: -color-text-secondary;
+    -fx-font-size: 11px;
+}
+
+/* Sign-In View */
+.signin-container {
+    -fx-background-color: -color-bg-canvas;
+    -fx-alignment: center;
+    -fx-spacing: 24;
+    -fx-padding: 40;
+}
+
+.signin-card {
+    -fx-background-color: -color-bg-card;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 16;
+    -fx-background-radius: 16;
+    -fx-padding: 40;
+    -fx-spacing: 20;
+    -fx-alignment: center;
+    -fx-pref-width: 440;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 20, 0, 0, 8);
+}
+
+.signin-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text-primary;
+}
+
+.signin-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: -color-text-secondary;
+    -fx-text-alignment: center;
+}
+
+/* Dialogs */
+.dialog-container {
+    -fx-background-color: -color-bg-canvas;
+    -fx-padding: 20;
+    -fx-spacing: 16;
+}
+
+.form-label {
+    -fx-text-fill: -color-text-secondary;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.text-input, .choice-box {
+    -fx-background-color: -color-bg-card;
+    -fx-text-fill: -color-text-primary;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+}
+
+.text-input:focused, .choice-box:focused {
+    -fx-border-color: -color-border-focus;
+}
+
+.check-box {
+    -fx-text-fill: -color-text-primary;
+}

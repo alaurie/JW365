@@ -1,0 +1,79 @@
+name: Release Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 1.0.0 or v1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Linux Packages (.deb, .rpm, .tar.gz)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install packaging dependencies (rpm, dpkg-dev, fakeroot)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot dpkg-dev rpm
+
+      - name: Set up Oracle GraalVM / JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'oracle'
+          cache: 'gradle'
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew jw365
+
+      - name: Determine release version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VER="${{ github.event.inputs.version }}"
+          else
+            TAG_VER="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG_VER#v}"
+          echo "Building release version: $VERSION"
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Run unit test suite
+        run: ./gradlew test -PappVersion=${{ env.APP_VERSION }}
+
+      - name: Build all distribution packages (Debian, RPM, and Portable Tarball)
+        run: ./gradlew packageDeb packageRpm packagePortableTar -PappVersion=${{ env.APP_VERSION }}
+
+      - name: List generated packages
+        run: |
+          ls -lh build/distributions/
+          sha256sum build/distributions/*.deb build/distributions/*.rpm build/distributions/*.tar.gz > build/distributions/checksums-sha256.txt
+          cat build/distributions/checksums-sha256.txt
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          files: |
+            build/distributions/*.deb
+            build/distributions/*.rpm
+            build/distributions/*.tar.gz
+            build/distributions/checksums-sha256.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
