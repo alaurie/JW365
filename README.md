@@ -113,7 +113,7 @@ JW365 adheres to the Linux XDG Base Directory specification:
 | Path | Purpose |
 | :--- | :--- |
 | `~/.config/jw365/config.json` | Application preferences (tenant, FreeRDP binary, display scaling, audio). |
-| `~/.local/share/jw365/token-cache.json` | Encrypted/restricted (`0600`) OAuth tokens and refresh tokens. |
+| `~/.local/share/jw365/token-cache.enc` | Machine-bound AES-256-GCM encrypted OAuth and refresh tokens (`0600`). |
 | `~/.local/share/jw365/workspaces.json` | Cached workspace feed metadata for instantaneous startup display. |
 | `~/.local/share/jw365/webview-cookies.json` | Microsoft Entra ID session cookies for Single Sign-On (SSO). |
 | `~/.local/share/jw365/feed/` | Downloaded `.rdp` session configuration files. |
