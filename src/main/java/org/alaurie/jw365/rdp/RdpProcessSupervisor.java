@@ -141,8 +141,12 @@ public final class RdpProcessSupervisor {
         // Stop any existing session for this resource ID first
         stopSession(sessionId);
 
-        List<String> rawCommand = buildCommandLine(freeRdp, config);
+        // Ensure FreeRDP SDL client hotkeys don't intercept normal typing (e.g. Shift+D disconnect)
+        if (freeRdp.flavor() == FreeRdpFlavor.SDL_FREERDP) {
+            ensureSdlConfig();
+        }
 
+        List<String> rawCommand = buildCommandLine(freeRdp, config);
         // Use script PTY wrapper if available to provide a valid terminal for FreeRDP
         List<String> processCommand;
         if (Files.isExecutable(Path.of("/usr/bin/script"))) {
@@ -323,6 +327,35 @@ public final class RdpProcessSupervisor {
             } catch (Exception e) {
                 System.err.println("Error in global session listener: " + e.getMessage());
             }
+        }
+    }
+
+    /**
+     * Ensures FreeRDP SDL client configuration disables hazardous default hotkeys (such as Right Shift + D = Disconnect).
+     */
+    public static void ensureSdlConfig() {
+        try {
+            String configHome = System.getenv("XDG_CONFIG_HOME");
+            Path base = (configHome != null && !configHome.isBlank())
+                ? Path.of(configHome)
+                : Path.of(System.getProperty("user.home"), ".config");
+            Path freerdpDir = base.resolve("freerdp");
+            Path configFile = freerdpDir.resolve("sdl-freerdp.json");
+
+            if (!Files.exists(configFile)) {
+                Files.createDirectories(freerdpDir);
+                String safeConfig = """
+                    {
+                      "SDL_KeyModMask": ["KMOD_RCTRL"],
+                      "SDL_Disconnect": ["SDL_SCANCODE_F12"],
+                      "SDL_Minimize": ["SDL_SCANCODE_F11"],
+                      "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
+                    }
+                    """;
+                Files.writeString(configFile, safeConfig, StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Could not configure sdl-freerdp.json: " + e.getMessage());
         }
     }
 }

@@ -97,6 +97,16 @@ Future agents **MUST NOT** violate these hard-won protocol, operating system, an
 - **The Rule**: `MainView` must reuse cards via `cardCache` and invoke `card.cleanup()` when resources are removed from the workspace.
 - **Anchor**: `org.alaurie.jw365.gui.view.MainView`, `org.alaurie.jw365.gui.view.ResourceCard`
 
+
+### 2.10. FreeRDP SDL Client Hotkey Interception Trap
+- **Context**: FreeRDP's SDL client (`sdl-freerdp3`) defaults to hardcoding `KMOD_RSHIFT` (Right Shift) as its hotkey modifier mask:
+  - `Right Shift + D`: `SDL_Disconnect` (closes the remote window!)
+  - `Right Shift + M`: `SDL_Minimize`
+  - `Right Shift + R`: `SDL_Resizeable`
+  - `Right Shift + G`: `SDL_Grab`
+- **The Trap**: When typing uppercase letters in Windows (like a capital 'D' or 'M') with Right Shift, FreeRDP intercepts the keypress as a local hotkey command and immediately terminates or minimizes the remote session.
+- **The Rule**: `RdpProcessSupervisor` **MUST** call `ensureSdlConfig()` before launching `sdl-freerdp3` to create `~/.config/freerdp/sdl-freerdp.json` mapping `SDL_KeyModMask` to `["KMOD_RCTRL"]` and remapping `SDL_Disconnect` to `["SDL_SCANCODE_F12"]`. Normal Shift typing must never be intercepted as a session-closing hotkey.
+- **Anchor**: `org.alaurie.jw365.rdp.RdpProcessSupervisor.ensureSdlConfig`
 ---
 
 ## 3. Project Structure & Code Map
