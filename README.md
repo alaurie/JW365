@@ -1,4 +1,4 @@
-# JW365 — Windows 365 & AVD Linux Client
+# JW365 - Windows 365 & AVD Linux Client
 
 **JW365** is a modern, high-performance Linux client for **Windows 365 Cloud PCs** and **Azure Virtual Desktop (AVD)** built with **Java 25+** and **OpenJFX 25**. It provides a native desktop experience with automated Microsoft Entra ID authentication, background workspace synchronization, and FreeRDP session supervision.
 
@@ -32,7 +32,7 @@ sudo apt update && sudo apt install freerdp3-sdl freerdp3-x11
 
 ## Installation
 
-### Option 1: Native Debian Package (`.deb`) — *Recommended*
+### Option 1: Native Debian Package (`.deb`) - *Recommended*
 
 Download or build `jw365_1.0.0_amd64.deb` and install with `apt`:
 
