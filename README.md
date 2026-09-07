@@ -1,6 +1,6 @@
-# JW365 - Windows 365 & AVD Linux Client
+# JW365 - Windows 365 Linux Client
 
-**JW365** is a modern, high-performance Linux client for **Windows 365 Cloud PCs** and **Azure Virtual Desktop (AVD)** built with **Java 25+** and **OpenJFX 25**. It provides a native desktop experience with automated Microsoft Entra ID authentication, background workspace synchronization, and FreeRDP session supervision.
+**JW365** is a modern, high-performance Linux client for **Windows 365 Cloud PCs** built with **Java 25+** and **OpenJFX 25**. It provides a native desktop experience with automated Microsoft Entra ID authentication, background workspace synchronization, and FreeRDP session supervision.
 
 ---
 
