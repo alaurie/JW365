@@ -51,8 +51,10 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("/gateway:type:arm");
         assertThat(cmd).contains("/sec:aad");
         assertThat(cmd).contains("/u:alex@contoso.com");
-        assertThat(cmd).contains("/sound:sys:pulse");
-        assertThat(cmd).contains("/microphone");
+        assertThat(cmd).contains("/sound:sys:pulse,rate:48000,channel:2,quality:high");
+        assertThat(cmd).contains("/microphone:sys:pulse,rate:48000");
+        assertThat(cmd).contains("/usb:auto");
+        assertThat(cmd).contains("/smartcard");
         assertThat(cmd).contains("/f");
         assertThat(cmd).contains("/scale-desktop:150");
         assertThat(cmd).contains("/multimon");

@@ -107,6 +107,24 @@ Future agents **MUST NOT** violate these hard-won protocol, operating system, an
 - **The Trap**: When typing uppercase letters in Windows (like a capital 'D' or 'M') with Right Shift, FreeRDP intercepts the keypress as a local hotkey command and immediately terminates or minimizes the remote session.
 - **The Rule**: `RdpProcessSupervisor` **MUST** call `ensureSdlConfig()` before launching `sdl-freerdp3` to create `~/.config/freerdp/sdl-freerdp.json` mapping `SDL_KeyModMask` to `["KMOD_RCTRL"]` and remapping `SDL_Disconnect` to `["SDL_SCANCODE_F12"]`. Normal Shift typing must never be intercepted as a session-closing hotkey.
 - **Anchor**: `org.alaurie.jw365.rdp.RdpProcessSupervisor.ensureSdlConfig`
+
+### 2.11. Mandatory Release Changelog & Verification Checksums
+- **Context**: Generic automated GitHub release notes often output empty bodies or a single uninformative link when commits are pushed directly without merged pull requests.
+- **The Rule**: All releases **MUST** generate a detailed, structured Markdown changelog using `scripts/generate-changelog.py`:
+  1. Categorizes commits between tags into **Features & Improvements**, **Bug Fixes & Stability**, **Documentation**, and **Other Changes**.
+  2. Embeds the full SHA-256 verification checksums for all distribution packages (`.deb`, `.rpm`, `.tar.gz`).
+  3. The project root **MUST** maintain `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) standards.
+- **Anchor**: `scripts/generate-changelog.py`, `.github/workflows/release.yml`, `CHANGELOG.md`
+
+### 2.12. Audio, Media, and Peripheral Redirection Posture
+- **Context**: Modern Linux distributions (Debian, Ubuntu, Fedora, Arch) default to PipeWire with `pipewire-pulse`.
+- **The Rule**:
+  - **Audio Output**: `/sound:sys:pulse,rate:48000,channel:2,quality:high` (matches PipeWire's native 48kHz clock, eliminating buffer resampling latency and distortion).
+  - **Microphone**: `/microphone:sys:pulse,rate:48000` (low-latency audio input for Teams/calls).
+  - **Environment**: FreeRDP process **MUST** receive `PULSE_SERVER=unix:${XDG_RUNTIME_DIR}/pulse/native` to connect directly to PipeWire without socket search delays.
+  - **Peripherals**: `/usb:auto` (webcams and USB devices) and `/smartcard` (YubiKeys / FIDO2 security keys) are enabled by default.
+  - **Shared Folder Prohibition**: Drive redirection (`/drive:...`) is explicitly removed and prohibited per user requirement.
+- **Anchor**: `org.alaurie.jw365.rdp.RdpProcessSupervisor.buildCommandLine`
 ---
 
 ## 3. Project Structure & Code Map

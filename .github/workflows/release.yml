@@ -63,16 +63,21 @@ jobs:
           sha256sum build/distributions/*.deb build/distributions/*.rpm build/distributions/*.tar.gz > build/distributions/checksums-sha256.txt
           cat build/distributions/checksums-sha256.txt
 
+      - name: Generate Changelog & Release Notes
+        run: |
+          chmod +x scripts/generate-changelog.py
+          python3 scripts/generate-changelog.py "v${{ env.APP_VERSION }}"
+
       - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
+          body_path: build/release-notes.md
           files: |
             build/distributions/*.deb
             build/distributions/*.rpm
             build/distributions/*.tar.gz
             build/distributions/checksums-sha256.txt
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:

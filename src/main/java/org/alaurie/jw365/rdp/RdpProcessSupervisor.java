@@ -75,14 +75,17 @@ public final class RdpProcessSupervisor {
             cmd.add("/u:" + config.username());
         }
 
-        // Audio and Microphone
+        // PipeWire / PulseAudio native 48kHz stereo output and input
         if (config.sound()) {
-            cmd.add("/sound:sys:pulse");
+            cmd.add("/sound:sys:pulse,rate:48000,channel:2,quality:high");
         }
         if (config.microphone()) {
-            cmd.add("/microphone");
+            cmd.add("/microphone:sys:pulse,rate:48000");
         }
 
+        // Peripheral & security hardware redirection
+        cmd.add("/usb:auto");
+        cmd.add("/smartcard");
         // Display settings
         if (config.fullscreen()) {
             cmd.add("/f");
@@ -202,6 +205,13 @@ public final class RdpProcessSupervisor {
             env.put("XDG_RUNTIME_DIR", xdgRuntime);
         }
 
+        // PipeWire / PulseAudio direct native socket path
+        String pulseServer = System.getenv("PULSE_SERVER");
+        if (pulseServer != null && !pulseServer.isBlank()) {
+            env.put("PULSE_SERVER", pulseServer);
+        } else if (xdgRuntime != null && !xdgRuntime.isBlank() && Files.exists(Path.of(xdgRuntime, "pulse", "native"))) {
+            env.put("PULSE_SERVER", "unix:" + xdgRuntime + "/pulse/native");
+        }
         Process process = pb.start();
 
         ActiveSession session = new ActiveSession(
