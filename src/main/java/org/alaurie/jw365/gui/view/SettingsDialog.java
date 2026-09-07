@@ -15,11 +15,11 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import org.alaurie.jw365.auth.BrowserInfo;
 import org.alaurie.jw365.config.ClientConfig;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
@@ -30,7 +30,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Settings configuration dialog for FreeRDP parameters, display scaling, browser preferences, and Entra ID tenant preferences.
+ * Settings configuration dialog for FreeRDP parameters, display scaling, browser preferences,
+ * shared folder redirection, and Entra ID tenant preferences.
  */
 public final class SettingsDialog extends Stage {
 
@@ -45,6 +46,16 @@ public final class SettingsDialog extends Stage {
     private final CheckBox soundCheck;
     private final CheckBox micCheck;
     private final CheckBox ignoreCertCheck;
+    private final CheckBox clipboardCheck;
+    private final CheckBox dynamicResCheck;
+    private final CheckBox gfxProgressiveCheck;
+    private final CheckBox asyncUpdateCheck;
+    private final CheckBox autoReconnectCheck;
+
+    private final CheckBox shareFolderCheck;
+    private final TextField sharedFolderPathField;
+    private final CheckBox autoConnectCheck;
+
     private final TextField autoRefreshField;
     private final TextField extraArgsField;
 
@@ -54,8 +65,8 @@ public final class SettingsDialog extends Stage {
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
         setTitle("JW365 Settings");
-        setMinWidth(540);
-        setMinHeight(640);
+        setMinWidth(580);
+        setMinHeight(720);
 
         ClientConfig currentConfig = state.getConfigManager().get();
 
@@ -121,8 +132,8 @@ public final class SettingsDialog extends Stage {
         });
         customRdpBox.getChildren().addAll(customRdpPathField, browseBtn);
 
-        // 3. Display & Audio Section
-        Label displaySection = new Label("Display & Peripherals");
+        // 3. Display & Performance Section
+        Label displaySection = new Label("Display & Performance");
         displaySection.getStyleClass().add("brand-title");
 
         GridPane displayGrid = new GridPane();
@@ -144,6 +155,21 @@ public final class SettingsDialog extends Stage {
         multiMonCheck = new CheckBox("Use Multiple Monitors if available (/multimon)");
         multiMonCheck.setSelected(currentConfig.multiMonitor());
 
+        dynamicResCheck = new CheckBox("Dynamic Desktop Resizing (+dynamic-resolution)");
+        dynamicResCheck.setSelected(currentConfig.dynamicResolution());
+
+        gfxProgressiveCheck = new CheckBox("H.264 / RDP8 Progressive Graphics Acceleration (/gfx:progressive)");
+        gfxProgressiveCheck.setSelected(currentConfig.gfxProgressive());
+
+        asyncUpdateCheck = new CheckBox("Asynchronous Rendering & Network Channel I/O (+async-update)");
+        asyncUpdateCheck.setSelected(currentConfig.asyncUpdate());
+
+        autoReconnectCheck = new CheckBox("Automatic Reconnection on Network Interruption (+auto-reconnect)");
+        autoReconnectCheck.setSelected(currentConfig.autoReconnect());
+
+        clipboardCheck = new CheckBox("Bidirectional Clipboard Synchronization (+clipboard)");
+        clipboardCheck.setSelected(currentConfig.clipboard());
+
         soundCheck = new CheckBox("Redirect Audio Output (/sound:sys:pulse)");
         soundCheck.setSelected(currentConfig.sound());
 
@@ -153,9 +179,38 @@ public final class SettingsDialog extends Stage {
         ignoreCertCheck = new CheckBox("Ignore SSL Certificate Warnings (/cert:ignore)");
         ignoreCertCheck.setSelected(currentConfig.ignoreCert());
 
-        // 4. Advanced Section
-        Label advancedSection = new Label("Advanced & Automation");
+        // 4. Productivity & Shared Folders
+        Label folderSection = new Label("Shared Folders & File Exchange");
+        folderSection.getStyleClass().add("brand-title");
+
+        shareFolderCheck = new CheckBox("Redirect Local Folder into Cloud PC (\\\\tsclient\\Share)");
+        shareFolderCheck.setSelected(currentConfig.shareFolder());
+
+        HBox folderBox = new HBox(8);
+        sharedFolderPathField = new TextField(currentConfig.sharedFolderPath());
+        sharedFolderPathField.setPromptText("Path to local folder, e.g. /home/user/CloudPC-Share");
+        HBox.setHgrow(sharedFolderPathField, Priority.ALWAYS);
+        sharedFolderPathField.disableProperty().bind(shareFolderCheck.selectedProperty().not());
+
+        Button browseFolderBtn = new Button("Browse...");
+        browseFolderBtn.getStyleClass().add("btn-secondary");
+        browseFolderBtn.disableProperty().bind(shareFolderCheck.selectedProperty().not());
+        browseFolderBtn.setOnAction(e -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            chooser.setTitle("Select Local Folder to Share with Cloud PC");
+            File f = chooser.showDialog(this);
+            if (f != null) {
+                sharedFolderPathField.setText(f.getAbsolutePath());
+            }
+        });
+        folderBox.getChildren().addAll(sharedFolderPathField, browseFolderBtn);
+
+        // 5. Automation Section
+        Label advancedSection = new Label("Automation & Preferences");
         advancedSection.getStyleClass().add("brand-title");
+
+        autoConnectCheck = new CheckBox("Automatically connect to primary Cloud PC on launch");
+        autoConnectCheck.setSelected(currentConfig.autoConnect());
 
         GridPane advGrid = new GridPane();
         advGrid.setHgap(12);
@@ -181,9 +236,12 @@ public final class SettingsDialog extends Stage {
             new Separator(),
             rdpSection, detectedLabel, customRdpBox,
             new Separator(),
-            displaySection, displayGrid, fullscreenCheck, multiMonCheck, soundCheck, micCheck, ignoreCertCheck,
+            displaySection, displayGrid,
+            fullscreenCheck, multiMonCheck, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
             new Separator(),
-            advancedSection, advGrid
+            folderSection, shareFolderCheck, folderBox,
+            new Separator(),
+            advancedSection, autoConnectCheck, advGrid
         );
 
         ScrollPane scrollPane = new ScrollPane(contentBox);
@@ -207,7 +265,7 @@ public final class SettingsDialog extends Stage {
         buttonBar.getChildren().addAll(cancelBtn, saveBtn);
         root.setBottom(buttonBar);
 
-        Scene scene = new Scene(root, 560, 660);
+        Scene scene = new Scene(root, 620, 720);
         scene.getStylesheets().add(getClass().getResource("/org/alaurie/jw365/gui/styles.css").toExternalForm());
         setScene(scene);
     }
@@ -245,6 +303,14 @@ public final class SettingsDialog extends Stage {
             micCheck.isSelected(),
             multiMonCheck.isSelected(),
             ignoreCertCheck.isSelected(),
+            clipboardCheck.isSelected(),
+            dynamicResCheck.isSelected(),
+            gfxProgressiveCheck.isSelected(),
+            asyncUpdateCheck.isSelected(),
+            autoReconnectCheck.isSelected(),
+            shareFolderCheck.isSelected(),
+            sharedFolderPathField.getText().trim(),
+            autoConnectCheck.isSelected(),
             autoRefresh,
             extraArgs
         );

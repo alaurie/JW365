@@ -76,7 +76,7 @@ public final class AppState {
     private final ObjectProperty<Instant> lastSynced = new SimpleObjectProperty<>(null);
     private final ObjectProperty<FreeRdpInfo> detectedFreeRdp = new SimpleObjectProperty<>(null);
     private final ObjectProperty<BrowserInfo> detectedEdge = new SimpleObjectProperty<>(null);
-
+    private final java.util.concurrent.atomic.AtomicBoolean autoConnectTriggered = new java.util.concurrent.atomic.AtomicBoolean(false);
     private final Map<String, Image> iconMemoryCache = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "jw365-scheduler");
@@ -339,8 +339,18 @@ public final class AppState {
                     lastSynced.set(Instant.now());
                     int totalResources = newWorkspaces.stream().mapToInt(w -> w.resources().size()).sum();
                     setLoading(false, "Discovered " + totalResources + " resources across " + newWorkspaces.size() + " workspaces");
-                });
 
+                    // Startup auto-connect if configured and primary desktop is present
+                    if (config.autoConnect() && !autoConnectTriggered.getAndSet(true)) {
+                        List<WorkspaceResource> allDesktops = newWorkspaces.stream()
+                            .flatMap(w -> w.resources().stream())
+                            .filter(r -> r.type().isDesktop())
+                            .toList();
+                        if (allDesktops.size() == 1) {
+                            connectResource(allDesktops.get(0), null);
+                        }
+                    }
+                });
                 // 5. Pre-fetch icons in parallel
                 for (Workspace ws : newWorkspaces) {
                     for (WorkspaceResource res : ws.resources()) {
@@ -360,7 +370,18 @@ public final class AppState {
         });
     }
 
+    public enum DisplayMode {
+        DEFAULT,
+        FULLSCREEN,
+        WINDOWED,
+        MULTIMON
+    }
+
     public void connectResource(WorkspaceResource resource, Consumer<String> onError) {
+        connectResource(resource, DisplayMode.DEFAULT, onError);
+    }
+
+    public void connectResource(WorkspaceResource resource, DisplayMode displayMode, Consumer<String> onError) {
         Optional<FreeRdpInfo> rdpOpt = Optional.ofNullable(detectedFreeRdp.get());
         if (rdpOpt.isEmpty()) {
             if (onError != null) {
@@ -394,17 +415,29 @@ public final class AppState {
                 UserClaims claims = currentUser.get();
                 String username = claims != null ? claims.rdpUsername() : "";
 
+                DisplayMode effectiveMode = displayMode != null ? displayMode : DisplayMode.DEFAULT;
+                boolean fullscreen = (effectiveMode == DisplayMode.FULLSCREEN) || (effectiveMode == DisplayMode.DEFAULT && config.fullscreen());
+                boolean multiMon = (effectiveMode == DisplayMode.MULTIMON) || (effectiveMode == DisplayMode.DEFAULT && config.multiMonitor());
+                if (effectiveMode == DisplayMode.WINDOWED) {
+                    fullscreen = false;
+                }
+
                 RdpSessionConfig sessionConfig = new RdpSessionConfig(
                     rdpFilePath,
                     username,
-                    config.fullscreen(),
+                    fullscreen,
                     config.scalePercent(),
                     config.sound(),
                     config.microphone(),
-                    config.multiMonitor(),
+                    multiMon,
                     config.ignoreCert(),
                     config.clipboard(),
                     config.dynamicResolution(),
+                    config.gfxProgressive(),
+                    config.asyncUpdate(),
+                    config.autoReconnect(),
+                    config.shareFolder(),
+                    config.sharedFolderPath(),
                     config.extraArgs()
                 );
 
@@ -418,6 +451,18 @@ public final class AppState {
                     }
                 });
             }
+        });
+    }
+
+    public void restartResource(WorkspaceResource resource, Consumer<String> onError) {
+        if (resource == null) return;
+        disconnectResource(resource);
+        Thread.ofVirtual().name("jw365-restart-" + resource.sanitizedFileName()).start(() -> {
+            try {
+                Thread.sleep(600);
+            } catch (InterruptedException ignored) {
+            }
+            connectResource(resource, DisplayMode.DEFAULT, onError);
         });
     }
 

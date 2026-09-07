@@ -186,11 +186,29 @@ public final class ResourceCard extends VBox {
     private void setupContextMenu() {
         ContextMenu menu = new ContextMenu();
 
-        MenuItem connectItem = new MenuItem("Connect");
-        connectItem.setOnAction(e -> handleActionClick());
+        MenuItem connectDefault = new MenuItem("Connect");
+        connectDefault.setOnAction(e -> handleActionClick());
+
+        MenuItem connectFullscreen = new MenuItem("Connect (Fullscreen)");
+        connectFullscreen.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.FULLSCREEN, this::showError));
+
+        MenuItem connectWindowed = new MenuItem("Connect (Windowed)");
+        connectWindowed.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.WINDOWED, this::showError));
+
+        MenuItem connectMultiMon = new MenuItem("Connect (Multi-Monitor)");
+        connectMultiMon.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.MULTIMON, this::showError));
+
+        MenuItem restartItem = new MenuItem("Restart Session");
+        restartItem.setOnAction(e -> state.restartResource(resource, this::showError));
 
         MenuItem disconnectItem = new MenuItem("Disconnect");
         disconnectItem.setOnAction(e -> state.disconnectResource(resource));
+
+        MenuItem viewLogItem = new MenuItem("View Latest Session Log");
+        viewLogItem.setOnAction(e -> openLatestLog());
+
+        MenuItem openRdpItem = new MenuItem("Open .RDP File");
+        openRdpItem.setOnAction(e -> openRdpFile());
 
         MenuItem copyIdItem = new MenuItem("Copy Resource ID");
         copyIdItem.setOnAction(e -> {
@@ -199,7 +217,72 @@ public final class ResourceCard extends VBox {
             javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
         });
 
-        menu.getItems().addAll(connectItem, disconnectItem, copyIdItem);
+        menu.getItems().addAll(
+            connectDefault,
+            connectFullscreen,
+            connectWindowed,
+            connectMultiMon,
+            new javafx.scene.control.SeparatorMenuItem(),
+            restartItem,
+            disconnectItem,
+            new javafx.scene.control.SeparatorMenuItem(),
+            viewLogItem,
+            openRdpItem,
+            new javafx.scene.control.SeparatorMenuItem(),
+            copyIdItem
+        );
+
         setOnContextMenuRequested(e -> menu.show(this, e.getScreenX(), e.getScreenY()));
+    }
+
+    private void showError(String error) {
+        Platform.runLater(() -> {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.ERROR,
+                error,
+                javafx.scene.control.ButtonType.OK
+            );
+            alert.setHeaderText("Connection Error");
+            alert.setTitle("JW365");
+            alert.showAndWait();
+        });
+    }
+
+    private void openLatestLog() {
+        try {
+            java.nio.file.Path logDir = org.alaurie.jw365.config.XdgPaths.logsDir();
+            try (var stream = java.nio.file.Files.list(logDir)) {
+                java.util.Optional<java.nio.file.Path> latest = stream
+                    .filter(p -> p.getFileName().toString().contains(resource.sanitizedFileName()) && p.getFileName().toString().endsWith(".log"))
+                    .max(java.util.Comparator.comparingLong(p -> {
+                        try {
+                            return java.nio.file.Files.getLastModifiedTime(p).toMillis();
+                        } catch (Exception e) {
+                            return 0L;
+                        }
+                    }));
+
+                if (latest.isPresent() && java.awt.Desktop.isDesktopSupported()) {
+                    java.awt.Desktop.getDesktop().open(latest.get().toFile());
+                } else {
+                    showError("No session log found yet for this resource.");
+                }
+            }
+        } catch (Exception e) {
+            showError("Could not open session log: " + e.getMessage());
+        }
+    }
+
+    private void openRdpFile() {
+        try {
+            java.nio.file.Path rdpFile = org.alaurie.jw365.config.XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
+            if (java.nio.file.Files.exists(rdpFile) && java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().open(rdpFile.toFile());
+            } else {
+                showError("RDP file has not been downloaded yet. Connect first.");
+            }
+        } catch (Exception e) {
+            showError("Could not open RDP file: " + e.getMessage());
+        }
     }
 }

@@ -19,6 +19,11 @@ public record RdpSessionConfig(
     boolean ignoreCert,
     boolean clipboard,
     boolean dynamicResolution,
+    boolean gfxProgressive,
+    boolean asyncUpdate,
+    boolean autoReconnect,
+    boolean shareFolder,
+    String sharedFolderPath,
     List<String> extraArgs
 ) {
 
@@ -36,9 +41,25 @@ public record RdpSessionConfig(
         boolean microphone,
         boolean multiMonitor,
         boolean ignoreCert,
+        boolean clipboard,
+        boolean dynamicResolution,
         List<String> extraArgs
     ) {
-        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, true, true, extraArgs);
+        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, clipboard, dynamicResolution, true, true, true, false, null, extraArgs);
+    }
+
+    public RdpSessionConfig(
+        Path rdpFile,
+        String username,
+        boolean fullscreen,
+        int scalePercent,
+        boolean sound,
+        boolean microphone,
+        boolean multiMonitor,
+        boolean ignoreCert,
+        List<String> extraArgs
+    ) {
+        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, null, extraArgs);
     }
 
     public static RdpSessionConfig defaults(Path rdpFile, String username) {
@@ -53,6 +74,11 @@ public record RdpSessionConfig(
             true,
             true,
             true,
+            true,
+            true,
+            true,
+            false,
+            null,
             Collections.emptyList()
         );
     }

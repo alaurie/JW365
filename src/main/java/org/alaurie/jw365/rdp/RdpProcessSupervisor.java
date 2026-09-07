@@ -107,9 +107,41 @@ public final class RdpProcessSupervisor {
             cmd.add("+dynamic-resolution");
         }
 
+        // Network auto-optimization
+        cmd.add("/network:auto");
+
+        // Async updates and channel processing
+        if (config.asyncUpdate()) {
+            cmd.add("+async-update");
+            cmd.add("+async-channels");
+        }
+
+        // Automatic reconnection on network blips
+        if (config.autoReconnect()) {
+            cmd.add("+auto-reconnect");
+            cmd.add("/auto-reconnect-max-retries:10");
+        }
+
+        // H.264 / RDP8 progressive rendering pipeline
+        if (config.gfxProgressive()) {
+            cmd.add("/gfx:progressive");
+        }
+
+        // Shared folder redirection
+        if (config.shareFolder() && config.sharedFolderPath() != null && !config.sharedFolderPath().isBlank()) {
+            Path shareDir = Path.of(config.sharedFolderPath());
+            try {
+                if (!Files.exists(shareDir)) {
+                    Files.createDirectories(shareDir);
+                }
+                cmd.add("/drive:Share," + shareDir.toAbsolutePath());
+            } catch (Exception e) {
+                System.err.println("Warning: Could not create shared folder " + shareDir + ": " + e.getMessage());
+            }
+        }
+
         // Log level
         cmd.add("/log-level:info");
-
         // Custom extra arguments
         if (config.extraArgs() != null) {
             cmd.addAll(config.extraArgs());
