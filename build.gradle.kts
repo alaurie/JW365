@@ -25,7 +25,7 @@ java {
     }
 }
 javafx {
-    version = "25.0.2"
+    version = "26.0.2"
     modules = listOf("javafx.controls", "javafx.graphics", "javafx.web")
 }
 
