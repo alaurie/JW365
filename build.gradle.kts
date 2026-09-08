@@ -74,7 +74,7 @@ tasks.withType<JavaExec>().configureEach {
 val javaHome = javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
 val jpackageJvmOptions = jvmFlags.flatMap { listOf("--java-options", it) }
 val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
-val resourceDir = file("src/package/resources")
+val resourceDir = file("packaging")
 val inputDir = layout.buildDirectory.dir("install/jw365/lib")
 
 tasks.register<Exec>("createRuntimeImage") {
@@ -174,7 +174,7 @@ tasks.register<Exec>("packagePortableTar") {
             rename("icon.png", "jw365.png")
         }
         copy {
-            from("src/package/resources/install-desktop.sh")
+            from("packaging/install-desktop.sh")
             into(appDir)
         }
         file("${appDir.absolutePath}/bin/jw365").setExecutable(true)
