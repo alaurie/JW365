@@ -28,19 +28,21 @@ javafx {
     version = "25.0.4"
     modules = listOf("javafx.controls", "javafx.graphics", "javafx.web")
 }
+// JVM tuning flags — single source of truth for dev run, jpackage, and JavaExec tasks
+val jvmFlags = listOf(
+    "--enable-native-access=ALL-UNNAMED",
+    "-Xms24m",
+    "-Xmx192m",
+    "-XX:ReservedCodeCacheSize=64m",
+    "-XX:CICompilerCount=2",
+    "-XX:+UseSerialGC",
+    "-XX:MinHeapFreeRatio=10",
+    "-XX:MaxHeapFreeRatio=20"
+)
 
 application {
     mainClass.set("org.alaurie.jw365.gui.Jw365Main")
-    applicationDefaultJvmArgs = listOf(
-        "--enable-native-access=ALL-UNNAMED",
-        "-Xms24m",
-        "-Xmx192m",
-        "-XX:ReservedCodeCacheSize=64m",
-        "-XX:CICompilerCount=2",
-        "-XX:+UseSerialGC",
-        "-XX:MinHeapFreeRatio=10",
-        "-XX:MaxHeapFreeRatio=20"
-    )
+    applicationDefaultJvmArgs = jvmFlags
 }
 
 dependencies {
@@ -63,22 +65,17 @@ tasks.withType<Test> {
 
 tasks.withType<JavaExec>().configureEach {
     javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
-    jvmArgs = listOf(
-        "--enable-native-access=ALL-UNNAMED",
-        "-Xms24m",
-        "-Xmx192m",
-        "-XX:ReservedCodeCacheSize=64m",
-        "-XX:CICompilerCount=2",
-        "-XX:+UseSerialGC",
-        "-XX:MinHeapFreeRatio=10",
-        "-XX:MaxHeapFreeRatio=20"
-    )
+    jvmArgs = jvmFlags
 }
 // --------------------------------------------------------------------------
 // Packaging: jlink minimal runtime + jpackage .deb, .rpm & portable tarball
 // --------------------------------------------------------------------------
 
 val javaHome = javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
+val jpackageJvmOptions = jvmFlags.flatMap { listOf("--java-options", it) }
+val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
+val resourceDir = file("src/package/resources")
+val inputDir = layout.buildDirectory.dir("install/jw365/lib")
 
 tasks.register<Exec>("createRuntimeImage") {
     dependsOn("jar")
@@ -106,82 +103,62 @@ tasks.register<Exec>("packageDeb") {
     dependsOn("installDist", "createRuntimeImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
-    val inputDir = layout.buildDirectory.dir("install/jw365/lib").get().asFile
-    val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
-    val resourceDir = file("src/package/resources")
 
-    doFirst {
-        distDir.mkdirs()
-    }
+    doFirst { distDir.mkdirs() }
 
-    commandLine(
-        "$javaHome/bin/jpackage",
-        "--type", "deb",
-        "--dest", distDir.absolutePath,
-        "--name", "jw365",
-        "--app-version", cleanVersion,
-        "--vendor", "Alex Laurie",
-        "--description", "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
-        "--icon", iconFile.absolutePath,
-        "--resource-dir", resourceDir.absolutePath,
-        "--runtime-image", runtimeDir.absolutePath,
-        "--input", inputDir.absolutePath,
-        "--main-jar", "jw365-$cleanVersion.jar",
-        "--main-class", "org.alaurie.jw365.gui.Jw365Main",
-        "--linux-package-name", "jw365",
-        "--linux-app-category", "Network",
-        "--linux-shortcut",
-        "--linux-menu-group", "Network;",
-        "--linux-package-deps", "freerdp3-sdl | freerdp3-x11 | freerdp3-wayland",
-        "--java-options", "--enable-native-access=ALL-UNNAMED",
-        "--java-options", "-Xms24m",
-        "--java-options", "-Xmx192m",
-        "--java-options", "-XX:ReservedCodeCacheSize=64m",
-        "--java-options", "-XX:CICompilerCount=2",
-        "--java-options", "-XX:+UseSerialGC",
-        "--java-options", "-XX:MinHeapFreeRatio=10",
-        "--java-options", "-XX:MaxHeapFreeRatio=20"
-    )
+    commandLine(buildList {
+        addAll(listOf(
+            "$javaHome/bin/jpackage",
+            "--type", "deb",
+            "--dest", distDir.absolutePath,
+            "--name", "jw365",
+            "--app-version", cleanVersion,
+            "--vendor", "Alex Laurie",
+            "--description", "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
+            "--icon", iconFile.absolutePath,
+            "--resource-dir", resourceDir.absolutePath,
+            "--runtime-image", runtimeDir.absolutePath,
+            "--input", inputDir.get().asFile.absolutePath,
+            "--main-jar", "jw365-$cleanVersion.jar",
+            "--main-class", "org.alaurie.jw365.gui.Jw365Main",
+            "--linux-package-name", "jw365",
+            "--linux-app-category", "Network",
+            "--linux-shortcut",
+            "--linux-menu-group", "Network;",
+            "--linux-package-deps", "freerdp3-sdl | freerdp3-x11 | freerdp3-wayland"
+        ))
+        addAll(jpackageJvmOptions)
+    })
 }
 
 tasks.register<Exec>("packageAppImage") {
     dependsOn("installDist", "createRuntimeImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
-    val inputDir = layout.buildDirectory.dir("install/jw365/lib").get().asFile
-    val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
-    val resourceDir = file("src/package/resources")
 
     doFirst {
         val appImageDir = file("${distDir.absolutePath}/jw365")
-        if (appImageDir.exists()) {
-            appImageDir.deleteRecursively()
-        }
+        if (appImageDir.exists()) appImageDir.deleteRecursively()
         distDir.mkdirs()
     }
 
-    commandLine(
-        "$javaHome/bin/jpackage",
-        "--type", "app-image",
-        "--dest", distDir.absolutePath,
-        "--name", "jw365",
-        "--app-version", cleanVersion,
-        "--vendor", "Alex Laurie",
-        "--icon", iconFile.absolutePath,
-        "--resource-dir", resourceDir.absolutePath,
-        "--runtime-image", runtimeDir.absolutePath,
-        "--input", inputDir.absolutePath,
-        "--main-jar", "jw365-$cleanVersion.jar",
-        "--main-class", "org.alaurie.jw365.gui.Jw365Main",
-        "--java-options", "--enable-native-access=ALL-UNNAMED",
-        "--java-options", "-Xms24m",
-        "--java-options", "-Xmx192m",
-        "--java-options", "-XX:ReservedCodeCacheSize=64m",
-        "--java-options", "-XX:CICompilerCount=2",
-        "--java-options", "-XX:+UseSerialGC",
-        "--java-options", "-XX:MinHeapFreeRatio=10",
-        "--java-options", "-XX:MaxHeapFreeRatio=20"
-    )
+    commandLine(buildList {
+        addAll(listOf(
+            "$javaHome/bin/jpackage",
+            "--type", "app-image",
+            "--dest", distDir.absolutePath,
+            "--name", "jw365",
+            "--app-version", cleanVersion,
+            "--vendor", "Alex Laurie",
+            "--icon", iconFile.absolutePath,
+            "--resource-dir", resourceDir.absolutePath,
+            "--runtime-image", runtimeDir.absolutePath,
+            "--input", inputDir.get().asFile.absolutePath,
+            "--main-jar", "jw365-$cleanVersion.jar",
+            "--main-class", "org.alaurie.jw365.gui.Jw365Main"
+        ))
+        addAll(jpackageJvmOptions)
+    })
 }
 
 tasks.register<Exec>("packagePortableTar") {
@@ -218,50 +195,40 @@ tasks.register<Exec>("packageRpm") {
     dependsOn("installDist", "createRuntimeImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
-    val inputDir = layout.buildDirectory.dir("install/jw365/lib").get().asFile
-    val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
-    val resourceDir = file("src/package/resources")
 
     doFirst {
         val hasRpmBuild = File("/usr/bin/rpmbuild").exists() || File("/bin/rpmbuild").exists()
-        if (!hasRpmBuild) {
-            throw GradleException(
-                "Cannot build RPM package: 'rpmbuild' is not installed.\n" +
-                "To install on Debian/Ubuntu: sudo apt install rpm\n" +
-                "To install on Fedora/RHEL: sudo dnf install rpm-build"
-            )
-        }
+        if (!hasRpmBuild) throw GradleException(
+            "Cannot build RPM package: 'rpmbuild' is not installed.\n" +
+            "To install on Debian/Ubuntu: sudo apt install rpm\n" +
+            "To install on Fedora/RHEL: sudo dnf install rpm-build"
+        )
         distDir.mkdirs()
     }
 
-    commandLine(
-        "$javaHome/bin/jpackage",
-        "--type", "rpm",
-        "--dest", distDir.absolutePath,
-        "--name", "jw365",
-        "--app-version", cleanVersion,
-        "--vendor", "Alex Laurie",
-        "--description", "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
-        "--icon", iconFile.absolutePath,
-        "--resource-dir", resourceDir.absolutePath,
-        "--runtime-image", runtimeDir.absolutePath,
-        "--input", inputDir.absolutePath,
-        "--main-jar", "jw365-$cleanVersion.jar",
-        "--main-class", "org.alaurie.jw365.gui.Jw365Main",
-        "--linux-package-name", "jw365",
-        "--linux-app-category", "Network",
-        "--linux-shortcut",
-        "--linux-menu-group", "Network;",
-        "--linux-package-deps", "freerdp",
-        "--java-options", "--enable-native-access=ALL-UNNAMED",
-        "--java-options", "-Xms24m",
-        "--java-options", "-Xmx192m",
-        "--java-options", "-XX:ReservedCodeCacheSize=64m",
-        "--java-options", "-XX:CICompilerCount=2",
-        "--java-options", "-XX:+UseSerialGC",
-        "--java-options", "-XX:MinHeapFreeRatio=10",
-        "--java-options", "-XX:MaxHeapFreeRatio=20"
-    )
+    commandLine(buildList {
+        addAll(listOf(
+            "$javaHome/bin/jpackage",
+            "--type", "rpm",
+            "--dest", distDir.absolutePath,
+            "--name", "jw365",
+            "--app-version", cleanVersion,
+            "--vendor", "Alex Laurie",
+            "--description", "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
+            "--icon", iconFile.absolutePath,
+            "--resource-dir", resourceDir.absolutePath,
+            "--runtime-image", runtimeDir.absolutePath,
+            "--input", inputDir.get().asFile.absolutePath,
+            "--main-jar", "jw365-$cleanVersion.jar",
+            "--main-class", "org.alaurie.jw365.gui.Jw365Main",
+            "--linux-package-name", "jw365",
+            "--linux-app-category", "Network",
+            "--linux-shortcut",
+            "--linux-menu-group", "Network;",
+            "--linux-package-deps", "freerdp"
+        ))
+        addAll(jpackageJvmOptions)
+    })
 }
 
 tasks.register("rpm") {
