@@ -204,8 +204,8 @@ public final class OAuthClient {
                 }
 
                 JsonNode errorNode = mapper.readTree(response.body());
-                String error = errorNode.has("error") ? errorNode.get("error").textValue() : "unknown_error";
-                String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").textValue() : "";
+                String error = errorNode.has("error") ? errorNode.get("error").asString() : "unknown_error";
+                String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").asString() : "";
 
                 switch (error) {
                     case "authorization_pending" -> {
@@ -265,8 +265,8 @@ public final class OAuthClient {
             }
 
             JsonNode errorNode = mapper.readTree(response.body());
-            String error = errorNode.has("error") ? errorNode.get("error").textValue() : "http_" + response.statusCode();
-            String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").textValue() : response.body();
+            String error = errorNode.has("error") ? errorNode.get("error").asString() : "http_" + response.statusCode();
+            String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").asString() : response.body();
 
             return new AuthResult.Failure(error, errorDesc);
         } catch (Exception e) {

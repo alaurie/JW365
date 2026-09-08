@@ -76,7 +76,7 @@ public final class JwtClaimsParser {
             JsonNode rolesNode = root.get("roles");
             if (rolesNode != null && rolesNode.isArray()) {
                 for (JsonNode r : rolesNode) {
-                    roles.add(r.textValue());
+                    roles.add(r.asString());
                 }
             }
 
@@ -88,6 +88,6 @@ public final class JwtClaimsParser {
 
     private static String textOrNull(JsonNode node, String fieldName) {
         JsonNode f = node.get(fieldName);
-        return (f != null && !f.isNull()) ? f.textValue() : null;
+        return (f != null && !f.isNull()) ? f.asString() : null;
     }
 }
