@@ -22,6 +22,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class XdgAndConfigTest {
 
     @Test
+    @DisplayName("AppVersion loads non-empty application version string")
+    void testAppVersionLoads() {
+        assertThat(AppVersion.VERSION).isNotBlank();
+        assertThat(AppVersion.VERSION).matches("\\d+\\.\\d+\\.\\d+.*");
+    }
+
+    @Test
     @DisplayName("ConfigManager saves and loads ClientConfig JSON")
     void testConfigManagerSaveAndLoad(@TempDir Path tempDir) throws IOException {
         Path configFile = tempDir.resolve("config.json");

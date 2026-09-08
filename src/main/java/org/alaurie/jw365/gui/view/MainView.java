@@ -16,11 +16,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import org.alaurie.jw365.auth.UserClaims;
+import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -57,6 +57,8 @@ public final class MainView extends BorderPane {
         Label brandBadge = new Label("Cloud PC");
         brandBadge.getStyleClass().add("brand-badge");
 
+        Label versionBadge = new Label("v" + AppVersion.VERSION);
+        versionBadge.getStyleClass().add("version-badge");
         searchField = new TextField();
         searchField.getStyleClass().add("search-field");
         searchField.setPromptText("Search Cloud PCs and Apps...");
@@ -94,6 +96,7 @@ public final class MainView extends BorderPane {
         headerBar.getChildren().addAll(
             brandTitle,
             brandBadge,
+            versionBadge,
             searchField,
             refreshBtn,
             refreshIndicator,
@@ -134,7 +137,11 @@ public final class MainView extends BorderPane {
         lastSyncedLabel = new Label("Not synced");
         lastSyncedLabel.getStyleClass().add("status-bar-text");
 
+        Label appVersionLabel = new Label("v" + AppVersion.VERSION);
+        appVersionLabel.getStyleClass().add("status-bar-text");
+
         statusBar.getChildren().addAll(
+            appVersionLabel,
             resourceCountLabel,
             statusMessageLabel,
             footerSpacer,

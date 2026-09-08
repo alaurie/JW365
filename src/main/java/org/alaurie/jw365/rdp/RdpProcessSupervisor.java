@@ -194,13 +194,21 @@ public final class RdpProcessSupervisor {
         // Pass through Wayland and X11 display environment
         Map<String, String> env = pb.environment();
         String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
-        if (waylandDisplay != null && !waylandDisplay.isBlank()) {
-            env.put("WAYLAND_DISPLAY", waylandDisplay);
-            env.put("SDL_VIDEODRIVER", "wayland,x11");
-        }
         String display = System.getenv("DISPLAY");
         if (display != null && !display.isBlank()) {
             env.put("DISPLAY", display);
+        }
+        if (waylandDisplay != null && !waylandDisplay.isBlank()) {
+            env.put("WAYLAND_DISPLAY", waylandDisplay);
+            if (config.multiMonitor() && display != null && !display.isBlank()) {
+                // FreeRDP SDL client implements multi-monitor via borderless positioned windows at (x, y).
+                // Under native Wayland, compositors (Mutter/GNOME) ignore client-side (x, y) window coordinates,
+                // causing all windows to collapse onto the primary display.
+                // Routing SDL through X11/XWayland honors absolute monitor geometry across all screens.
+                env.put("SDL_VIDEODRIVER", "x11");
+            } else {
+                env.put("SDL_VIDEODRIVER", "wayland,x11");
+            }
         }
         String xdgRuntime = System.getenv("XDG_RUNTIME_DIR");
         if (xdgRuntime != null && !xdgRuntime.isBlank()) {

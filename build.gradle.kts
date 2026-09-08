@@ -5,7 +5,7 @@ plugins {
 
 val rawVersion: String = (project.findProperty("appVersion") as? String)
     ?: System.getenv("APP_VERSION")
-    ?: "1.0.0"
+    ?: "0.2.1"
 
 val cleanVersion: String = rawVersion.removePrefix("v").trim()
 
@@ -58,9 +58,14 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.addAll(listOf("-Xlint:all", "-parameters"))
 }
-
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+tasks.named<ProcessResources>("processResources") {
+    filesMatching("**/version.properties") {
+        expand(mapOf("version" to cleanVersion))
+    }
 }
 
 tasks.named<CreateStartScripts>("startScripts") {

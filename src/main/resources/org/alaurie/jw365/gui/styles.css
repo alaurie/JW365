@@ -60,6 +60,17 @@
     -fx-padding: 2 6 2 6;
 }
 
+.version-badge {
+    -fx-background-color: #ffffff10;
+    -fx-border-color: #ffffff20;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-text-fill: -color-text-muted;
+    -fx-font-size: 11px;
+    -fx-font-weight: normal;
+    -fx-padding: 2 6 2 6;
+}
+
 /* Search Bar */
 .search-field {
     -fx-background-color: -color-bg-card;

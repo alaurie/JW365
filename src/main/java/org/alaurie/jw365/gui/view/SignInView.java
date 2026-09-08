@@ -7,8 +7,8 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.gui.state.AppState;
-
 /**
  * Landing view presented when no active user session is authenticated.
  */
@@ -76,12 +76,16 @@ public final class SignInView extends StackPane {
         HBox statusBox = new HBox(8, progressIndicator, statusLabel);
         statusBox.setAlignment(Pos.CENTER);
 
+        Label versionLabel = new Label("JW365 v" + AppVersion.VERSION);
+        versionLabel.getStyleClass().add("status-bar-text");
+        versionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: -color-text-muted;");
+
         card.getChildren().addAll(
             headerBox,
             signInBtn,
             settingsBtn,
-            statusBox
+            statusBox,
+            versionLabel
         );
-        getChildren().add(card);
     }
 }

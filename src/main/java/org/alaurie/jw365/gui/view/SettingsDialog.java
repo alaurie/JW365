@@ -19,10 +19,10 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.config.ClientConfig;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,7 +61,7 @@ public final class SettingsDialog extends Stage {
 
         initOwner(owner);
         initModality(Modality.WINDOW_MODAL);
-        setTitle("JW365 Settings");
+        setTitle("JW365 Settings (v" + AppVersion.VERSION + ")");
         setMinWidth(580);
         setMinHeight(680);
 
@@ -220,8 +220,12 @@ public final class SettingsDialog extends Stage {
 
         // Bottom Action Buttons
         HBox buttonBar = new HBox(12);
-        buttonBar.setAlignment(Pos.CENTER_RIGHT);
+        buttonBar.setAlignment(Pos.CENTER_LEFT);
         buttonBar.setPadding(new Insets(12, 16, 12, 16));
+
+        Label versionInfo = new Label("JW365 Client v" + AppVersion.VERSION);
+        versionInfo.getStyleClass().add("status-bar-text");
+        HBox.setHgrow(versionInfo, Priority.ALWAYS);
 
         Button cancelBtn = new Button("Cancel");
         cancelBtn.getStyleClass().add("btn-secondary");
@@ -231,7 +235,7 @@ public final class SettingsDialog extends Stage {
         saveBtn.getStyleClass().add("btn-primary");
         saveBtn.setOnAction(e -> handleSave());
 
-        buttonBar.getChildren().addAll(cancelBtn, saveBtn);
+        buttonBar.getChildren().addAll(versionInfo, cancelBtn, saveBtn);
         root.setBottom(buttonBar);
 
         Scene scene = new Scene(root, 600, 700);
