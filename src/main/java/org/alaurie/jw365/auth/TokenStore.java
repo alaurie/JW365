@@ -1,7 +1,8 @@
 package org.alaurie.jw365.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.SerializationFeature;
 import org.alaurie.jw365.config.XdgPaths;
 
 import java.io.File;
@@ -22,8 +23,9 @@ import java.util.concurrent.TimeUnit;
  */
 public final class TokenStore {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-        .enable(SerializationFeature.INDENT_OUTPUT);
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .build();
 
     private final Path tokenFile;
     private final Path encryptedFile;

@@ -1,7 +1,7 @@
 package org.alaurie.jw365.auth;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -76,7 +76,7 @@ public final class JwtClaimsParser {
             JsonNode rolesNode = root.get("roles");
             if (rolesNode != null && rolesNode.isArray()) {
                 for (JsonNode r : rolesNode) {
-                    roles.add(r.asText());
+                    roles.add(r.textValue());
                 }
             }
 
@@ -88,6 +88,6 @@ public final class JwtClaimsParser {
 
     private static String textOrNull(JsonNode node, String fieldName) {
         JsonNode f = node.get(fieldName);
-        return (f != null && !f.isNull()) ? f.asText() : null;
+        return (f != null && !f.isNull()) ? f.textValue() : null;
     }
 }

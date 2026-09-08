@@ -1,7 +1,8 @@
 package org.alaurie.jw365.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.SerializationFeature;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,8 +16,9 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class ConfigManager {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-        .enable(SerializationFeature.INDENT_OUTPUT);
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .build();
 
     private final Path configFile;
     private final AtomicReference<ClientConfig> cachedConfig = new AtomicReference<>();

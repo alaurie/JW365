@@ -1,8 +1,9 @@
 package org.alaurie.jw365.config;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.SerializationFeature;
 import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceResource;
 
@@ -19,8 +20,9 @@ import java.util.Optional;
  */
 public final class WorkspaceCache {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-        .enable(SerializationFeature.INDENT_OUTPUT);
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .build();
 
     private final Path cacheFile;
     private final Path iconsDirectory;

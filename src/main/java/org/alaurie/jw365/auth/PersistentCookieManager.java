@@ -1,8 +1,9 @@
 package org.alaurie.jw365.auth;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.SerializationFeature;
 import org.alaurie.jw365.config.XdgPaths;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ import java.util.List;
  */
 public final class PersistentCookieManager extends CookieManager {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    private static final ObjectMapper MAPPER = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
     private final Path storageFile;
 
     public PersistentCookieManager() {

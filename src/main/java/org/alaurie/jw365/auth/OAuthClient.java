@@ -1,7 +1,7 @@
 package org.alaurie.jw365.auth;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
@@ -204,8 +204,8 @@ public final class OAuthClient {
                 }
 
                 JsonNode errorNode = mapper.readTree(response.body());
-                String error = errorNode.has("error") ? errorNode.get("error").asText() : "unknown_error";
-                String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").asText() : "";
+                String error = errorNode.has("error") ? errorNode.get("error").textValue() : "unknown_error";
+                String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").textValue() : "";
 
                 switch (error) {
                     case "authorization_pending" -> {
@@ -265,8 +265,8 @@ public final class OAuthClient {
             }
 
             JsonNode errorNode = mapper.readTree(response.body());
-            String error = errorNode.has("error") ? errorNode.get("error").asText() : "http_" + response.statusCode();
-            String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").asText() : response.body();
+            String error = errorNode.has("error") ? errorNode.get("error").textValue() : "http_" + response.statusCode();
+            String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").textValue() : response.body();
 
             return new AuthResult.Failure(error, errorDesc);
         } catch (Exception e) {
