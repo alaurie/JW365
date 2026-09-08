@@ -17,7 +17,7 @@ repositories {
 }
 
 val targetJavaVersion = (project.findProperty("javaVersion") as? String)?.toIntOrNull()
-    ?: 26
+    ?: 25
 
 java {
     toolchain {
@@ -25,7 +25,7 @@ java {
     }
 }
 javafx {
-    version = "26.0.2"
+    version = "25.0.4"
     modules = listOf("javafx.controls", "javafx.graphics", "javafx.web")
 }
 

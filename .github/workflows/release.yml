@@ -30,10 +30,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot dpkg-dev rpm
 
-      - name: Set up Oracle GraalVM / JDK 26
+      - name: Set up Oracle GraalVM / JDK 25
         uses: actions/setup-java@v6
         with:
-          java-version: '26'
+          java-version: '25'
           distribution: 'oracle'
           cache: 'gradle'
 
