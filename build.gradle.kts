@@ -17,7 +17,7 @@ repositories {
 }
 
 val targetJavaVersion = (project.findProperty("javaVersion") as? String)?.toIntOrNull()
-    ?: 25
+    ?: 26
 
 java {
     toolchain {
