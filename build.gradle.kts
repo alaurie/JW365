@@ -1,6 +1,6 @@
 plugins {
     application
-    id("org.openjfx.javafxplugin") version "0.1.0"
+    id("org.openjfx.javafxplugin")
 }
 
 val rawVersion: String = (project.findProperty("appVersion") as? String)
@@ -61,6 +61,10 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+tasks.named<CreateStartScripts>("startScripts") {
+    doLast { windowsScript.delete() }
 }
 
 tasks.withType<JavaExec>().configureEach {
