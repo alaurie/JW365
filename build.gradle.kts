@@ -16,12 +16,14 @@ repositories {
     mavenCentral()
 }
 
+val targetJavaVersion = (project.findProperty("javaVersion") as? String)?.toIntOrNull()
+    ?: 25
+
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(targetJavaVersion))
     }
 }
-
 javafx {
     version = "25.0.2"
     modules = listOf("javafx.controls", "javafx.graphics", "javafx.web")
@@ -60,6 +62,19 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.withType<JavaExec>().configureEach {
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
+    jvmArgs = listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "-Xms24m",
+        "-Xmx192m",
+        "-XX:ReservedCodeCacheSize=64m",
+        "-XX:CICompilerCount=2",
+        "-XX:+UseSerialGC",
+        "-XX:MinHeapFreeRatio=10",
+        "-XX:MaxHeapFreeRatio=20"
+    )
+}
 // --------------------------------------------------------------------------
 // Packaging: jlink minimal runtime + jpackage .deb, .rpm & portable tarball
 // --------------------------------------------------------------------------
