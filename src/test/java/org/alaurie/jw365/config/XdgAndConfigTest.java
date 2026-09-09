@@ -5,6 +5,7 @@ import org.alaurie.jw365.auth.TokenStore;
 import org.alaurie.jw365.feed.ResourceType;
 import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceResource;
+import org.alaurie.jw365.rdp.FreeRdpSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,7 +36,8 @@ class XdgAndConfigTest {
 
         ClientConfig initial = manager.get();
         assertThat(initial.defaultTenant()).isEqualTo("organizations");
-        assertThat(initial.freerdpSource()).isEqualTo("AUTO");
+        assertThat(initial.freerdpSource()).isEqualTo(FreeRdpSource.AUTO);
+        assertThat(initial.autoConnect()).isFalse();
 
         ClientConfig custom = new ClientConfig(
             "custom-tenant-uuid",
@@ -57,7 +59,7 @@ class XdgAndConfigTest {
         ClientConfig loaded = reloadedManager.load();
 
         assertThat(loaded.defaultTenant()).isEqualTo("custom-tenant-uuid");
-        assertThat(loaded.freerdpSource()).isEqualTo("AUTO");
+        assertThat(loaded.freerdpSource()).isEqualTo(FreeRdpSource.AUTO);
         assertThat(loaded.preferredFreeRdpPath()).isEqualTo("/usr/bin/sdl-freerdp");
         assertThat(loaded.scalePercent()).isEqualTo(150);
         assertThat(loaded.fullscreen()).isTrue();

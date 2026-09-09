@@ -144,7 +144,8 @@ public final class AppState {
     public void initialize() {
         // 1. Locate FreeRDP and Edge Browser
         ClientConfig config = configManager.get();
-        Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(config.freerdpSource(), config.preferredFreeRdpPath());
+        String source = XdgPaths.isFlatpak() ? "BUNDLED" : config.freerdpSource().name();
+        Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(source, config.preferredFreeRdpPath());
         runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
 
         Optional<BrowserInfo> edgeInfo = BrowserLocator.findEdge();
@@ -233,7 +234,7 @@ public final class AppState {
     }
 
     /**
-     * Performs zero-copy Single Sign-On using Microsoft Edge or system browser via localhost loopback callback.
+     * Performs browser sign-in through a localhost loopback callback.
      */
     public void signInWithBrowser(BrowserInfo browser, Runnable onSuccess, Consumer<String> onError) {
         setLoading(true, "Opening " + (browser != null ? browser.displayName() : "browser") + " for sign-in...");
@@ -529,7 +530,8 @@ public final class AppState {
     public void updateConfig(ClientConfig newConfig) {
         try {
             configManager.save(newConfig);
-            Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(newConfig.freerdpSource(), newConfig.preferredFreeRdpPath());
+            String source = XdgPaths.isFlatpak() ? "BUNDLED" : newConfig.freerdpSource().name();
+            Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(source, newConfig.preferredFreeRdpPath());
             runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
         } catch (IOException e) {
             System.err.println("Warning: Failed to save config: " + e.getMessage());
@@ -606,7 +608,7 @@ public final class AppState {
                 Platform.runLater(action);
             }
         } catch (IllegalStateException ignored) {
-            action.run();
+            // JavaFX toolkit is shutting down; discard late UI work.
         }
     }
 }

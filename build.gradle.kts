@@ -13,6 +13,7 @@ group = "org.alaurie"
 version = cleanVersion
 
 repositories {
+    maven { url = uri("offline-repository") }
     mavenCentral()
 }
 

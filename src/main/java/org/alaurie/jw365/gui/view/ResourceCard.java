@@ -22,7 +22,7 @@ import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.rdp.SessionStatus;
 
 /**
- * Modern visual tile representing an individual Cloud PC or RemoteApp in the workspace grid.
+ * Visual tile for a Cloud PC or RemoteApp workspace resource.
  */
 public final class ResourceCard extends VBox {
 

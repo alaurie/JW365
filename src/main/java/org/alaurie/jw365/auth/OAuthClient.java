@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * High-performance modern HTTP client for Entra ID (Azure AD) OAuth 2.0 authentication.
+ * HTTP client for Entra ID OAuth 2.0 authentication.
  */
 public final class OAuthClient {
 

@@ -1,0 +1,242 @@
+[
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+    "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+    "dest": "offline-repository/com/google/code/findbugs/jsr305/3.0.2"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.pom",
+    "sha256": "19889dbdf1b254b2601a5ee645b8147a974644882297684c798afe5d63d78dfe",
+    "dest": "offline-repository/com/google/code/findbugs/jsr305/3.0.2"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/com/google/gradle/osdetector-gradle-plugin/1.7.3/osdetector-gradle-plugin-1.7.3.jar",
+    "sha256": "6b4692f913a21b1fb603169ee78ba8f3e4ab2af9d762af9ca88b79126c1c0ad1",
+    "dest": "offline-repository/com/google/gradle/osdetector-gradle-plugin/1.7.3"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/com/google/gradle/osdetector-gradle-plugin/1.7.3/osdetector-gradle-plugin-1.7.3.pom",
+    "sha256": "8460c950127ca3598766161e38b4ff8d63b4d69fb8310a16e00b351350010c11",
+    "dest": "offline-repository/com/google/gradle/osdetector-gradle-plugin/1.7.3"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/kr/motd/maven/os-maven-plugin/1.7.1/os-maven-plugin-1.7.1.jar",
+    "sha256": "f47aeef86821e52b2b18758978bd045f03d722292e32e747082122c6228952e0",
+    "dest": "offline-repository/kr/motd/maven/os-maven-plugin/1.7.1"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/kr/motd/maven/os-maven-plugin/1.7.1/os-maven-plugin-1.7.1.pom",
+    "sha256": "4b758004422b9633dd318f29e784f1d180bd8a5920cd50af1930861f6d6a5476",
+    "dest": "offline-repository/kr/motd/maven/os-maven-plugin/1.7.1"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/org/openjfx/javafx-plugin/0.1.0/javafx-plugin-0.1.0.jar",
+    "sha256": "5eaeec0799b440646b0ca4cfda219a32db6be2ba5792d032a0da4a3a5c388fab",
+    "dest": "offline-repository/org/openjfx/javafx-plugin/0.1.0"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/org/openjfx/javafx-plugin/0.1.0/javafx-plugin-0.1.0.module",
+    "sha256": "adffb7440d249ed17c049383d67069f9453b17782770c005b682a43416d83661",
+    "dest": "offline-repository/org/openjfx/javafx-plugin/0.1.0"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/org/openjfx/javafx-plugin/0.1.0/javafx-plugin-0.1.0.pom",
+    "sha256": "34c8df5527eb5a35e5f009a3cde1f7a089c4ce4a0e725802f2ecbe503bbd3cb6",
+    "dest": "offline-repository/org/openjfx/javafx-plugin/0.1.0"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/org/openjfx/javafxplugin/org.openjfx.javafxplugin.gradle.plugin/0.1.0/org.openjfx.javafxplugin.gradle.plugin-0.1.0.pom",
+    "sha256": "d6d0127ff4363d00173c357a981c9e73eff03c30a5d0e86ad82b6054faefa841",
+    "dest": "offline-repository/org/openjfx/javafxplugin/org.openjfx.javafxplugin.gradle.plugin/0.1.0"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/org/sonatype/oss/oss-parent/7/oss-parent-7.pom",
+    "sha256": "b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454",
+    "dest": "offline-repository/org/sonatype/oss/oss-parent/7"
+  },
+  {
+    "type": "file",
+    "url": "https://plugins.gradle.org/m2/org/sonatype/oss/oss-parent/9/oss-parent-9.pom",
+    "sha256": "fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a",
+    "dest": "offline-repository/org/sonatype/oss/oss-parent/9"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+    "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
+    "dest": "offline-repository/com/fasterxml/jackson/core/jackson-annotations/2.22"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.module",
+    "sha256": "3d22704448e98dfd578c5df5646dd0a98aec04080b08a3245cf8beb8a25dcb5d",
+    "dest": "offline-repository/com/fasterxml/jackson/core/jackson-annotations/2.22"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.pom",
+    "sha256": "38c3ba52a0eade3e3eacc5b13499d56e1038ccbad8ec4bb79426dc21432b46d0",
+    "dest": "offline-repository/com/fasterxml/jackson/core/jackson-annotations/2.22"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/jackson-parent/2.22/jackson-parent-2.22.pom",
+    "sha256": "7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129",
+    "dest": "offline-repository/com/fasterxml/jackson/jackson-parent/2.22"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/fasterxml/oss-parent/79/oss-parent-79.pom",
+    "sha256": "9206b7dd67fb138036576c3dfca947a2a8f3e2c4d2d9c1f2d1dea519b3a4dae1",
+    "dest": "offline-repository/com/fasterxml/oss-parent/79"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/6.0.3/junit-bom-6.0.3.module",
+    "sha256": "280e3c34855f2a13de24121937e4cf97e4b9eb9206e60f891e4f0a1cf0e7aba1",
+    "dest": "offline-repository/org/junit/junit-bom/6.0.3"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/6.0.3/junit-bom-6.0.3.pom",
+    "sha256": "a655b6a5dc00d1bebc91fb2b15c0c7e8aeac9d6bdcf879595505370e27530287",
+    "dest": "offline-repository/org/junit/junit-bom/6.0.3"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-base/25.0.4/javafx-base-25.0.4-linux.jar",
+    "sha256": "c4fdfd2b5845edbcaa83928a85fb38dd4c63a337229728fac36d2b6c816763a6",
+    "dest": "offline-repository/org/openjfx/javafx-base/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-base/25.0.4/javafx-base-25.0.4.pom",
+    "sha256": "404ff8dfe30aa82c50001fe7a2b0f8522e46b1b3f2eaa3fdd747e335e00b2023",
+    "dest": "offline-repository/org/openjfx/javafx-base/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-controls/25.0.4/javafx-controls-25.0.4-linux.jar",
+    "sha256": "cb95588636cda9dcc561779f74e41e52c83161f2aeba20c6a9f776423f538a70",
+    "dest": "offline-repository/org/openjfx/javafx-controls/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-controls/25.0.4/javafx-controls-25.0.4.pom",
+    "sha256": "d5f2ce7454974fb19e82f1bc5b8c9f3cafb8200672678f95ca01d23a41087b60",
+    "dest": "offline-repository/org/openjfx/javafx-controls/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-graphics/25.0.4/javafx-graphics-25.0.4-linux.jar",
+    "sha256": "7104d131b2bcc65585bb62b471171aae5804ad65a50b64f16a2ed7d5f390024c",
+    "dest": "offline-repository/org/openjfx/javafx-graphics/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-graphics/25.0.4/javafx-graphics-25.0.4.pom",
+    "sha256": "f587675d6a2bddeec0a5eb4b0e47e7814d86d255da3b1b5b93cd6fd01cf64214",
+    "dest": "offline-repository/org/openjfx/javafx-graphics/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-media/25.0.4/javafx-media-25.0.4-linux.jar",
+    "sha256": "5f342db118a6df9be1a06fbca52dda8caf605c5e4e5b36fcf378903c84d173e8",
+    "dest": "offline-repository/org/openjfx/javafx-media/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-media/25.0.4/javafx-media-25.0.4.pom",
+    "sha256": "3974fb7f133ab8d1f977c9206f5c667f152a26158b5916eaebcbe0ae8114a2ef",
+    "dest": "offline-repository/org/openjfx/javafx-media/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-web/25.0.4/javafx-web-25.0.4-linux.jar",
+    "sha256": "2ac56686b23a99ce73ca06ff16e8464020cf8939178cd1598262019c75f8663c",
+    "dest": "offline-repository/org/openjfx/javafx-web/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-web/25.0.4/javafx-web-25.0.4.pom",
+    "sha256": "366c794bb9586bf6d4438523ec7ee1f030693d1c19eb1c6503f64ae22815743a",
+    "dest": "offline-repository/org/openjfx/javafx-web/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx/25.0.4/javafx-25.0.4.pom",
+    "sha256": "98e6d0ae231917502fb53394c90957a17629e02c9905d4f0ce3ced98369b26de",
+    "dest": "offline-repository/org/openjfx/javafx/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/jdk-jsobject/25.0.4/jdk-jsobject-25.0.4.jar",
+    "sha256": "23aefc0cd449e704eaa0222d861301fcb9d1743668173b7f8f40931c7509f6d2",
+    "dest": "offline-repository/org/openjfx/jdk-jsobject/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/openjfx/jdk-jsobject/25.0.4/jdk-jsobject-25.0.4.pom",
+    "sha256": "dae3968c543b663d1ec1eae1b3cfa3dbd40131f106c38508aee7efd67ffdb2e7",
+    "dest": "offline-repository/org/openjfx/jdk-jsobject/25.0.4"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.jar",
+    "sha256": "93d9090b8c505b2f942ad85dd5821e8c401bfbafafff11708a3fbe2ef9da18ca",
+    "dest": "offline-repository/tools/jackson/core/jackson-core/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.module",
+    "sha256": "c4eccda67893e0c62cb49385b6bb5b13f5c68cdeeeec935cdda23f7f3e38a6e2",
+    "dest": "offline-repository/tools/jackson/core/jackson-core/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-core/3.2.2/jackson-core-3.2.2.pom",
+    "sha256": "32f6e0acf6c798c8ba5101d73fe5401b5c20f435779241134a99fe9f2cc29632",
+    "dest": "offline-repository/tools/jackson/core/jackson-core/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.jar",
+    "sha256": "d27509f990d990fc779a01f3f612005ff6c67dc3bb0a720f5f4d9b2f5c713401",
+    "dest": "offline-repository/tools/jackson/core/jackson-databind/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.module",
+    "sha256": "2e56bc4186ad7f0f8b9b641aac7a57dedac6d399da0ab4d4e8ce68408ae9a0a0",
+    "dest": "offline-repository/tools/jackson/core/jackson-databind/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-databind/3.2.2/jackson-databind-3.2.2.pom",
+    "sha256": "afb706b09466b4308c449c944497818eea8ef9cdc012ca2e5a8d466709aab296",
+    "dest": "offline-repository/tools/jackson/core/jackson-databind/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/jackson-base/3.2.2/jackson-base-3.2.2.pom",
+    "sha256": "4e4daa8acdcc2b445575f8fd064058e642f218cb5d4de35f099854f4ba147864",
+    "dest": "offline-repository/tools/jackson/jackson-base/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/tools/jackson/jackson-bom/3.2.2/jackson-bom-3.2.2.pom",
+    "sha256": "1d6ca81311534231b34da71f0c8b2b08b0888333069d56edb05b9c5c00f51c29",
+    "dest": "offline-repository/tools/jackson/jackson-bom/3.2.2"
+  }
+]

@@ -3,6 +3,7 @@ package org.alaurie.jw365.config;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.alaurie.jw365.auth.OAuthClient;
+import org.alaurie.jw365.rdp.FreeRdpSource;
 
 import java.util.Collections;
 import java.util.List;
@@ -13,7 +14,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ClientConfig(
     @JsonProperty("defaultTenant") String defaultTenant,
-    @JsonProperty("freerdpSource") String freerdpSource,
+    @JsonProperty("freerdpSource") FreeRdpSource freerdpSource,
     @JsonProperty("preferredFreeRdpPath") String preferredFreeRdpPath,
     @JsonProperty("preferredBrowser") String preferredBrowser,
     @JsonProperty("scalePercent") int scalePercent,
@@ -38,10 +39,7 @@ public record ClientConfig(
         if (defaultTenant == null || defaultTenant.isBlank()) {
             defaultTenant = OAuthClient.DEFAULT_TENANT;
         }
-        freerdpSource = freerdpSource == null || freerdpSource.isBlank() ? "AUTO" : freerdpSource.toUpperCase();
-        if (!freerdpSource.equals("AUTO") && !freerdpSource.equals("SYSTEM") && !freerdpSource.equals("FLATPAK") && !freerdpSource.equals("CUSTOM")) {
-            freerdpSource = "AUTO";
-        }
+        freerdpSource = freerdpSource == null ? FreeRdpSource.AUTO : freerdpSource;
         if (autoRefreshMinutes <= 0) {
             autoRefreshMinutes = 15;
         }
@@ -61,13 +59,13 @@ public record ClientConfig(
         int autoRefreshMinutes,
         List<String> extraArgs
     ) {
-        this(defaultTenant, "AUTO", preferredFreeRdpPath, preferredBrowser, scalePercent, fullscreen, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, false, false, autoRefreshMinutes, extraArgs);
+        this(defaultTenant, FreeRdpSource.AUTO, preferredFreeRdpPath, preferredBrowser, scalePercent, fullscreen, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, false, false, autoRefreshMinutes, extraArgs);
     }
 
     public static ClientConfig defaultConfig() {
         return new ClientConfig(
             OAuthClient.DEFAULT_TENANT,
-            "AUTO",
+            FreeRdpSource.AUTO,
             null,
             null,
             0,
@@ -81,11 +79,22 @@ public record ClientConfig(
             true,
             true,
             true,
-            true,
+            false,
             false,
             false,
             15,
             Collections.emptyList()
         );
     }
+    public DisplaySettings displaySettings() {
+        return new DisplaySettings(fullscreen, multiMonitor, scalePercent, dynamicResolution);
+    }
+
+    public RedirectionSettings redirectionSettings() {
+        return new RedirectionSettings(sound, microphone, clipboard, usbRedirection, smartcard);
+    }
+
+    public record DisplaySettings(boolean fullscreen, boolean multiMonitor, int scalePercent, boolean dynamicResolution) {}
+
+    public record RedirectionSettings(boolean sound, boolean microphone, boolean clipboard, boolean usb, boolean smartcard) {}
 }

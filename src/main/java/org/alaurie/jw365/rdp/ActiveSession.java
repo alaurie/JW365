@@ -91,7 +91,6 @@ public final class ActiveSession {
      */
     public void stop() {
         userInitiatedStop.set(true);
-        setStatus(SessionStatus.DISCONNECTED);
         if (!process.isAlive()) {
             return;
         }

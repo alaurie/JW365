@@ -87,5 +87,6 @@ public final class SignInView extends StackPane {
             statusBox,
             versionLabel
         );
+        getChildren().add(card);
     }
 }

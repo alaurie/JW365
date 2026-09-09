@@ -1,0 +1,94 @@
+app-id: io.github.alaurie.JW365
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.openjdk25
+cleanup:
+  - /include
+  - /lib/*.a
+  - /lib/*.la
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+  - /share/applications/org.opensc.notify.desktop
+command: jw365
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --socket=pcsc
+  - --device=dri
+  - --filesystem=xdg-download
+  - --env=OPENSSL_CONF=/app/share/legacy-openssl.cnf
+modules:
+  - packaging/flatpak/modules/cJSON.json
+  - packaging/flatpak/modules/pcsc.json
+  - packaging/flatpak/modules/uriparser.json
+  - packaging/flatpak/modules/pkcs11-helper.json
+  - packaging/flatpak/modules/opensc.json
+  - packaging/flatpak/modules/krb5.json
+
+  - name: freerdp
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DWITH_WAYLAND=OFF
+      - -DWITH_CLIENT_X11=OFF
+      - -DWITH_CLIENT_WAYLAND=OFF
+      - -DWITH_CLIENT_SDL3=ON
+      - -DWITH_SERVER=OFF
+      - -DWITH_CLIENT_SDL2=OFF
+      - -DWITH_WEBVIEW=OFF
+      - -DWITH_PULSE=ON
+      - -DWITH_CUPS=ON
+      - -DWITH_PCSC=ON
+      - -DWITH_FFMPEG=ON
+      - -DWITH_DSP_FFMPEG=ON
+      - -DWITH_SWSCALE=ON
+      - -DWITH_INTERNAL_MD4=ON
+      - -DWITH_INTERNAL_MD5=ON
+      - -DWITH_INTERNAL_RC4=ON
+      - -DWITH_VERBOSE_WINPR_ASSERT=OFF
+      - -DCHANNEL_TSMF=OFF
+      - -DWITH_FUSE=OFF
+    sources:
+      - type: archive
+        url: https://pub.freerdp.com/releases/freerdp-3.31.1.tar.xz
+        sha256: e679ab1400b4d3f829786782d16e318d72f4712c9d29c041a86f5cc1a2a4ec94
+        x-checker-data:
+          type: anitya
+          project-id: 10442
+          stable-only: true
+          url-template: https://pub.freerdp.com/releases/freerdp-${version0}.${version1}.${version2}.tar.xz
+
+  - name: jw365
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/openjdk25/bin
+      env:
+        JAVA_HOME: /usr/lib/sdk/openjdk25
+    build-commands:
+      - unzip -q gradle-dist/gradle-9.7.1-bin.zip -d gradle-dist-extracted
+      - GRADLE_USER_HOME=gradle-home gradle-dist-extracted/gradle-9.7.1/bin/gradle --offline --no-daemon createRuntimeImage installDist -PappVersion=0.2.2
+      - install -d /app/runtime /app/lib /app/bin
+      - cp -a build/runtime/. /app/runtime/
+      - cp -a build/install/jw365/lib/. /app/lib/
+      - install -m 0755 packaging/flatpak/jw365-launcher.sh /app/bin/jw365
+      - install -Dm0644 packaging/flatpak/io.github.alaurie.JW365.desktop /app/share/applications/io.github.alaurie.JW365.desktop
+      - install -Dm0644 packaging/flatpak/io.github.alaurie.JW365.metainfo.xml /app/share/metainfo/io.github.alaurie.JW365.metainfo.xml
+      - install -Dm0644 src/main/resources/org/alaurie/jw365/gui/icon.png /app/share/icons/hicolor/256x256/apps/io.github.alaurie.JW365.png
+    sources:
+      - type: file
+        url: https://services.gradle.org/distributions/gradle-9.7.1-bin.zip
+        sha256: acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a
+        dest: gradle-dist
+      - packaging/flatpak/gradle-sources.json
+      - type: dir
+        path: .

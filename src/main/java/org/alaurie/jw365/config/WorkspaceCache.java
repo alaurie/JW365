@@ -101,7 +101,7 @@ public final class WorkspaceCache {
      * Retrieves the path for a resource icon in the local cache.
      */
     public Path getIconPath(WorkspaceResource resource) {
-        return iconsDirectory.resolve(resource.sanitizedFileName() + ".png");
+        return iconsDirectory.resolve(resource.cacheFileName() + ".png");
     }
 
     /**
