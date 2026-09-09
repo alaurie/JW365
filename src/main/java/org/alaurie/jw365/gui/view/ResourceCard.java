@@ -256,7 +256,7 @@ public final class ResourceCard extends VBox {
     private void showSessionControls() {
         Alert alert = new Alert(
             Alert.AlertType.INFORMATION,
-            "Right Ctrl + F12  Disconnect\nRight Ctrl + F10  Toggle fullscreen\nCtrl + Alt + Enter  Toggle FreeRDP fullscreen",
+            "F12  Disconnect\nF11  Minimize\nF10  Toggle fullscreen\nCtrl + Alt + Enter  Toggle FreeRDP fullscreen",
             ButtonType.OK
         );
         alert.setHeaderText("Fullscreen Session Controls");

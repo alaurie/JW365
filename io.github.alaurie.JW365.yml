@@ -23,7 +23,6 @@ finish-args:
   - --socket=pulseaudio
   - --socket=pcsc
   - --device=dri
-  - --filesystem=xdg-download
   - --env=OPENSSL_CONF=/app/share/legacy-openssl.cnf
 modules:
   - packaging/flatpak/modules/cJSON.json

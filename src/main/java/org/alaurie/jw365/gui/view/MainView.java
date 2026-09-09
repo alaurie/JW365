@@ -294,8 +294,9 @@ public final class MainView extends BorderPane {
         Alert alert = new Alert(
             Alert.AlertType.INFORMATION,
             "RDP session shortcuts:\n\n"
-                + "Right Ctrl + F12  Disconnect session\n"
-                + "Right Ctrl + F10  Toggle fullscreen\n"
+                + "F12  Disconnect session\n"
+                + "F11  Minimize session\n"
+                + "F10  Toggle fullscreen\n"
                 + "Ctrl + Alt + Enter  Toggle FreeRDP fullscreen when supported\n\n"
                 + "Teams optimization:\n"
                 + "Teams media optimization is not available through generic Linux FreeRDP. "

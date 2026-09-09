@@ -168,7 +168,7 @@ public final class SettingsDialog extends Stage {
         fullscreenCheck.setSelected(currentConfig.fullscreen());
 
         multiMonCheck = new CheckBox("Use Multiple Monitors if available (/multimon)");
-        Label multiMonHint = new Label("Multi-monitor launches fullscreen. Right Ctrl + F10 toggles fullscreen; Right Ctrl + F12 disconnects.");
+        Label multiMonHint = new Label("Multi-monitor launches fullscreen. F10 toggles fullscreen; F12 disconnects.");
         multiMonHint.getStyleClass().add("status-bar-text");
         multiMonCheck.setSelected(currentConfig.multiMonitor());
 

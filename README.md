@@ -89,8 +89,9 @@ cd jw365
 
 
 When using fullscreen or multi-monitor mode with SDL FreeRDP:
-- Press **Right Ctrl + F12** to disconnect.
-- Press **Right Ctrl + F10** to toggle fullscreen.
+- Press **F12** to disconnect.
+- Press **F11** to minimize.
+- Press **F10** to toggle fullscreen.
 - Press **Ctrl + Alt + Enter** to toggle FreeRDP fullscreen when supported.
 ---
 

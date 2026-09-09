@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.2] - 2026-09-07
 
 ### Fixed
-- **FreeRDP SDL Hotkey Interception**: Automated generation of `~/.config/freerdp/sdl-freerdp.json` mapping `SDL_KeyModMask` to `KMOD_RCTRL` and `SDL_Disconnect` to `F12`, fixing the issue where pressing `Shift + D` in Windows closed the remote window.
+- **FreeRDP SDL Hotkey Interception**: Generates `sdl-freerdp.json` with dedicated `F12` disconnect, `F11` minimize, and `F10` fullscreen shortcuts so normal `Shift + D` input remains safe.
 
 ---
 

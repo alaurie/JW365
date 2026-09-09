@@ -433,7 +433,7 @@ public final class RdpProcessSupervisor {
     public static void ensureSdlConfig() {
         String safeConfig = """
             {
-              "SDL_KeyModMask": ["KMOD_RCTRL"],
+              "SDL_KeyModMask": ["KMOD_NONE"],
               "SDL_Disconnect": ["SDL_SCANCODE_F12"],
               "SDL_Minimize": ["SDL_SCANCODE_F11"],
               "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
@@ -447,7 +447,8 @@ public final class RdpProcessSupervisor {
                 ? Path.of(configHome)
                 : Path.of(System.getProperty("user.home"), ".config");
             Path configFile = base.resolve("freerdp").resolve("sdl-freerdp.json");
-            if (!Files.exists(configFile)) {
+            String existing = Files.exists(configFile) ? Files.readString(configFile) : "";
+            if (!Files.exists(configFile) || existing.contains("KMOD_RSHIFT") || existing.contains("KMOD_RCTRL") || existing.contains("SDL_SCANCODE_D")) {
                 Files.createDirectories(configFile.getParent());
                 Files.writeString(configFile, safeConfig, StandardCharsets.UTF_8);
             }
@@ -460,7 +461,8 @@ public final class RdpProcessSupervisor {
             Path flatpakDir = Path.of(System.getProperty("user.home"), ".var", "app", "com.freerdp.FreeRDP", "config", "freerdp");
             if (Files.exists(flatpakDir.getParent())) {
                 Path flatpakConfig = flatpakDir.resolve("sdl-freerdp.json");
-                if (!Files.exists(flatpakConfig)) {
+                String existing = Files.exists(flatpakConfig) ? Files.readString(flatpakConfig) : "";
+                if (!Files.exists(flatpakConfig) || existing.contains("KMOD_RSHIFT") || existing.contains("KMOD_RCTRL") || existing.contains("SDL_SCANCODE_D")) {
                     Files.createDirectories(flatpakDir);
                     Files.writeString(flatpakConfig, safeConfig, StandardCharsets.UTF_8);
                 }
