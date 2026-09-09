@@ -137,7 +137,7 @@ public final class RdpProcessSupervisor {
             cmd.add("/gfx:progressive");
         }
 
-        // Hardware accelerated GDI and true color
+        // Display color depth and GDI renderer.
         cmd.add("/gdi:hw");
         cmd.add("/bpp:32");
 
@@ -145,6 +145,11 @@ public final class RdpProcessSupervisor {
         cmd.add("/log-level:info");
         // Custom extra arguments
         if (config.extraArgs() != null) {
+            for (String arg : config.extraArgs()) {
+                if (arg == null || arg.indexOf('\u0000') >= 0 || arg.indexOf('\n') >= 0 || arg.indexOf('\r') >= 0) {
+                    throw new IllegalArgumentException("FreeRDP arguments cannot contain control characters");
+                }
+            }
             cmd.addAll(config.extraArgs());
         }
 
@@ -362,6 +367,9 @@ public final class RdpProcessSupervisor {
 
     private void updateStatus(ActiveSession session, SessionListener listener, SessionStatus newStatus, String message) {
         SessionStatus old = session.status();
+        if (old == newStatus) {
+            return;
+        }
         session.setStatus(newStatus);
         emitEvent(listener, new SessionEvent.StatusChanged(session.sessionId(), old, newStatus, message));
     }

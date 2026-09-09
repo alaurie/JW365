@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=JW365
+GenericName=Windows 365 Client
+Comment=Linux client for Windows 365 and Azure Virtual Desktop
+Exec=jw365
+Icon=io.github.alaurie.JW365
+Terminal=false
+Type=Application
+Categories=Network;RemoteAccess;
+StartupNotify=true
+StartupWMClass=org.alaurie.jw365.gui.Jw365App
+Keywords=Windows 365;Azure Virtual Desktop;RDP;Remote Desktop;

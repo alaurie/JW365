@@ -26,8 +26,7 @@ import java.util.regex.Pattern;
 import java.util.Objects;
 
 /**
- * Interactive sign-in dialog embedding JavaFX WebView to seamlessly complete Entra ID OAuth 2.0 PKCE flow.
- * Intercepts the OAuth redirect automatically with ZERO manual URL copying required.
+ * JavaFX WebView dialog for Entra ID OAuth 2.0 PKCE sign-in.
  */
 public final class AuthDialog extends Stage {
 

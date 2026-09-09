@@ -39,6 +39,11 @@ public record WorkspaceResource(
         return id.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
+
+    @JsonIgnore
+    public String cacheFileName() {
+        return (tenantId + "_" + id).replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
     /**
      * Display label combining title and publisher if available.
      */

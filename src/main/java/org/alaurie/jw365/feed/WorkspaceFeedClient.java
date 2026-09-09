@@ -20,7 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
- * Modern HTTP/2 client for Windows 365 and AVD Workspace Feed Discovery and Resource APIs.
+ * HTTP/2 client for Windows 365 and Azure Virtual Desktop workspace feeds.
  */
 public final class WorkspaceFeedClient {
 

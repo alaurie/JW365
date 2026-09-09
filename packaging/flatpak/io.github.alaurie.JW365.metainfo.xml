@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.alaurie.JW365</id>
+  <name>JW365</name>
+  <summary>Windows 365 client for Linux</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="io.github.alaurie">
+    <name>Alex Laurie</name>
+  </developer>
+  <description>
+    <p>Connect to Windows 365 Cloud PCs and Azure Virtual Desktop workspaces from Linux.</p>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/alaurie/JW365/main/packaging/flatpak/screenshots/main.png</image>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/alaurie/JW365/main/packaging/flatpak/screenshots/session.png</image>
+    </screenshot>
+  </screenshots>
+  <launchable type="desktop-id">io.github.alaurie.JW365.desktop</launchable>
+  <url type="homepage">https://github.com/alaurie/JW365</url>
+  <url type="bugtracker">https://github.com/alaurie/JW365/issues</url>
+  <provides>
+    <binary>jw365</binary>
+  </provides>
+  <releases>
+    <release version="0.2.2" date="2026-09-09" />
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

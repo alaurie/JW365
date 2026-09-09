@@ -131,6 +131,10 @@ public final class XdgPaths {
         return dataDir().resolve("workspaces.json");
     }
 
+    public static boolean isFlatpak() {
+        return System.getenv("FLATPAK_ID") != null || Files.exists(Path.of("/.flatpak-info"));
+    }
+
     private static void ensureDir(Path dir) {
         try {
             if (!Files.exists(dir)) {

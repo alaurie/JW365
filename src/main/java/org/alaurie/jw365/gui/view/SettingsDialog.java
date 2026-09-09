@@ -21,6 +21,8 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.alaurie.jw365.config.XdgPaths;
+import org.alaurie.jw365.rdp.FreeRdpSource;
 import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.config.ClientConfig;
 import org.alaurie.jw365.gui.state.AppState;
@@ -122,14 +124,15 @@ public final class SettingsDialog extends Stage {
         Label sourceLabel = new Label("Source:");
         sourceLabel.getStyleClass().add("form-label");
         freerdpSourceChoice = new ChoiceBox<>();
-        freerdpSourceChoice.getItems().addAll("Automatic (Flatpak first)", "System FreeRDP", "Flatpak FreeRDP", "Custom executable");
-        freerdpSourceChoice.setValue(sourceCodeToLabel(currentConfig.freerdpSource()));
+        boolean flatpakRuntime = XdgPaths.isFlatpak();
+        freerdpSourceChoice.setValue(flatpakRuntime ? "Bundled FreeRDP" : sourceCodeToLabel(currentConfig.freerdpSource().name()));
+        freerdpSourceChoice.setDisable(flatpakRuntime);
         HBox sourceBox = new HBox(12, sourceLabel, freerdpSourceChoice);
         sourceBox.setAlignment(Pos.CENTER_LEFT);
 
         HBox customRdpBox = new HBox(8);
         customRdpPathField = new TextField(currentConfig.preferredFreeRdpPath() != null ? currentConfig.preferredFreeRdpPath() : "");
-        customRdpPathField.setPromptText("Path to custom sdl-freerdp/xfreerdp binary");
+        customRdpPathField.setDisable(flatpakRuntime);
         HBox.setHgrow(customRdpPathField, Priority.ALWAYS);
 
         Button browseBtn = new Button("Browse...");
@@ -312,7 +315,7 @@ public final class SettingsDialog extends Stage {
 
         ClientConfig newConfig = new ClientConfig(
             tenant,
-            browserCodeToSource(freerdpSourceChoice.getValue()),
+            FreeRdpSource.valueOf(browserCodeToSource(freerdpSourceChoice.getValue())),
             customPath,
             preferredBrowser,
             scale,
@@ -340,6 +343,7 @@ public final class SettingsDialog extends Stage {
     private static String sourceCodeToLabel(String source) {
         if ("SYSTEM".equalsIgnoreCase(source)) return "System FreeRDP";
         if ("FLATPAK".equalsIgnoreCase(source)) return "Flatpak FreeRDP";
+        if ("BUNDLED".equalsIgnoreCase(source)) return "Bundled FreeRDP";
         if ("CUSTOM".equalsIgnoreCase(source)) return "Custom executable";
         return "Automatic (Flatpak first)";
     }
@@ -347,6 +351,7 @@ public final class SettingsDialog extends Stage {
     private static String browserCodeToSource(String label) {
         if (label != null && label.startsWith("System")) return "SYSTEM";
         if (label != null && label.startsWith("Flatpak")) return "FLATPAK";
+        if (label != null && label.startsWith("Bundled")) return "BUNDLED";
         if (label != null && label.startsWith("Custom")) return "CUSTOM";
         return "AUTO";
     }

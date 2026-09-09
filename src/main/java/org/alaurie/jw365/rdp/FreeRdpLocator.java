@@ -42,6 +42,9 @@ public final class FreeRdpLocator {
      */
     public static Optional<FreeRdpInfo> locate(String source, String customPath) {
         String preference = source == null || source.isBlank() ? "AUTO" : source.toUpperCase();
+        if (preference.equals("BUNDLED")) {
+            return locateBundled();
+        }
         if (preference.equals("FLATPAK")) {
             return checkFlatpak();
         }
@@ -61,6 +64,16 @@ public final class FreeRdpLocator {
             }
         }
         return locateNative();
+    }
+
+    private static Optional<FreeRdpInfo> locateBundled() {
+        for (String candidate : List.of("/app/bin/sdl-freerdp3", "/app/bin/sdl-freerdp")) {
+            Optional<FreeRdpInfo> bundled = inspectCustomPath(candidate);
+            if (bundled.isPresent()) {
+                return bundled;
+            }
+        }
+        return Optional.empty();
     }
 
     private static Optional<FreeRdpInfo> inspectCustomPath(String customPath) {

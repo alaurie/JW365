@@ -28,12 +28,8 @@ import java.util.function.Consumer;
 import java.util.Objects;
 
 /**
- * High-performance silent-first authentication resolver for FreeRDP.
- * Attempts to resolve Microsoft Entra ID OAuth redirects silently in the background
- * using active session cookies with ZERO window flickering.
- *
- * If Microsoft requires interactive input (e.g. MFA / password prompt),
- * a modal window appears seamlessly after a short threshold so the user can interact.
+ * Resolves FreeRDP Entra ID redirects using persisted WebView session data.
+ * Shows a modal WebView when silent authentication does not complete.
  */
 public final class SessionAuthDialog extends Stage {
 
