@@ -43,6 +43,8 @@ sudo dnf install freerdp
 # Arch Linux
 sudo pacman -S freerdp
 ```
+
+JW365 can use the newest available FreeRDP through Flatpak. In **Settings > FreeRDP Client Engine**, choose **Automatic (Flatpak first)**, **System FreeRDP**, **Flatpak FreeRDP**, or a custom executable.
 ---
 
 ## Quick Install
@@ -85,6 +87,11 @@ cd jw365
    - **Restart Session** with one click.
    - View recent connection logs for troubleshooting.
 
+
+When using fullscreen or multi-monitor mode with SDL FreeRDP:
+- Press **Right Ctrl + F12** to disconnect.
+- Press **Right Ctrl + F10** to toggle fullscreen.
+- Press **Ctrl + Alt + Enter** to toggle FreeRDP fullscreen when supported.
 ---
 
 ## Under the Hood (Technical Architecture)

@@ -51,8 +51,8 @@ jobs:
           echo "Building release version: $VERSION"
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Run unit test suite
-        run: ./gradlew test -PappVersion=${{ env.APP_VERSION }}
+      - name: Run verification suite
+        run: ./gradlew clean check -PappVersion=${{ env.APP_VERSION }}
 
       - name: Build all distribution packages (Debian, RPM, and Portable Tarball)
         run: ./gradlew packageDeb packageRpm packagePortableTar -PappVersion=${{ env.APP_VERSION }}

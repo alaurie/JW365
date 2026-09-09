@@ -12,13 +12,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -85,9 +86,13 @@ public final class RdpProcessSupervisor {
             cmd.add("/microphone:sys:pulse,rate:48000");
         }
 
-        // Peripheral & security hardware redirection
-        cmd.add("/usb:auto");
-        cmd.add("/smartcard");
+        // Peripheral redirection
+        if (config.usbRedirection()) {
+            cmd.add("/usb:auto");
+        }
+        if (config.smartcard()) {
+            cmd.add("/smartcard");
+        }
         // Display settings
         if (config.multiMonitor()) {
             cmd.add("/f");
@@ -95,7 +100,7 @@ public final class RdpProcessSupervisor {
         } else if (config.fullscreen()) {
             cmd.add("/f");
         }
-        if (config.scalePercent() > 0) {
+        if (config.scalePercent() > 0 && !config.fullscreen() && !config.multiMonitor()) {
             cmd.add("/scale-desktop:" + config.scalePercent());
         }
         if (config.ignoreCert()) {
@@ -108,7 +113,7 @@ public final class RdpProcessSupervisor {
         }
 
         // Dynamic desktop resolution updates
-        if (config.dynamicResolution()) {
+        if (config.dynamicResolution() && !config.fullscreen() && !config.multiMonitor()) {
             cmd.add("+dynamic-resolution");
         }
 
@@ -153,9 +158,8 @@ public final class RdpProcessSupervisor {
      * @param resource target workspace resource
      * @param config   session parameters
      * @param listener optional session-specific event listener
-     * @return active session handle
      */
-    public ActiveSession launch(
+    public void launch(
         FreeRdpInfo freeRdp,
         WorkspaceResource resource,
         RdpSessionConfig config,
@@ -169,12 +173,13 @@ public final class RdpProcessSupervisor {
         // Stop any existing session for this resource ID first
         stopSession(sessionId);
 
-        // Ensure FreeRDP SDL client hotkeys don't intercept normal typing (e.g. Shift+D disconnect)
-        if (freeRdp.flavor() == FreeRdpFlavor.SDL_FREERDP) {
-            ensureSdlConfig();
-        }
-
         List<String> rawCommand = buildCommandLine(freeRdp, config);
+        if (config.multiMonitor() && !freeRdp.isFlatpak()) {
+            detectMonitorSelection(freeRdp).ifPresent(selection -> rawCommand.add("/monitors:" + selection));
+        } else if (config.fullscreen() && freeRdp.isFlatpak()) {
+            detectMonitorSelection(freeRdp).map(selection -> selection.split(",")[0])
+                .ifPresent(primary -> rawCommand.add("/monitors:" + primary));
+        }
         // Use script PTY wrapper if available to provide a valid terminal for FreeRDP
         List<String> processCommand;
         if (Files.isExecutable(Path.of("/usr/bin/script"))) {
@@ -200,11 +205,9 @@ public final class RdpProcessSupervisor {
         }
         if (waylandDisplay != null && !waylandDisplay.isBlank()) {
             env.put("WAYLAND_DISPLAY", waylandDisplay);
-            if (config.multiMonitor() && display != null && !display.isBlank()) {
-                // FreeRDP SDL client implements multi-monitor via borderless positioned windows at (x, y).
-                // Under native Wayland, compositors (Mutter/GNOME) ignore client-side (x, y) window coordinates,
-                // causing all windows to collapse onto the primary display.
-                // Routing SDL through X11/XWayland honors absolute monitor geometry across all screens.
+            boolean x11Fullscreen = freeRdp.isFlatpak() && config.fullscreen();
+            if ((config.multiMonitor() || x11Fullscreen) && display != null && !display.isBlank()) {
+                // Flatpak SDL fullscreen is more stable through XWayland on mixed Wayland/X11 desktops.
                 env.put("SDL_VIDEODRIVER", "x11");
             } else {
                 env.put("SDL_VIDEODRIVER", "wayland,x11");
@@ -277,6 +280,9 @@ public final class RdpProcessSupervisor {
 
                     // Inspect line for connection established state
                     String lower = line.toLowerCase();
+                    if (lower.contains("reconnect") || lower.contains("reconnecting")) {
+                        updateStatus(session, listener, SessionStatus.RECONNECTING, "Reconnecting...");
+                    }
                     if (lower.contains("activated") ||
                         lower.contains("channelconnected") ||
                         lower.contains("logon info") ||
@@ -304,13 +310,16 @@ public final class RdpProcessSupervisor {
 
                 emitEvent(listener, new SessionEvent.Exited(sessionId, exitCode, "Exit code " + exitCode));
             } catch (Exception e) {
-                updateStatus(session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
+                if (session.isUserInitiatedStop()) {
+                    updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
+                } else {
+                    updateStatus(session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
+                }
             } finally {
-                activeSessions.remove(sessionId);
+                activeSessions.remove(sessionId, session);
             }
         });
 
-        return session;
     }
 
     /**
@@ -374,6 +383,42 @@ public final class RdpProcessSupervisor {
         }
     }
 
+
+    private static Optional<String> detectMonitorSelection(FreeRdpInfo freeRdp) {
+        String executable = freeRdp.binaryPath() != null
+            ? freeRdp.binaryPath().toString()
+            : freeRdp.flavor().getExecutableName();
+        try {
+            Process process = new ProcessBuilder(executable, "/list:monitor")
+                .redirectErrorStream(true)
+                .start();
+            if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return Optional.empty();
+            }
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            Pattern idPattern = Pattern.compile("\\[(\\d+)]");
+            List<String> ids = new ArrayList<>();
+            String primary = null;
+            for (String line : output.lines().toList()) {
+                Matcher matcher = idPattern.matcher(line);
+                if (matcher.find()) {
+                    String id = matcher.group(1);
+                    ids.add(id);
+                    if (line.contains("*") && primary == null) {
+                        primary = id;
+                    }
+                }
+            }
+            if (primary != null) {
+                ids.remove(primary);
+                ids.add(0, primary);
+            }
+            return ids.isEmpty() ? Optional.empty() : Optional.of(String.join(",", ids));
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
     /**
      * Ensures FreeRDP SDL client configuration disables hazardous default hotkeys (such as Right Shift + D = Disconnect).
      */

@@ -4,15 +4,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RdpProcessSupervisorLifecycleTest {
@@ -91,9 +86,7 @@ class RdpProcessSupervisorLifecycleTest {
     @DisplayName("RdpProcessSupervisor registers listeners and manages session handles")
     void testSupervisorListeners() {
         RdpProcessSupervisor supervisor = new RdpProcessSupervisor();
-        List<SessionEvent> captured = new ArrayList<>();
-
-        SessionListener listener = captured::add;
+        SessionListener listener = event -> {};
         supervisor.addGlobalListener(listener);
 
         assertThat(supervisor.getActiveSessions()).isEmpty();

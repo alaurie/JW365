@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -89,7 +90,7 @@ public final class LoopbackAuthReceiver implements AutoCloseable {
         if (query != null && query.contains("code=")) {
             Matcher m = CODE_PATTERN.matcher(query);
             if (m.find()) {
-                extractedCode = m.group(1);
+                extractedCode = decodeQueryValue(m.group(1));
                 responseCode = 200;
                 responseHtml = """
                     <!DOCTYPE html>
@@ -121,9 +122,9 @@ public final class LoopbackAuthReceiver implements AutoCloseable {
             }
         } else if (query != null && query.contains("error=")) {
             Matcher m = ERROR_PATTERN.matcher(query);
-            extractedError = m.find() ? m.group(1) : "unknown_error";
+            extractedError = m.find() ? decodeQueryValue(m.group(1)) : "unknown_error";
             responseCode = 400;
-            responseHtml = "<h1>Sign-in Failed</h1><p>" + extractedError + "</p>";
+            responseHtml = "<h1>Sign-in Failed</h1><p>" + escapeHtml(extractedError) + "</p>";
         } else {
             responseCode = 200;
             responseHtml = "<h1>JW365 Authentication Endpoint</h1><p>Waiting for sign-in redirect...</p>";
@@ -133,11 +134,9 @@ public final class LoopbackAuthReceiver implements AutoCloseable {
         exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
         exchange.sendResponseHeaders(responseCode, bytes.length);
 
-        try (OutputStream os = exchange.getResponseBody()) {
+        try (exchange; OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
             os.flush();
-        } finally {
-            exchange.close();
         }
 
         if (extractedCode != null) {
@@ -153,5 +152,17 @@ public final class LoopbackAuthReceiver implements AutoCloseable {
             server.stop(0);
         } catch (Exception ignored) {
         }
+    }
+
+    private static String decodeQueryValue(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
+    }
+
+    private static String escapeHtml(String value) {
+        return value.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;");
     }
 }

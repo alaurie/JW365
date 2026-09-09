@@ -19,9 +19,13 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 import org.alaurie.jw365.rdp.SessionEvent;
+import org.alaurie.jw365.config.XdgPaths;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * High-performance silent-first authentication resolver for FreeRDP.
@@ -56,8 +60,17 @@ public final class SessionAuthDialog extends Stage {
         // Create WebView in memory
         this.webView = new WebView();
         this.webEngine = webView.getEngine();
-        this.webEngine.setJavaScriptEnabled(true);
-        this.webEngine.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
+        try {
+            Path webViewData = XdgPaths.dataDir().resolve("webview");
+            Files.createDirectories(webViewData);
+            try {
+                Files.setPosixFilePermissions(webViewData, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            } catch (UnsupportedOperationException ignored) {
+            }
+            this.webEngine.setUserDataDirectory(webViewData.toFile());
+        } catch (Exception e) {
+            System.err.println("Warning: Could not configure persistent WebView storage: " + e.getMessage());
+        }
 
         // Listen for OAuth redirect code
         this.webEngine.locationProperty().addListener((obs, oldLoc, newLoc) -> {
@@ -77,8 +90,8 @@ public final class SessionAuthDialog extends Stage {
      */
     public void startSilentOrShow() {
         Platform.runLater(() -> {
-            // Schedule fallback timer: if redirect is not obtained within 1.2s, display window
-            displayFallbackTimer = new Timeline(new KeyFrame(Duration.millis(1200), e -> {
+            // Allow persisted SSO cookies time to complete silent authentication before showing UI.
+            displayFallbackTimer = new Timeline(new KeyFrame(Duration.seconds(3), e -> {
                 if (!completed.get() && !isShowing()) {
                     constructAndShowWindow();
                 }
@@ -148,7 +161,10 @@ public final class SessionAuthDialog extends Stage {
         root.setCenter(webView);
 
         Scene scene = new Scene(root, 620, 680);
-        scene.getStylesheets().add(getClass().getResource("/org/alaurie/jw365/gui/styles.css").toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(
+            getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
+            "Missing stylesheet resource"
+        ).toExternalForm());
         setScene(scene);
 
         setMinWidth(580);

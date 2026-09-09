@@ -7,7 +7,9 @@ public enum SessionStatus {
     IDLE("Idle"),
     STARTING("Starting..."),
     CONNECTING("Connecting..."),
+    RECONNECTING("Reconnecting..."),
     CONNECTED("Connected"),
+    DISCONNECTING("Disconnecting..."),
     DISCONNECTED("Disconnected"),
     FAILED("Failed");
 
@@ -22,6 +24,6 @@ public enum SessionStatus {
     }
 
     public boolean isActive() {
-        return this == STARTING || this == CONNECTING || this == CONNECTED;
+        return this == STARTING || this == CONNECTING || this == RECONNECTING || this == CONNECTED || this == DISCONNECTING;
     }
 }

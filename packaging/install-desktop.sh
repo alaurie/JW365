@@ -14,13 +14,15 @@ cat << EOF > "$APPS/jw365.desktop"
 Version=1.0
 Type=Application
 Name=JW365
-Comment=Modern Linux Client for Windows 365 and Azure Virtual Desktop
+Comment=Linux client for Windows 365 and Azure Virtual Desktop
+GenericName=Windows 365 Client
 Exec=$DIR/bin/jw365
 Icon=$ICONS/jw365.png
 Terminal=false
 Categories=Network;RemoteAccess;
+StartupNotify=true
 StartupWMClass=org.alaurie.jw365.gui.Jw365App
-EOF
+Keywords=Windows 365;Azure Virtual Desktop;RDP;Remote Desktop;
 
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$APPS" 2>/dev/null || true

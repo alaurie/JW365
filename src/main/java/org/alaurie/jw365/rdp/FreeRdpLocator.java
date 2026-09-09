@@ -1,7 +1,6 @@
 package org.alaurie.jw365.rdp;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,35 +31,63 @@ public final class FreeRdpLocator {
     }
 
     /**
-     * Locates the best available FreeRDP installation on the host system.
-     *
-     * @param customPath optional custom path configured by the user
-     * @return Optional containing FreeRdpInfo if found
+     * Locates FreeRDP using legacy automatic behavior.
      */
     public static Optional<FreeRdpInfo> locate(String customPath) {
-        // 1. Check custom configured path (supports explicit "flatpak" keyword)
-        if (customPath != null && !customPath.isBlank()) {
-            if (customPath.equalsIgnoreCase("flatpak") || customPath.contains("com.freerdp.FreeRDP")) {
-                Optional<FreeRdpInfo> flatpak = checkFlatpak();
-                if (flatpak.isPresent()) {
-                    return flatpak;
-                }
+        return locate("AUTO", customPath);
+    }
+
+    /**
+     * Locates FreeRDP according to source preference: AUTO, SYSTEM, FLATPAK, or CUSTOM.
+     */
+    public static Optional<FreeRdpInfo> locate(String source, String customPath) {
+        String preference = source == null || source.isBlank() ? "AUTO" : source.toUpperCase();
+        if (preference.equals("FLATPAK")) {
+            return checkFlatpak();
+        }
+        if (preference.equals("CUSTOM")) {
+            return inspectCustomPath(customPath);
+        }
+        if (preference.equals("AUTO") && customPath != null && !customPath.isBlank()) {
+            Optional<FreeRdpInfo> custom = inspectCustomPath(customPath);
+            if (custom.isPresent()) {
+                return custom;
             }
+        }
+        if (preference.equals("AUTO")) {
+            Optional<FreeRdpInfo> flatpak = checkFlatpak();
+            if (flatpak.isPresent()) {
+                return flatpak;
+            }
+        }
+        return locateNative();
+    }
+
+    private static Optional<FreeRdpInfo> inspectCustomPath(String customPath) {
+        if (customPath == null || customPath.isBlank()) {
+            return Optional.empty();
+        }
+        if (customPath.equalsIgnoreCase("flatpak") || customPath.contains("com.freerdp.FreeRDP")) {
+            return checkFlatpak();
+        }
+        try {
             Path p = Paths.get(customPath);
             if (Files.isExecutable(p)) {
                 return Optional.of(inspectBinary(p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
             }
+        } catch (RuntimeException ignored) {
         }
-        // 2. Check environment variable JW365_FREERDP
+        return Optional.empty();
+    }
+
+    private static Optional<FreeRdpInfo> locateNative() {
         String envPath = System.getenv("JW365_FREERDP");
         if (envPath != null && !envPath.isBlank()) {
-            Path p = Paths.get(envPath);
-            if (Files.isExecutable(p)) {
-                return Optional.of(inspectBinary(p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
+            Optional<FreeRdpInfo> configured = inspectCustomPath(envPath);
+            if (configured.isPresent()) {
+                return configured;
             }
         }
-
-        // 3. Search PATH for native candidates
         for (String candidate : CANDIDATE_NAMES) {
             Optional<Path> found = findExecutableOnPath(candidate);
             if (found.isPresent()) {
@@ -68,13 +95,6 @@ public final class FreeRdpLocator {
                 return Optional.of(inspectBinary(bin, FreeRdpFlavor.fromBinaryName(candidate)));
             }
         }
-
-        // 4. Check Flatpak
-        Optional<FreeRdpInfo> flatpak = checkFlatpak();
-        if (flatpak.isPresent()) {
-            return flatpak;
-        }
-
         return Optional.empty();
     }
 

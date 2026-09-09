@@ -6,6 +6,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
@@ -27,6 +29,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
 
 /**
  * Settings configuration dialog for FreeRDP parameters, display scaling, browser preferences,
@@ -38,12 +43,15 @@ public final class SettingsDialog extends Stage {
 
     private final TextField tenantField;
     private final ChoiceBox<String> browserChoice;
+    private final ChoiceBox<String> freerdpSourceChoice;
     private final TextField customRdpPathField;
     private final ChoiceBox<String> scalingChoice;
     private final CheckBox fullscreenCheck;
     private final CheckBox multiMonCheck;
     private final CheckBox soundCheck;
     private final CheckBox micCheck;
+    private final CheckBox usbCheck;
+    private final CheckBox smartcardCheck;
     private final CheckBox ignoreCertCheck;
     private final CheckBox clipboardCheck;
     private final CheckBox dynamicResCheck;
@@ -111,10 +119,17 @@ public final class SettingsDialog extends Stage {
         FreeRdpInfo detected = state.detectedFreeRdpProperty().get();
         Label detectedLabel = new Label("Detected: " + (detected != null ? detected.displayName() : "None found (please install FreeRDP)"));
         detectedLabel.getStyleClass().add("status-bar-text");
+        Label sourceLabel = new Label("Source:");
+        sourceLabel.getStyleClass().add("form-label");
+        freerdpSourceChoice = new ChoiceBox<>();
+        freerdpSourceChoice.getItems().addAll("Automatic (Flatpak first)", "System FreeRDP", "Flatpak FreeRDP", "Custom executable");
+        freerdpSourceChoice.setValue(sourceCodeToLabel(currentConfig.freerdpSource()));
+        HBox sourceBox = new HBox(12, sourceLabel, freerdpSourceChoice);
+        sourceBox.setAlignment(Pos.CENTER_LEFT);
 
         HBox customRdpBox = new HBox(8);
         customRdpPathField = new TextField(currentConfig.preferredFreeRdpPath() != null ? currentConfig.preferredFreeRdpPath() : "");
-        customRdpPathField.setPromptText("Auto-detect (or path to custom sdl-freerdp/xfreerdp binary)");
+        customRdpPathField.setPromptText("Path to custom sdl-freerdp/xfreerdp binary");
         HBox.setHgrow(customRdpPathField, Priority.ALWAYS);
 
         Button browseBtn = new Button("Browse...");
@@ -150,6 +165,8 @@ public final class SettingsDialog extends Stage {
         fullscreenCheck.setSelected(currentConfig.fullscreen());
 
         multiMonCheck = new CheckBox("Use Multiple Monitors if available (/multimon)");
+        Label multiMonHint = new Label("Multi-monitor launches fullscreen. Right Ctrl + F10 toggles fullscreen; Right Ctrl + F12 disconnects.");
+        multiMonHint.getStyleClass().add("status-bar-text");
         multiMonCheck.setSelected(currentConfig.multiMonitor());
 
         dynamicResCheck = new CheckBox("Dynamic Desktop Resizing (+dynamic-resolution)");
@@ -163,6 +180,10 @@ public final class SettingsDialog extends Stage {
 
         autoReconnectCheck = new CheckBox("Automatic Reconnection on Network Interruption (+auto-reconnect)");
         autoReconnectCheck.setSelected(currentConfig.autoReconnect());
+        usbCheck = new CheckBox("Redirect USB devices (/usb:auto)");
+        usbCheck.setSelected(currentConfig.usbRedirection());
+        smartcardCheck = new CheckBox("Redirect smartcard (/smartcard)");
+        smartcardCheck.setSelected(currentConfig.smartcard());
 
         clipboardCheck = new CheckBox("Bidirectional Clipboard Synchronization (+clipboard)");
         clipboardCheck.setSelected(currentConfig.clipboard());
@@ -197,7 +218,6 @@ public final class SettingsDialog extends Stage {
         Label extraArgsLabel = new Label("Extra FreeRDP Args:");
         extraArgsLabel.getStyleClass().add("form-label");
         extraArgsField = new TextField(String.join(" ", currentConfig.extraArgs()));
-        extraArgsField.setPromptText("/bpp:32 /network:auto ...");
         GridPane.setHgrow(extraArgsField, Priority.ALWAYS);
 
         advGrid.addRow(1, extraArgsLabel, extraArgsField);
@@ -205,10 +225,10 @@ public final class SettingsDialog extends Stage {
         contentBox.getChildren().addAll(
             tenantSection, tenantGrid,
             new Separator(),
-            rdpSection, detectedLabel, customRdpBox,
+            rdpSection, detectedLabel, sourceBox, customRdpBox,
             new Separator(),
             displaySection, displayGrid,
-            fullscreenCheck, multiMonCheck, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
+            fullscreenCheck, multiMonCheck, multiMonHint, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, usbCheck, smartcardCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
             new Separator(),
             advancedSection, autoConnectCheck, advGrid
         );
@@ -239,18 +259,32 @@ public final class SettingsDialog extends Stage {
         root.setBottom(buttonBar);
 
         Scene scene = new Scene(root, 600, 700);
-        scene.getStylesheets().add(getClass().getResource("/org/alaurie/jw365/gui/styles.css").toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(
+            getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
+            "Missing stylesheet resource"
+        ).toExternalForm());
         setScene(scene);
     }
 
     private void handleSave() {
-        int scale = parseScaleString(scalingChoice.getValue());
-        int autoRefresh = 15;
-        try {
-            autoRefresh = Integer.parseInt(autoRefreshField.getText().trim());
-        } catch (NumberFormatException ignored) {
+        String tenant = tenantField.getText() == null ? "" : tenantField.getText().trim();
+        if (tenant.isBlank()) {
+            showValidationError("Default tenant cannot be empty.");
+            return;
         }
 
+        int scale = parseScaleString(scalingChoice.getValue());
+        int autoRefresh;
+        try {
+            autoRefresh = Integer.parseInt(autoRefreshField.getText().trim());
+        } catch (NumberFormatException e) {
+            showValidationError("Auto refresh must be a whole number between 5 and 1440 minutes.");
+            return;
+        }
+        if (autoRefresh < 5 || autoRefresh > 1440) {
+            showValidationError("Auto refresh must be between 5 and 1440 minutes.");
+            return;
+        }
         List<String> extraArgs = new ArrayList<>();
         String rawExtra = extraArgsField.getText();
         if (rawExtra != null && !rawExtra.isBlank()) {
@@ -260,14 +294,25 @@ public final class SettingsDialog extends Stage {
         }
 
         String customPath = customRdpPathField.getText().trim();
-        if (customPath.isBlank()) {
+        if (!customPath.isBlank()) {
+            try {
+                if (!Files.isExecutable(Path.of(customPath))) {
+                    showValidationError("Selected FreeRDP path is not executable.");
+                    return;
+                }
+            } catch (RuntimeException e) {
+                showValidationError("Selected FreeRDP path is invalid.");
+                return;
+            }
+        } else {
             customPath = null;
         }
 
         String preferredBrowser = labelToBrowserCode(browserChoice.getValue());
 
         ClientConfig newConfig = new ClientConfig(
-            tenantField.getText().trim(),
+            tenant,
+            browserCodeToSource(freerdpSourceChoice.getValue()),
             customPath,
             preferredBrowser,
             scale,
@@ -282,12 +327,35 @@ public final class SettingsDialog extends Stage {
             asyncUpdateCheck.isSelected(),
             autoReconnectCheck.isSelected(),
             autoConnectCheck.isSelected(),
+            usbCheck.isSelected(),
+            smartcardCheck.isSelected(),
             autoRefresh,
             extraArgs
         );
 
         state.updateConfig(newConfig);
         close();
+    }
+
+    private static String sourceCodeToLabel(String source) {
+        if ("SYSTEM".equalsIgnoreCase(source)) return "System FreeRDP";
+        if ("FLATPAK".equalsIgnoreCase(source)) return "Flatpak FreeRDP";
+        if ("CUSTOM".equalsIgnoreCase(source)) return "Custom executable";
+        return "Automatic (Flatpak first)";
+    }
+
+    private static String browserCodeToSource(String label) {
+        if (label != null && label.startsWith("System")) return "SYSTEM";
+        if (label != null && label.startsWith("Flatpak")) return "FLATPAK";
+        if (label != null && label.startsWith("Custom")) return "CUSTOM";
+        return "AUTO";
+    }
+
+    private void showValidationError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        alert.setTitle("Invalid Settings");
+        alert.setHeaderText("Check your settings");
+        alert.showAndWait();
     }
 
     private static String browserCodeToLabel(String code) {

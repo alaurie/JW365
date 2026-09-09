@@ -57,8 +57,6 @@ public final class MainView extends BorderPane {
         Label brandBadge = new Label("Cloud PC");
         brandBadge.getStyleClass().add("brand-badge");
 
-        Label versionBadge = new Label("v" + AppVersion.VERSION);
-        versionBadge.getStyleClass().add("version-badge");
         searchField = new TextField();
         searchField.getStyleClass().add("search-field");
         searchField.setPromptText("Search Cloud PCs and Apps...");
@@ -70,6 +68,9 @@ public final class MainView extends BorderPane {
 
         Button refreshBtn = new Button("Refresh");
         refreshBtn.getStyleClass().add("btn-secondary");
+        Button helpBtn = new Button("Help");
+        helpBtn.getStyleClass().add("btn-secondary");
+        helpBtn.setOnAction(e -> showHelp());
         refreshBtn.setOnAction(e -> state.refreshWorkspacesAsync(false));
 
         HBox spacer = new HBox();
@@ -96,9 +97,8 @@ public final class MainView extends BorderPane {
         headerBar.getChildren().addAll(
             brandTitle,
             brandBadge,
-            versionBadge,
             searchField,
-            refreshBtn,
+            helpBtn,
             refreshIndicator,
             spacer,
             userPill,
@@ -286,5 +286,50 @@ public final class MainView extends BorderPane {
                 state.signOut();
             }
         });
+    }
+    private void showHelp() {
+        FreeRdpInfo engine = state.detectedFreeRdpProperty().get();
+        String engineText = engine != null ? engine.displayName() : "Not detected";
+        ButtonType aboutButton = new ButtonType("About");
+        Alert alert = new Alert(
+            Alert.AlertType.INFORMATION,
+            "RDP session shortcuts:\n\n"
+                + "Right Ctrl + F12  Disconnect session\n"
+                + "Right Ctrl + F10  Toggle fullscreen\n"
+                + "Ctrl + Alt + Enter  Toggle FreeRDP fullscreen when supported\n\n"
+                + "Teams optimization:\n"
+                + "Teams media optimization is not available through generic Linux FreeRDP. "
+                + "Use Teams locally for meetings.\n\n"
+                + "FreeRDP engine: " + engineText,
+            aboutButton,
+            ButtonType.OK
+        );
+        alert.setTitle("JW365 Help");
+        alert.setHeaderText("Shortcuts and connection help");
+        if (alert.showAndWait().orElse(ButtonType.OK) == aboutButton) {
+            showAbout();
+        }
+    }
+
+    private void showAbout() {
+        ButtonType githubButton = new ButtonType("Open GitHub");
+        Alert alert = new Alert(
+            Alert.AlertType.INFORMATION,
+            "JW365\n"
+                + "Windows 365 and Azure Virtual Desktop client for Linux\n\n"
+                + "Version " + AppVersion.VERSION + "\n"
+                + "https://github.com/alaurie/JW365",
+            githubButton,
+            ButtonType.OK
+        );
+        alert.setTitle("About JW365");
+        alert.setHeaderText("JW365");
+        if (alert.showAndWait().orElse(ButtonType.OK) == githubButton) {
+            try {
+                java.awt.Desktop.getDesktop().browse(java.net.URI.create("https://github.com/alaurie/JW365"));
+            } catch (Exception e) {
+                state.statusMessageProperty().set("GitHub: https://github.com/alaurie/JW365");
+            }
+        }
     }
 }

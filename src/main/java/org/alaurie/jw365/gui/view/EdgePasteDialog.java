@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -159,7 +160,10 @@ public final class EdgePasteDialog extends Stage {
         setOnCloseRequest(e -> clipboardWatcher.shutdownNow());
 
         Scene scene = new Scene(root, 560, 400);
-        scene.getStylesheets().add(getClass().getResource("/org/alaurie/jw365/gui/styles.css").toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(
+            getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
+            "Missing stylesheet resource"
+        ).toExternalForm());
         setScene(scene);
     }
 

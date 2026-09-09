@@ -57,7 +57,7 @@ public final class WorkspaceCache {
      * Saves workspaces to disk atomically.
      */
     public synchronized void saveWorkspaces(List<Workspace> workspaces) {
-        if (workspaces == null || workspaces.isEmpty()) {
+        if (workspaces == null) {
             return;
         }
 

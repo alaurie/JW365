@@ -1,7 +1,6 @@
 package org.alaurie.jw365.feed;
 
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -182,6 +181,7 @@ class WorkspaceFeedClientTest {
         assertThat(Files.exists(targetRdp)).isTrue();
         String content = Files.readString(targetRdp);
         assertThat(content).contains("gatewayhostname:s:gateway.wvd.microsoft.com");
+        assertThat(content).doesNotContain("use multimon:i:1");
 
         URI iconUri = URI.create("http://localhost:" + port + "/api/icons/cloudpc1.png");
         byte[] iconBytes = client.downloadIconBytes("test_token_xyz", iconUri);

@@ -5,7 +5,7 @@ plugins {
 
 val rawVersion: String = (project.findProperty("appVersion") as? String)
     ?: System.getenv("APP_VERSION")
-    ?: "0.2.1"
+    ?: "0.2.2"
 
 val cleanVersion: String = rawVersion.removePrefix("v").trim()
 

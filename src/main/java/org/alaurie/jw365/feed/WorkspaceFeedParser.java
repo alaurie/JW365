@@ -36,7 +36,7 @@ public final class WorkspaceFeedParser {
 
         try {
             Document doc = parseSecurely(xml);
-            NodeList feedNodes = doc.getElementsByTagName("TenantFeedURL");
+            NodeList feedNodes = doc.getElementsByTagNameNS("*", "TenantFeedURL");
             for (int i = 0; i < feedNodes.getLength(); i++) {
                 Node node = feedNodes.item(i);
                 if (node instanceof Element el) {
@@ -52,7 +52,11 @@ public final class WorkspaceFeedParser {
                             displayName = tenantId;
                         }
 
-                        feeds.add(new TenantFeed(tenantId, displayName, URI.create(feedUrlStr.trim())));
+                        URI feedUri = parseAllowedUri(feedUrlStr.trim());
+                        if (feedUri == null) {
+                            continue;
+                        }
+                        feeds.add(new TenantFeed(tenantId, displayName, feedUri));
                     }
                 }
             }
@@ -84,7 +88,7 @@ public final class WorkspaceFeedParser {
             Document doc = parseSecurely(xml);
 
             // Look for Publisher elements
-            NodeList publisherNodes = doc.getElementsByTagName("Publisher");
+            NodeList publisherNodes = doc.getElementsByTagNameNS("*", "Publisher");
             if (publisherNodes.getLength() > 0) {
                 for (int p = 0; p < publisherNodes.getLength(); p++) {
                     Node pNode = publisherNodes.item(p);
@@ -116,7 +120,7 @@ public final class WorkspaceFeedParser {
         String tenantId,
         String publisherName
     ) {
-        NodeList resourceNodes = parentElement.getElementsByTagName("Resource");
+        NodeList resourceNodes = parentElement.getElementsByTagNameNS("*", "Resource");
         for (int r = 0; r < resourceNodes.getLength(); r++) {
             Node rNode = resourceNodes.item(r);
             if (rNode instanceof Element rEl) {
@@ -159,15 +163,15 @@ public final class WorkspaceFeedParser {
     }
 
     private static URI findChildAttributeUri(Element parent, String tagName, String... attrNames) {
-        NodeList list = parent.getElementsByTagName(tagName);
+        NodeList list = parent.getElementsByTagNameNS("*", tagName);
         for (int i = 0; i < list.getLength(); i++) {
             Node n = list.item(i);
             if (n instanceof Element el) {
                 String val = getAttributeIgnoreCase(el, attrNames);
                 if (val != null && !val.isBlank()) {
-                    try {
-                        return URI.create(val.trim());
-                    } catch (Exception ignored) {
+                    URI uri = parseAllowedUri(val.trim());
+                    if (uri != null) {
+                        return uri;
                     }
                 }
             }
@@ -184,9 +188,32 @@ public final class WorkspaceFeedParser {
         return null;
     }
 
+    private static URI parseAllowedUri(String value) {
+        try {
+            URI uri = URI.create(value);
+            String scheme = uri.getScheme();
+            if ("https".equalsIgnoreCase(scheme)) {
+                return uri;
+            }
+            if ("http".equalsIgnoreCase(scheme)) {
+                String host = uri.getHost();
+                if ("localhost".equalsIgnoreCase(host)
+                    || "127.0.0.1".equals(host)
+                    || "::1".equals(host)) {
+                    return uri;
+                }
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+        return null;
+    }
+
     private static Document parseSecurely(String xml) throws Exception {
         if (xml == null || xml.isBlank()) {
             throw new IllegalArgumentException("XML content is empty");
+        }
+        if (xml.length() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("XML content exceeds 10 MiB limit");
         }
 
         // Strip UTF-8 Byte Order Mark (\uFEFF) and any leading whitespace or pre-prolog characters
@@ -198,6 +225,7 @@ public final class WorkspaceFeedParser {
         }
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setFeature("http://xml.org/sax/features/external-general-entities", false);

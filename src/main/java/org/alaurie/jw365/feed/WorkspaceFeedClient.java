@@ -26,6 +26,7 @@ public final class WorkspaceFeedClient {
 
     public static final String DEFAULT_DISCOVERY_URL = "https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery";
     public static final String USER_AGENT = "com.microsoft.rdc.html/2.0.79.2 rdhtml-sdk/2.0.4";
+    private static final int MAX_XML_RESPONSE_BYTES = 10 * 1024 * 1024;
 
     private final URI discoveryUri;
     private final HttpClient httpClient;
@@ -62,12 +63,13 @@ public final class WorkspaceFeedClient {
             .timeout(Duration.ofSeconds(25))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        String body = responseBody(response);
         if (response.statusCode() != 200) {
-            throw new IOException("Workspace feed discovery failed with HTTP " + response.statusCode() + ": " + response.body());
+            throw new IOException("Workspace feed discovery failed with HTTP " + response.statusCode() + ": " + body);
         }
 
-        return WorkspaceFeedParser.parseDiscoveryXml(response.body());
+        return WorkspaceFeedParser.parseDiscoveryXml(body);
     }
 
     /**
@@ -91,12 +93,13 @@ public final class WorkspaceFeedClient {
             .timeout(Duration.ofSeconds(25))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        String body = responseBody(response);
         if (response.statusCode() != 200) {
-            throw new IOException("Failed to fetch feed for tenant " + tenantFeed.tenantDisplayName() + " (HTTP " + response.statusCode() + "): " + response.body());
+            throw new IOException("Failed to fetch feed for tenant " + tenantFeed.tenantDisplayName() + " (HTTP " + response.statusCode() + "): " + body);
         }
 
-        return WorkspaceFeedParser.parseFeedXml(response.body(), tenantFeed);
+        return WorkspaceFeedParser.parseFeedXml(body, tenantFeed);
     }
 
     /**
@@ -118,17 +121,22 @@ public final class WorkspaceFeedClient {
 
             List<Future<Workspace>> futures = executor.invokeAll(tasks);
             List<Workspace> workspaces = new ArrayList<>();
+            boolean failed = false;
             for (Future<Workspace> f : futures) {
                 try {
                     workspaces.add(f.get());
                 } catch (Exception e) {
+                    failed = true;
                     System.err.println("Warning: Failed to fetch workspace feed: " + e.getMessage());
                 }
+            }
+            if (failed) {
+                throw new IllegalStateException("One or more workspace feeds failed");
             }
             return workspaces;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Collections.emptyList();
+            throw new IllegalStateException("Workspace feed fetch interrupted", e);
         }
     }
 
@@ -138,9 +146,8 @@ public final class WorkspaceFeedClient {
      * @param accessToken Entra ID access token
      * @param rdpUrl      URI of the RDP file
      * @param targetPath  destination file path
-     * @return the written Path
      */
-    public Path downloadRdpFile(String accessToken, URI rdpUrl, Path targetPath) throws IOException, InterruptedException {
+    public void downloadRdpFile(String accessToken, URI rdpUrl, Path targetPath) throws IOException, InterruptedException {
         Objects.requireNonNull(accessToken, "accessToken must not be null");
         Objects.requireNonNull(rdpUrl, "rdpUrl must not be null");
         Objects.requireNonNull(targetPath, "targetPath must not be null");
@@ -167,19 +174,7 @@ public final class WorkspaceFeedClient {
             throw new IOException("Failed to download RDP file from " + rdpUrl + " (HTTP " + response.statusCode() + ")");
         }
 
-        // Ensure singlemoninwindowedmode does not force single monitor locks
-        try {
-            String content = Files.readString(tempFile, StandardCharsets.UTF_8);
-            String updated = content.replace("singlemoninwindowedmode:i:1", "singlemoninwindowedmode:i:0");
-            if (!updated.contains("use multimon")) {
-                updated += "\nuse multimon:i:1\n";
-            }
-            Files.writeString(tempFile, updated, StandardCharsets.UTF_8);
-        } catch (Exception ignored) {
-        }
-
         Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        return targetPath;
     }
 
     /**
@@ -214,5 +209,12 @@ public final class WorkspaceFeedClient {
             System.err.println("Warning: Failed to download icon from " + iconUrl + ": " + e.getMessage());
         }
         return null;
+    }
+
+    private static String responseBody(HttpResponse<byte[]> response) throws IOException {
+        if (response.body().length > MAX_XML_RESPONSE_BYTES) {
+            throw new IOException("Workspace feed response exceeds 10 MiB limit");
+        }
+        return new String(response.body(), StandardCharsets.UTF_8);
     }
 }

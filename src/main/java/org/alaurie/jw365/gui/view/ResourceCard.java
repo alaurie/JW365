@@ -6,16 +6,19 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
-import javafx.scene.image.Image;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.shape.Circle;
 import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
+import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.rdp.SessionStatus;
 
 /**
@@ -155,18 +158,21 @@ public final class ResourceCard extends VBox {
                 statusBadge.setText("Idle");
                 statusBadge.getStyleClass().add("badge-status-idle");
                 actionButton.setText("Connect");
+                actionButton.setDisable(false);
                 actionButton.getStyleClass().removeAll("btn-secondary");
                 if (!actionButton.getStyleClass().contains("btn-primary")) {
                     actionButton.getStyleClass().add("btn-primary");
                 }
-            } else if (status == SessionStatus.STARTING || status == SessionStatus.CONNECTING) {
+            } else if (status == SessionStatus.STARTING || status == SessionStatus.CONNECTING || status == SessionStatus.RECONNECTING || status == SessionStatus.DISCONNECTING) {
                 statusBadge.setText(status.getLabel());
                 statusBadge.getStyleClass().add("badge-status-connecting");
-                actionButton.setText("Connecting...");
+                actionButton.setText(status == SessionStatus.DISCONNECTING ? "Disconnecting..." : status == SessionStatus.RECONNECTING ? "Reconnecting..." : "Connecting...");
+                actionButton.setDisable(status == SessionStatus.DISCONNECTING);
             } else if (status == SessionStatus.CONNECTED) {
                 statusBadge.setText("Connected");
                 statusBadge.getStyleClass().add("badge-status-connected");
                 actionButton.setText("Disconnect");
+                actionButton.setDisable(false);
                 actionButton.getStyleClass().removeAll("btn-primary");
                 if (!actionButton.getStyleClass().contains("btn-secondary")) {
                     actionButton.getStyleClass().add("btn-secondary");
@@ -175,6 +181,7 @@ public final class ResourceCard extends VBox {
                 statusBadge.setText("Failed");
                 statusBadge.getStyleClass().add("badge-status-failed");
                 actionButton.setText("Retry");
+                actionButton.setDisable(false);
                 actionButton.getStyleClass().removeAll("btn-secondary");
                 if (!actionButton.getStyleClass().contains("btn-primary")) {
                     actionButton.getStyleClass().add("btn-primary");
@@ -199,6 +206,8 @@ public final class ResourceCard extends VBox {
         connectMultiMon.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.MULTIMON, this::showError));
 
         MenuItem restartItem = new MenuItem("Restart Session");
+        MenuItem retryItem = new MenuItem("Retry Connection");
+        retryItem.setOnAction(e -> state.connectResource(resource, this::showError));
         restartItem.setOnAction(e -> state.restartResource(resource, this::showError));
 
         MenuItem disconnectItem = new MenuItem("Disconnect");
@@ -217,14 +226,23 @@ public final class ResourceCard extends VBox {
             javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
         });
 
+        MenuItem controlsItem = new MenuItem("Fullscreen Controls...");
+        controlsItem.setOnAction(e -> showSessionControls());
+
+        MenuItem diagnosticsItem = new MenuItem("Copy Diagnostics");
+        diagnosticsItem.setOnAction(e -> copyDiagnostics());
+
         menu.getItems().addAll(
             connectDefault,
             connectFullscreen,
             connectWindowed,
             connectMultiMon,
             new javafx.scene.control.SeparatorMenuItem(),
-            restartItem,
+            retryItem,
             disconnectItem,
+            new javafx.scene.control.SeparatorMenuItem(),
+            controlsItem,
+            diagnosticsItem,
             new javafx.scene.control.SeparatorMenuItem(),
             viewLogItem,
             openRdpItem,
@@ -235,6 +253,29 @@ public final class ResourceCard extends VBox {
         setOnContextMenuRequested(e -> menu.show(this, e.getScreenX(), e.getScreenY()));
     }
 
+    private void showSessionControls() {
+        Alert alert = new Alert(
+            Alert.AlertType.INFORMATION,
+            "Right Ctrl + F12  Disconnect\nRight Ctrl + F10  Toggle fullscreen\nCtrl + Alt + Enter  Toggle FreeRDP fullscreen",
+            ButtonType.OK
+        );
+        alert.setHeaderText("Fullscreen Session Controls");
+        alert.setTitle("JW365");
+        alert.showAndWait();
+    }
+
+    private void copyDiagnostics() {
+        SessionStatus status = state.getSessionStatuses().get(resource.id());
+        var engine = state.detectedFreeRdpProperty().get();
+        String diagnostics = "JW365 " + AppVersion.VERSION + "\n"
+            + "Resource: " + resource.title() + " (" + resource.id() + ")\n"
+            + "Status: " + (status != null ? status.getLabel() : "Idle") + "\n"
+            + "RDP engine: " + (engine != null ? engine.displayName() : "Not detected") + "\n"
+            + "Session controls: Right Ctrl+F12 disconnect; Right Ctrl+F10 fullscreen toggle";
+        ClipboardContent content = new ClipboardContent();
+        content.putString(diagnostics);
+        Clipboard.getSystemClipboard().setContent(content);
+    }
     private void showError(String error) {
         Platform.runLater(() -> {
             javafx.scene.control.Alert alert = new javafx.scene.control.Alert(

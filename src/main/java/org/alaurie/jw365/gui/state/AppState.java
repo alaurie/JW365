@@ -29,8 +29,6 @@ import org.alaurie.jw365.feed.TenantFeed;
 import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceFeedClient;
 import org.alaurie.jw365.feed.WorkspaceResource;
-import org.alaurie.jw365.rdp.ActiveSession;
-import org.alaurie.jw365.rdp.FreeRdpFlavor;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
 import org.alaurie.jw365.rdp.FreeRdpLocator;
 import org.alaurie.jw365.rdp.RdpProcessSupervisor;
@@ -44,7 +42,6 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,6 +49,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -77,6 +76,8 @@ public final class AppState {
     private final ObjectProperty<FreeRdpInfo> detectedFreeRdp = new SimpleObjectProperty<>(null);
     private final ObjectProperty<BrowserInfo> detectedEdge = new SimpleObjectProperty<>(null);
     private final java.util.concurrent.atomic.AtomicBoolean autoConnectTriggered = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final AtomicBoolean refreshInProgress = new AtomicBoolean(false);
+    private final AtomicLong operationGeneration = new AtomicLong();
     private final Map<String, Image> iconMemoryCache = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "jw365-scheduler");
@@ -143,7 +144,7 @@ public final class AppState {
     public void initialize() {
         // 1. Locate FreeRDP and Edge Browser
         ClientConfig config = configManager.get();
-        Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(config.preferredFreeRdpPath());
+        Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(config.freerdpSource(), config.preferredFreeRdpPath());
         runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
 
         Optional<BrowserInfo> edgeInfo = BrowserLocator.findEdge();
@@ -184,6 +185,7 @@ public final class AppState {
     }
 
     public void signInWithCode(String authorizationCode, String codeVerifier, String redirectUri, Runnable onSuccess, Consumer<String> onError) {
+        long generation = operationGeneration.get();
         setLoading(true, "Authenticating with Microsoft Entra ID...");
 
         Thread.ofVirtual().name("jw365-auth-worker").start(() -> {
@@ -193,6 +195,9 @@ public final class AppState {
 
                 switch (result) {
                     case AuthResult.Success(var tokens, var claims) -> {
+                        if (generation != operationGeneration.get()) {
+                            return;
+                        }
                         tokenStore.save(tokens);
                         runOnFxThread(() -> {
                             currentUser.set(claims);
@@ -269,6 +274,7 @@ public final class AppState {
     }
 
     public void signOut() {
+        operationGeneration.incrementAndGet();
         rdpSupervisor.stopAllSessions();
         tokenStore.clear();
         workspaceCache.clear();
@@ -283,10 +289,17 @@ public final class AppState {
         });
     }
 
+    public void shutdown() {
+        operationGeneration.incrementAndGet();
+        scheduler.shutdownNow();
+        rdpSupervisor.stopAllSessions();
+    }
+
     public void refreshWorkspacesAsync(boolean forceTokenRefresh) {
-        if (!authenticated.get()) {
+        if (!authenticated.get() || !refreshInProgress.compareAndSet(false, true)) {
             return;
         }
+        long generation = operationGeneration.get();
 
         runOnFxThread(() -> setLoading(true, "Discovering Windows 365 workspaces..."));
 
@@ -294,6 +307,9 @@ public final class AppState {
             try {
                 Optional<TokenResponse> tokenOpt = tokenStore.load();
                 if (tokenOpt.isEmpty()) {
+                    if (generation != operationGeneration.get()) {
+                        return;
+                    }
                     runOnFxThread(() -> {
                         authenticated.set(false);
                         setLoading(false, "Session expired, please sign in again");
@@ -304,38 +320,37 @@ public final class AppState {
                 TokenResponse tokens = tokenOpt.get();
                 ClientConfig config = configManager.get();
 
-                // Refresh token if needed
                 if (forceTokenRefresh || tokens.isExpiringSoon()) {
                     runOnFxThread(() -> statusMessage.set("Refreshing authentication token..."));
                     AuthResult refreshResult = oauthClient.refreshToken(config.defaultTenant(), tokens.refreshToken());
                     if (refreshResult instanceof AuthResult.Success(var newTokens, var claims)) {
                         tokenStore.save(newTokens);
                         tokens = newTokens;
-                        runOnFxThread(() -> currentUser.set(claims));
+                        if (generation == operationGeneration.get()) {
+                            runOnFxThread(() -> currentUser.set(claims));
+                        }
                     } else if (refreshResult instanceof AuthResult.Failure f) {
                         System.err.println("Warning: Token refresh failed: " + f.errorMessage());
                     }
                 }
 
                 String accessToken = tokens.accessToken();
-
-                // 1. Discover Feeds
                 List<TenantFeed> feeds = feedClient.discoverTenantFeeds(accessToken);
-
-                // 2. Fetch all workspaces in parallel
                 List<Workspace> newWorkspaces = feedClient.fetchAllWorkspaces(accessToken, feeds);
-
-                // 3. Cache workspaces to disk
                 workspaceCache.saveWorkspaces(newWorkspaces);
 
-                // 4. Update UI
+                if (generation != operationGeneration.get()) {
+                    return;
+                }
                 runOnFxThread(() -> {
+                    if (generation != operationGeneration.get()) {
+                        return;
+                    }
                     workspaces.setAll(newWorkspaces);
                     lastSynced.set(Instant.now());
                     int totalResources = newWorkspaces.stream().mapToInt(w -> w.resources().size()).sum();
                     setLoading(false, "Discovered " + totalResources + " resources across " + newWorkspaces.size() + " workspaces");
 
-                    // Startup auto-connect if configured and primary desktop is present
                     if (config.autoConnect() && !autoConnectTriggered.getAndSet(true)) {
                         List<WorkspaceResource> allDesktops = newWorkspaces.stream()
                             .flatMap(w -> w.resources().stream())
@@ -346,7 +361,7 @@ public final class AppState {
                         }
                     }
                 });
-                // 5. Pre-fetch icons in parallel
+
                 for (Workspace ws : newWorkspaces) {
                     for (WorkspaceResource res : ws.resources()) {
                         if (res.iconUrl() != null && !workspaceCache.hasCachedIcon(res)) {
@@ -360,7 +375,11 @@ public final class AppState {
                     }
                 }
             } catch (Exception e) {
-                runOnFxThread(() -> setLoading(false, "Feed refresh error: " + e.getMessage()));
+                if (generation == operationGeneration.get()) {
+                    runOnFxThread(() -> setLoading(false, "Feed refresh error: " + e.getMessage()));
+                }
+            } finally {
+                refreshInProgress.set(false);
             }
         });
     }
@@ -403,6 +422,7 @@ public final class AppState {
                 ClientConfig config = configManager.get();
 
                 // Download RDP file
+                runOnFxThread(() -> statusMessage.set("Downloading remote desktop profile..."));
                 Path rdpFilePath = XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
                 feedClient.downloadRdpFile(tokens.accessToken(), resource.rdpUrl(), rdpFilePath);
 
@@ -432,14 +452,18 @@ public final class AppState {
                     config.gfxProgressive(),
                     config.asyncUpdate(),
                     config.autoReconnect(),
+                    config.usbRedirection(),
+                    config.smartcard(),
                     config.extraArgs()
                 );
 
                 // Launch session
+                runOnFxThread(() -> statusMessage.set("Starting FreeRDP session..."));
                 rdpSupervisor.launch(freeRdp, resource, sessionConfig, null);
             } catch (Exception e) {
                 runOnFxThread(() -> {
                     sessionStatuses.put(resource.id(), SessionStatus.FAILED);
+                    statusMessage.set("Connection failed");
                     if (onError != null) {
                         onError.accept("Failed to start session: " + e.getMessage());
                     }
@@ -459,8 +483,11 @@ public final class AppState {
             connectResource(resource, DisplayMode.DEFAULT, onError);
         });
     }
-
     public void disconnectResource(WorkspaceResource resource) {
+        if (resource == null) {
+            return;
+        }
+        runOnFxThread(() -> sessionStatuses.put(resource.id(), SessionStatus.DISCONNECTING));
         rdpSupervisor.stopSession(resource.id());
     }
 
@@ -502,7 +529,7 @@ public final class AppState {
     public void updateConfig(ClientConfig newConfig) {
         try {
             configManager.save(newConfig);
-            Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(newConfig.preferredFreeRdpPath());
+            Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(newConfig.freerdpSource(), newConfig.preferredFreeRdpPath());
             runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
         } catch (IOException e) {
             System.err.println("Warning: Failed to save config: " + e.getMessage());

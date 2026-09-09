@@ -11,7 +11,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +35,7 @@ class XdgAndConfigTest {
 
         ClientConfig initial = manager.get();
         assertThat(initial.defaultTenant()).isEqualTo("organizations");
+        assertThat(initial.freerdpSource()).isEqualTo("AUTO");
 
         ClientConfig custom = new ClientConfig(
             "custom-tenant-uuid",
@@ -57,6 +57,7 @@ class XdgAndConfigTest {
         ClientConfig loaded = reloadedManager.load();
 
         assertThat(loaded.defaultTenant()).isEqualTo("custom-tenant-uuid");
+        assertThat(loaded.freerdpSource()).isEqualTo("AUTO");
         assertThat(loaded.preferredFreeRdpPath()).isEqualTo("/usr/bin/sdl-freerdp");
         assertThat(loaded.scalePercent()).isEqualTo(150);
         assertThat(loaded.fullscreen()).isTrue();

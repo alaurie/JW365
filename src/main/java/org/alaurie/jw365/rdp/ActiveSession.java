@@ -1,6 +1,5 @@
 package org.alaurie.jw365.rdp;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Objects;

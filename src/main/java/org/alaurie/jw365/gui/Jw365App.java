@@ -99,7 +99,7 @@ public final class Jw365App extends Application {
 
     private void cleanup() {
         if (state != null) {
-            state.getRdpSupervisor().stopAllSessions();
+            state.shutdown();
         }
         if (cookieManager != null) {
             cookieManager.persistCookies();

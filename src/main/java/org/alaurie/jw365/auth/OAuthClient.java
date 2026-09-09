@@ -241,6 +241,15 @@ public final class OAuthClient {
     private static URI buildEndpointUri(String tenant, String endpoint) {
         String effectiveTenant = (tenant != null && !tenant.isBlank()) ? tenant : DEFAULT_TENANT;
         if (effectiveTenant.startsWith("http://") || effectiveTenant.startsWith("https://")) {
+            URI tenantUri = URI.create(effectiveTenant);
+            String scheme = tenantUri.getScheme();
+            boolean localHttp = "http".equalsIgnoreCase(scheme)
+                && ("localhost".equalsIgnoreCase(tenantUri.getHost())
+                    || "127.0.0.1".equalsIgnoreCase(tenantUri.getHost())
+                    || "::1".equalsIgnoreCase(tenantUri.getHost()));
+            if (!"https".equalsIgnoreCase(scheme) && !localHttp) {
+                throw new IllegalArgumentException("Tenant endpoint must use HTTPS");
+            }
             return URI.create(effectiveTenant + "/oauth2/v2.0/" + endpoint);
         }
         return URI.create(String.format(LOGIN_BASE, effectiveTenant) + "/" + endpoint);

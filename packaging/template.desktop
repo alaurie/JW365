@@ -1,10 +1,13 @@
 [Desktop Entry]
-Name=APPLICATION_NAME
-Comment=APPLICATION_DESCRIPTION
+Name=JW365
+GenericName=Windows 365 Client
+Comment=Linux client for Windows 365 and Azure Virtual Desktop
 Exec=APPLICATION_LAUNCHER
 Icon=APPLICATION_ICON
 Terminal=false
 Type=Application
 Categories=DEPLOY_BUNDLE_CATEGORY
+StartupNotify=true
+Keywords=Windows 365;Azure Virtual Desktop;RDP;Remote Desktop;
 StartupWMClass=org.alaurie.jw365.gui.Jw365App
 DESKTOP_MIMES

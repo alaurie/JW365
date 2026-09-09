@@ -56,11 +56,11 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("/usb:auto");
         assertThat(cmd).contains("/smartcard");
         assertThat(cmd).contains("/f");
-        assertThat(cmd).contains("/scale-desktop:150");
+        assertThat(cmd).doesNotContain("/scale-desktop:150");
         assertThat(cmd).contains("/multimon:force");
         assertThat(cmd).contains("/cert:ignore");
         assertThat(cmd).contains("+clipboard");
-        assertThat(cmd).contains("+dynamic-resolution");
+        assertThat(cmd).doesNotContain("+dynamic-resolution");
         assertThat(cmd).contains("/network:auto");
         assertThat(cmd).contains("+async-update");
         assertThat(cmd).contains("+async-channels");

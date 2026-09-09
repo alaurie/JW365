@@ -23,6 +23,7 @@ import org.alaurie.jw365.gui.state.AppState;
 import java.net.URI;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Objects;
 
 /**
  * Interactive sign-in dialog embedding JavaFX WebView to seamlessly complete Entra ID OAuth 2.0 PKCE flow.
@@ -117,7 +118,10 @@ public final class AuthDialog extends Stage {
         webEngine.load(authUri.toString());
 
         Scene scene = new Scene(root, 650, 750);
-        scene.getStylesheets().add(getClass().getResource("/org/alaurie/jw365/gui/styles.css").toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(
+            getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
+            "Missing stylesheet resource"
+        ).toExternalForm());
         setScene(scene);
     }
 
