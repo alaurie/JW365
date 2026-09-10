@@ -3,7 +3,6 @@ package org.alaurie.jw365.auth;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -14,8 +13,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * HTTP client for Entra ID OAuth 2.0 authentication.
@@ -51,13 +48,6 @@ public final class OAuthClient {
         this.mapper = new ObjectMapper();
     }
 
-    public String getClientId() {
-        return clientId;
-    }
-
-    public String getScope() {
-        return scope;
-    }
 
     /**
      * Builds the interactive PKCE authorization URL to present to the user or embedded WebView.
@@ -134,109 +124,6 @@ public final class OAuthClient {
         return executeTokenRequest(tokenUri, params);
     }
 
-    /**
-     * Initiates the Device Code authorization flow.
-     */
-    public DeviceCodeResponse requestDeviceCode(String tenant) throws IOException, InterruptedException {
-        URI deviceCodeUri = buildEndpointUri(tenant, "devicecode");
-
-        Map<String, String> params = new HashMap<>();
-        params.put("client_id", clientId);
-        params.put("scope", scope);
-
-        String formBody = encodeFormData(params);
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(deviceCodeUri)
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .header("Accept", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(formBody, StandardCharsets.UTF_8))
-            .timeout(Duration.ofSeconds(15))
-            .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        if (response.statusCode() != 200) {
-            throw new IOException("Device code request failed with HTTP " + response.statusCode() + ": " + response.body());
-        }
-
-        return mapper.readValue(response.body(), DeviceCodeResponse.class);
-    }
-
-    /**
-     * Polls the token endpoint for device code authorization until completed, expired, or failed.
-     */
-    public AuthResult pollDeviceCode(
-        String tenant,
-        String deviceCode,
-        int intervalSec,
-        int timeoutSec,
-        Consumer<String> statusListener
-    ) throws InterruptedException {
-        URI tokenUri = buildEndpointUri(tenant, "token");
-
-        int pollInterval = Math.max(intervalSec, 3);
-        long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSec);
-
-        Map<String, String> params = new HashMap<>();
-        params.put("client_id", clientId);
-        params.put("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
-        params.put("device_code", deviceCode);
-
-        while (System.currentTimeMillis() < deadline) {
-            if (Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException("Device code polling was interrupted");
-            }
-
-            try {
-                String formBody = encodeFormData(params);
-                HttpRequest request = HttpRequest.newBuilder()
-                    .uri(tokenUri)
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .header("Accept", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(formBody, StandardCharsets.UTF_8))
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                if (response.statusCode() == 200) {
-                    TokenResponse tokens = mapper.readValue(response.body(), TokenResponse.class);
-                    UserClaims claims = JwtClaimsParser.parseIdToken(tokens.idToken());
-                    return new AuthResult.Success(tokens, claims);
-                }
-
-                JsonNode errorNode = mapper.readTree(response.body());
-                String error = errorNode.has("error") ? errorNode.get("error").asString() : "unknown_error";
-                String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").asString() : "";
-
-                switch (error) {
-                    case "authorization_pending" -> {
-                        if (statusListener != null) {
-                            statusListener.accept("Waiting for user to authenticate...");
-                        }
-                    }
-                    case "slow_down" -> {
-                        pollInterval += 5;
-                        if (statusListener != null) {
-                            statusListener.accept("Rate limit hit, slowing down polling interval...");
-                        }
-                    }
-                    case "expired_token" -> {
-                        return new AuthResult.Failure("expired_token", "Device code expired. Please try signing in again.");
-                    }
-                    default -> {
-                        return new AuthResult.Failure(error, errorDesc.isBlank() ? "Authentication failed: " + error : errorDesc);
-                    }
-                }
-            } catch (IOException e) {
-                if (statusListener != null) {
-                    statusListener.accept("Network error during token poll: " + e.getMessage());
-                }
-            }
-
-            TimeUnit.SECONDS.sleep(pollInterval);
-        }
-
-        return new AuthResult.Failure("timeout", "Sign-in timed out. Please try again.");
-    }
 
     private static URI buildEndpointUri(String tenant, String endpoint) {
         String effectiveTenant = (tenant != null && !tenant.isBlank()) ? tenant : DEFAULT_TENANT;

@@ -32,21 +32,6 @@ public record RdpSessionConfig(
         extraArgs = extraArgs != null ? List.copyOf(extraArgs) : Collections.emptyList();
     }
 
-    public RdpSessionConfig(
-        Path rdpFile,
-        String username,
-        boolean fullscreen,
-        int scalePercent,
-        boolean sound,
-        boolean microphone,
-        boolean multiMonitor,
-        boolean ignoreCert,
-        boolean clipboard,
-        boolean dynamicResolution,
-        List<String> extraArgs
-    ) {
-        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, clipboard, dynamicResolution, true, true, true, true, true, extraArgs);
-    }
 
     public RdpSessionConfig(
         Path rdpFile,

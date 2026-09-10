@@ -22,22 +22,12 @@ public record BrowserInfo(
 ) {
 
     public enum BrowserType {
-        EDGE("Microsoft Edge"),
-        CHROME("Google Chrome"),
-        CHROMIUM("Chromium"),
-        FIREFOX("Mozilla Firefox"),
-        SYSTEM_DEFAULT("System Default (xdg-open)"),
-        EMBEDDED_WEBVIEW("Embedded In-App WebView");
-
-        private final String label;
-
-        BrowserType(String label) {
-            this.label = label;
-        }
-
-        public String getLabel() {
-            return label;
-        }
+        EDGE,
+        CHROME,
+        CHROMIUM,
+        FIREFOX,
+        SYSTEM_DEFAULT,
+        EMBEDDED_WEBVIEW
     }
 
     public static BrowserInfo embeddedWebView() {

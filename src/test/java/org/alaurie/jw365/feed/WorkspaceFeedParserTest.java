@@ -53,7 +53,7 @@ class WorkspaceFeedParserTest {
 
         assertThat(feeds).hasSize(2);
 
-        TenantFeed f1 = feeds.get(0);
+        TenantFeed f1 = feeds.getFirst();
         assertThat(f1.tenantId()).isEqualTo("00000000-0000-0000-0000-000000000001");
         assertThat(f1.tenantDisplayName()).isEqualTo("Contoso Cloud PCs");
         assertThat(f1.feedUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
@@ -82,7 +82,7 @@ class WorkspaceFeedParserTest {
         List<WorkspaceResource> resources = ws.resources();
         assertThat(resources).hasSize(2);
 
-        WorkspaceResource r1 = resources.get(0);
+        WorkspaceResource r1 = resources.getFirst();
         assertThat(r1.title()).isEqualTo("Windows 365 Cloud PC 01");
         assertThat(r1.type()).isEqualTo(ResourceType.DESKTOP);
         assertThat(r1.type().isDesktop()).isTrue();
@@ -117,7 +117,7 @@ class WorkspaceFeedParserTest {
         assertThat(feeds).hasSize(2);
 
         String feedWithBom = "\uFEFF" + SAMPLE_WORKSPACE_XML;
-        Workspace ws = WorkspaceFeedParser.parseFeedXml(feedWithBom, feeds.get(0));
+        Workspace ws = WorkspaceFeedParser.parseFeedXml(feedWithBom, feeds.getFirst());
         assertThat(ws.resources()).hasSize(2);
     }
 }

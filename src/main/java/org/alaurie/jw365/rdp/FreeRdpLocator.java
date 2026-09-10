@@ -1,11 +1,10 @@
 package org.alaurie.jw365.rdp;
 
-import java.io.File;
+import org.alaurie.jw365.util.ExecutableLocator;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -30,40 +29,25 @@ public final class FreeRdpLocator {
     private FreeRdpLocator() {
     }
 
-    /**
-     * Locates FreeRDP using legacy automatic behavior.
-     */
-    public static Optional<FreeRdpInfo> locate(String customPath) {
-        return locate("AUTO", customPath);
-    }
 
     /**
      * Locates FreeRDP according to source preference: AUTO, SYSTEM, FLATPAK, or CUSTOM.
      */
     public static Optional<FreeRdpInfo> locate(String source, String customPath) {
         String preference = source == null || source.isBlank() ? "AUTO" : source.toUpperCase();
-        if (preference.equals("BUNDLED")) {
-            return locateBundled();
-        }
-        if (preference.equals("FLATPAK")) {
-            return checkFlatpak();
-        }
-        if (preference.equals("CUSTOM")) {
-            return inspectCustomPath(customPath);
-        }
-        if (preference.equals("AUTO") && customPath != null && !customPath.isBlank()) {
-            Optional<FreeRdpInfo> custom = inspectCustomPath(customPath);
-            if (custom.isPresent()) {
-                return custom;
+        return switch (preference) {
+            case "BUNDLED" -> locateBundled();
+            case "FLATPAK" -> checkFlatpak();
+            case "CUSTOM" -> inspectCustomPath(customPath);
+            case "AUTO" -> {
+                Optional<FreeRdpInfo> custom = inspectCustomPath(customPath);
+                if (custom.isPresent()) {
+                    yield custom;
+                }
+                yield checkFlatpak().or(FreeRdpLocator::locateNative);
             }
-        }
-        if (preference.equals("AUTO")) {
-            Optional<FreeRdpInfo> flatpak = checkFlatpak();
-            if (flatpak.isPresent()) {
-                return flatpak;
-            }
-        }
-        return locateNative();
+            default -> locateNative();
+        };
     }
 
     private static Optional<FreeRdpInfo> locateBundled() {
@@ -102,7 +86,7 @@ public final class FreeRdpLocator {
             }
         }
         for (String candidate : CANDIDATE_NAMES) {
-            Optional<Path> found = findExecutableOnPath(candidate);
+            Optional<Path> found = ExecutableLocator.findOnPath(candidate);
             if (found.isPresent()) {
                 Path bin = found.get();
                 return Optional.of(inspectBinary(bin, FreeRdpFlavor.fromBinaryName(candidate)));
@@ -111,36 +95,7 @@ public final class FreeRdpLocator {
         return Optional.empty();
     }
 
-    /**
-     * Finds all available FreeRDP installations on the host system.
-     */
-    public static List<FreeRdpInfo> findAll() {
-        List<FreeRdpInfo> list = new ArrayList<>();
 
-        for (String candidate : CANDIDATE_NAMES) {
-            Optional<Path> found = findExecutableOnPath(candidate);
-            found.ifPresent(path -> list.add(inspectBinary(path, FreeRdpFlavor.fromBinaryName(candidate))));
-        }
-
-        checkFlatpak().ifPresent(list::add);
-        return list;
-    }
-
-    private static Optional<Path> findExecutableOnPath(String executableName) {
-        String pathEnv = System.getenv("PATH");
-        if (pathEnv == null || pathEnv.isBlank()) {
-            return Optional.empty();
-        }
-
-        String[] dirs = pathEnv.split(File.pathSeparator);
-        for (String dir : dirs) {
-            Path p = Paths.get(dir, executableName);
-            if (Files.isExecutable(p) && !Files.isDirectory(p)) {
-                return Optional.of(p.toAbsolutePath());
-            }
-        }
-        return Optional.empty();
-    }
 
     private static FreeRdpInfo inspectBinary(Path path, FreeRdpFlavor flavor) {
         String version = extractVersion(List.of(path.toString(), "--version"));
@@ -151,7 +106,7 @@ public final class FreeRdpLocator {
     }
 
     private static Optional<FreeRdpInfo> checkFlatpak() {
-        Optional<Path> flatpakBin = findExecutableOnPath("flatpak");
+        Optional<Path> flatpakBin = ExecutableLocator.findOnPath("flatpak");
         if (flatpakBin.isEmpty()) {
             return Optional.empty();
         }

@@ -21,7 +21,6 @@ import java.util.Objects;
 public final class Jw365App extends Application {
 
     private AppState state;
-    private Stage primaryStage;
     private StackPane rootContainer;
     private SignInView signInView;
     private MainView mainView;
@@ -48,8 +47,6 @@ public final class Jw365App extends Application {
 
     @Override
     public void start(Stage stage) {
-        this.primaryStage = stage;
-
         Platform.setImplicitExit(true);
 
         rootContainer = new StackPane();
@@ -59,39 +56,36 @@ public final class Jw365App extends Application {
         mainView = new MainView(state);
 
         // Bind root view to authentication state
-        state.authenticatedProperty().addListener((obs, oldVal, isAuth) -> {
-            Platform.runLater(() -> updateActiveView(isAuth));
-        });
+        state.authenticatedProperty().addListener((obs, oldVal, isAuth) -> Platform.runLater(() -> updateActiveView(isAuth)));
         updateActiveView(state.authenticatedProperty().get());
 
         Scene scene = new Scene(rootContainer, 1050, 720);
         String cssPath = Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css")).toExternalForm();
         scene.getStylesheets().add(cssPath);
 
-        primaryStage.setTitle("JW365 - Windows 365 & AVD Client");
-        primaryStage.setMinWidth(750);
-        primaryStage.setMinHeight(550);
-        primaryStage.setScene(scene);
+        stage.setTitle("JW365 - Windows 365 & AVD Client");
+        stage.setMinWidth(750);
+        stage.setMinHeight(550);
+        stage.setScene(scene);
 
         // Load multiple icon resolutions so Wayland / X11 window managers select the crispest match
         for (int size : new int[]{16, 32, 48, 64, 128, 256}) {
             try (InputStream is = getClass().getResourceAsStream("/org/alaurie/jw365/gui/icons/icon_" + size + ".png")) {
                 if (is != null) {
-                    primaryStage.getIcons().add(new Image(is));
+                    stage.getIcons().add(new Image(is));
                 }
             } catch (Exception ignored) {
             }
         }
 
         // Lifecycle hooks
-        primaryStage.setOnCloseRequest(e -> cleanup());
+        stage.setOnCloseRequest(e -> cleanup());
 
         // Initialize state & load cached data
         state.initialize();
 
-        primaryStage.show();
+        stage.show();
     }
-
     @Override
     public void stop() {
         cleanup();

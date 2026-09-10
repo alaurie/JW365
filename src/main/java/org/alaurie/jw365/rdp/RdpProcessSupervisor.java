@@ -236,7 +236,6 @@ public final class RdpProcessSupervisor {
             sessionId,
             resource.title(),
             process,
-            logFile,
             SessionStatus.STARTING
         );
 
@@ -420,54 +419,11 @@ public final class RdpProcessSupervisor {
             }
             if (primary != null) {
                 ids.remove(primary);
-                ids.add(0, primary);
+                ids.addFirst(primary);
             }
             return ids.isEmpty() ? Optional.empty() : Optional.of(String.join(",", ids));
         } catch (Exception ignored) {
             return Optional.empty();
-        }
-    }
-    /**
-     * Ensures FreeRDP SDL client configuration disables hazardous default hotkeys (such as Right Shift + D = Disconnect).
-     */
-    public static void ensureSdlConfig() {
-        String safeConfig = """
-            {
-              "SDL_KeyModMask": ["KMOD_NONE"],
-              "SDL_Disconnect": ["SDL_SCANCODE_F12"],
-              "SDL_Minimize": ["SDL_SCANCODE_F11"],
-              "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
-            }
-            """;
-
-        // 1. Native config path (~/.config/freerdp/sdl-freerdp.json)
-        try {
-            String configHome = System.getenv("XDG_CONFIG_HOME");
-            Path base = (configHome != null && !configHome.isBlank())
-                ? Path.of(configHome)
-                : Path.of(System.getProperty("user.home"), ".config");
-            Path configFile = base.resolve("freerdp").resolve("sdl-freerdp.json");
-            String existing = Files.exists(configFile) ? Files.readString(configFile) : "";
-            if (!Files.exists(configFile) || existing.contains("KMOD_RSHIFT") || existing.contains("KMOD_RCTRL") || existing.contains("SDL_SCANCODE_D")) {
-                Files.createDirectories(configFile.getParent());
-                Files.writeString(configFile, safeConfig, StandardCharsets.UTF_8);
-            }
-        } catch (Exception e) {
-            System.err.println("Warning: Could not configure native sdl-freerdp.json: " + e.getMessage());
-        }
-
-        // 2. Flatpak sandbox config path (~/.var/app/com.freerdp.FreeRDP/config/freerdp/sdl-freerdp.json)
-        try {
-            Path flatpakDir = Path.of(System.getProperty("user.home"), ".var", "app", "com.freerdp.FreeRDP", "config", "freerdp");
-            if (Files.exists(flatpakDir.getParent())) {
-                Path flatpakConfig = flatpakDir.resolve("sdl-freerdp.json");
-                String existing = Files.exists(flatpakConfig) ? Files.readString(flatpakConfig) : "";
-                if (!Files.exists(flatpakConfig) || existing.contains("KMOD_RSHIFT") || existing.contains("KMOD_RCTRL") || existing.contains("SDL_SCANCODE_D")) {
-                    Files.createDirectories(flatpakDir);
-                    Files.writeString(flatpakConfig, safeConfig, StandardCharsets.UTF_8);
-                }
-            }
-        } catch (Exception ignored) {
         }
     }
 }

@@ -35,7 +35,6 @@ public final class AuthDialog extends Stage {
     private final AppState state;
     private final PkceChallenge challenge;
     private final WebView webView;
-    private final WebEngine webEngine;
     private final ProgressBar progressBar;
     private final Label statusLabel;
     private boolean codeIntercepted = false;
@@ -81,7 +80,7 @@ public final class AuthDialog extends Stage {
 
         // Center WebView
         webView = new WebView();
-        webEngine = webView.getEngine();
+        WebEngine webEngine = webView.getEngine();
         webEngine.setJavaScriptEnabled(true);
         webEngine.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
         root.setCenter(webView);
@@ -145,16 +144,14 @@ public final class AuthDialog extends Stage {
             webView.setDisable(true);
         });
 
-        state.signInWithCode(code, challenge.codeVerifier(), OAuthClient.REDIRECT_URI, () -> {
-            Platform.runLater(this::close);
-        }, error -> {
-            Platform.runLater(() -> {
+        state.signInWithCode(code, challenge.codeVerifier(), OAuthClient.REDIRECT_URI,
+            () -> Platform.runLater(this::close),
+            error -> Platform.runLater(() -> {
                 codeIntercepted = false;
                 statusLabel.setText("Authentication failed: " + error);
                 progressBar.setVisible(false);
                 webView.setDisable(false);
-            });
-        });
+            }));
     }
 
     private static String extractCodeFromText(String text) {

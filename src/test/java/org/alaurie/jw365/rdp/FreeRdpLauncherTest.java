@@ -46,7 +46,7 @@ class FreeRdpLauncherTest {
 
         List<String> cmd = RdpProcessSupervisor.buildCommandLine(freeRdp, config);
 
-        assertThat(cmd.get(0)).isEqualTo("/usr/bin/sdl-freerdp");
+        assertThat(cmd.getFirst()).isEqualTo("/usr/bin/sdl-freerdp");
         assertThat(cmd).contains(rdpFile.toAbsolutePath().toString());
         assertThat(cmd).contains("/gateway:type:arm");
         assertThat(cmd).contains("/sec:aad");
@@ -81,7 +81,7 @@ class FreeRdpLauncherTest {
 
         List<String> cmd = RdpProcessSupervisor.buildCommandLine(freeRdp, config);
 
-        assertThat(cmd.get(0)).isEqualTo("flatpak");
+        assertThat(cmd.getFirst()).isEqualTo("flatpak");
         assertThat(cmd.get(1)).isEqualTo("run");
         assertThat(cmd.get(2)).isEqualTo("--file-forwarding");
         assertThat(cmd.get(3)).isEqualTo("com.freerdp.FreeRDP");

@@ -49,12 +49,14 @@ class BrowserLocatorTest {
 
             // Simulate browser redirect with auth code
             URI callbackRequest = URI.create("http://127.0.0.1:" + port + "/auth/callback?code=mock_auth_code_12345&state=xyz");
-            HttpClient httpClient = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder().uri(callbackRequest).GET().build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            try (HttpClient httpClient = HttpClient.newHttpClient()) {
+                HttpRequest request = HttpRequest.newBuilder().uri(callbackRequest).GET().build();
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            assertThat(response.statusCode()).isEqualTo(200);
-            assertThat(response.body()).contains("Sign-in Successful");
+                assertThat(response.statusCode()).isEqualTo(200);
+                assertThat(response.body()).contains("Sign-in Successful");
+            }
+
 
             String receivedCode = codeFuture.get();
             assertThat(receivedCode).isEqualTo("mock_auth_code_12345");

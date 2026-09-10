@@ -76,9 +76,7 @@ public final class SessionAuthDialog extends Stage {
         });
 
         // Clean up on manual window close
-        setOnCloseRequest(e -> {
-            cancelTimer();
-        });
+        setOnCloseRequest(e -> cancelTimer());
     }
 
     /**

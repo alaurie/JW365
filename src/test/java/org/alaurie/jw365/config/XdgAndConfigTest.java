@@ -95,8 +95,8 @@ class XdgAndConfigTest {
 
         List<Workspace> loaded = cache.loadWorkspaces();
         assertThat(loaded).hasSize(1);
-        assertThat(loaded.get(0).resources()).hasSize(1);
-        assertThat(loaded.get(0).resources().get(0).title()).isEqualTo("Cloud PC 1");
+        assertThat(loaded.getFirst().resources()).hasSize(1);
+        assertThat(loaded.getFirst().resources().getFirst().title()).isEqualTo("Cloud PC 1");
 
         // Test icon caching
         byte[] fakePngBytes = new byte[]{ (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };

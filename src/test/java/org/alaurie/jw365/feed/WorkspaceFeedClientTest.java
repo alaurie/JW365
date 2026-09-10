@@ -93,9 +93,7 @@ class WorkspaceFeedClientTest {
         });
 
         // 5. Error endpoint
-        server.createContext("/api/error/unauthorized", exchange -> {
-            sendResponse(exchange, 401, "application/json", "{\"error\": \"Unauthorized\"}".getBytes(StandardCharsets.UTF_8));
-        });
+        server.createContext("/api/error/unauthorized", exchange -> sendResponse(exchange, 401, "application/json", "{\"error\": \"Unauthorized\"}".getBytes(StandardCharsets.UTF_8)));
 
         server.start();
     }
@@ -122,10 +120,8 @@ class WorkspaceFeedClientTest {
     private static void sendResponse(HttpExchange exchange, int status, String contentType, byte[] body) throws IOException {
         exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(status, body.length);
-        try (OutputStream os = exchange.getResponseBody()) {
+        try (exchange; OutputStream os = exchange.getResponseBody()) {
             os.write(body);
-        } finally {
-            exchange.close();
         }
     }
 
@@ -138,7 +134,7 @@ class WorkspaceFeedClientTest {
         List<TenantFeed> feeds = client.discoverTenantFeeds("test_token_xyz");
 
         assertThat(feeds).hasSize(1);
-        TenantFeed feed = feeds.get(0);
+        TenantFeed feed = feeds.getFirst();
         assertThat(feed.tenantId()).isEqualTo("tenant-123");
         assertThat(feed.tenantDisplayName()).isEqualTo("Contoso Workspace");
         assertThat(feed.feedUrl().toString()).contains("http://localhost:" + port + "/api/feed/tenant-123");
@@ -158,10 +154,10 @@ class WorkspaceFeedClientTest {
         List<Workspace> workspaces = client.fetchAllWorkspaces("test_token_xyz", List.of(tenant));
 
         assertThat(workspaces).hasSize(1);
-        Workspace ws = workspaces.get(0);
+        Workspace ws = workspaces.getFirst();
         assertThat(ws.resources()).hasSize(1);
 
-        WorkspaceResource res = ws.resources().get(0);
+        WorkspaceResource res = ws.resources().getFirst();
         assertThat(res.id()).isEqualTo("res-cloudpc-1");
         assertThat(res.title()).isEqualTo("Cloud PC 01");
         assertThat(res.type()).isEqualTo(ResourceType.DESKTOP);

@@ -14,10 +14,8 @@ import javafx.scene.image.Image;
 import org.alaurie.jw365.auth.AuthResult;
 import org.alaurie.jw365.auth.BrowserInfo;
 import org.alaurie.jw365.auth.BrowserLocator;
-import org.alaurie.jw365.auth.JwtClaimsParser;
-import org.alaurie.jw365.auth.LoopbackAuthReceiver;
 import org.alaurie.jw365.auth.OAuthClient;
-import org.alaurie.jw365.auth.PkceChallenge;
+import org.alaurie.jw365.auth.JwtClaimsParser;
 import org.alaurie.jw365.auth.TokenResponse;
 import org.alaurie.jw365.auth.TokenStore;
 import org.alaurie.jw365.auth.UserClaims;
@@ -38,14 +36,11 @@ import org.alaurie.jw365.rdp.SessionStatus;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -181,9 +176,6 @@ public final class AppState {
         }, refreshMin, refreshMin, TimeUnit.MINUTES);
     }
 
-    public void signInWithCode(String authorizationCode, String codeVerifier, Runnable onSuccess, Consumer<String> onError) {
-        signInWithCode(authorizationCode, codeVerifier, OAuthClient.REDIRECT_URI, onSuccess, onError);
-    }
 
     public void signInWithCode(String authorizationCode, String codeVerifier, String redirectUri, Runnable onSuccess, Consumer<String> onError) {
         long generation = operationGeneration.get();
@@ -210,17 +202,12 @@ public final class AppState {
                             refreshWorkspacesAsync(false);
                         });
                     }
-                    case AuthResult.Failure(var code, var msg, var cause) -> {
-                        runOnFxThread(() -> {
-                            setLoading(false, "Authentication failed");
-                            if (onError != null) {
-                                onError.accept(msg != null ? msg : code);
-                            }
-                        });
-                    }
-                    case AuthResult.DeviceCodeRequired ignored -> {
-                        runOnFxThread(() -> setLoading(false, "Device code required"));
-                    }
+                    case AuthResult.Failure(var code, var msg, _) -> runOnFxThread(() -> {
+                        setLoading(false, "Authentication failed");
+                        if (onError != null) {
+                            onError.accept(msg != null ? msg : code);
+                        }
+                    });
                 }
             } catch (Exception e) {
                 runOnFxThread(() -> {
@@ -233,46 +220,6 @@ public final class AppState {
         });
     }
 
-    /**
-     * Performs browser sign-in through a localhost loopback callback.
-     */
-    public void signInWithBrowser(BrowserInfo browser, Runnable onSuccess, Consumer<String> onError) {
-        setLoading(true, "Opening " + (browser != null ? browser.displayName() : "browser") + " for sign-in...");
-
-        Thread.ofVirtual().name("jw365-browser-sso").start(() -> {
-            LoopbackAuthReceiver receiver = null;
-            try {
-                receiver = new LoopbackAuthReceiver();
-                PkceChallenge challenge = PkceChallenge.create();
-                ClientConfig config = configManager.get();
-
-                String redirectUri = receiver.getRedirectUri().toString();
-                URI authUri = oauthClient.buildAuthorizeUrl(config.defaultTenant(), challenge, redirectUri, null);
-
-                // Launch Edge / browser
-                BrowserInfo targetBrowser = browser != null ? browser : BrowserLocator.findBestBrowser();
-                BrowserLocator.launch(targetBrowser, authUri, true);
-
-                runOnFxThread(() -> statusMessage.set("Waiting for sign-in in " + targetBrowser.displayName() + "..."));
-
-                // Wait for redirect
-                CompletableFuture<String> codeFuture = receiver.waitForAuthCode(Duration.ofMinutes(5));
-                String code = codeFuture.get();
-
-                signInWithCode(code, challenge.codeVerifier(), redirectUri, onSuccess, onError);
-            } catch (Exception e) {
-                if (receiver != null) {
-                    receiver.close();
-                }
-                runOnFxThread(() -> {
-                    setLoading(false, "Browser sign-in failed: " + e.getMessage());
-                    if (onError != null) {
-                        onError.accept(e.getMessage());
-                    }
-                });
-            }
-        });
-    }
 
     public void signOut() {
         operationGeneration.incrementAndGet();
@@ -358,7 +305,7 @@ public final class AppState {
                             .filter(r -> r.type().isDesktop())
                             .toList();
                         if (allDesktops.size() == 1) {
-                            connectResource(allDesktops.get(0), null);
+                            connectResource(allDesktops.getFirst(), null);
                         }
                     }
                 });
@@ -434,10 +381,6 @@ public final class AppState {
                 DisplayMode effectiveMode = displayMode != null ? displayMode : DisplayMode.DEFAULT;
                 boolean multiMon = (effectiveMode == DisplayMode.MULTIMON) || (effectiveMode == DisplayMode.DEFAULT && config.multiMonitor());
                 boolean fullscreen = (effectiveMode == DisplayMode.FULLSCREEN) || (effectiveMode == DisplayMode.DEFAULT && config.fullscreen()) || multiMon;
-                if (effectiveMode == DisplayMode.WINDOWED) {
-                    fullscreen = false;
-                    multiMon = false;
-                }
 
                 RdpSessionConfig sessionConfig = new RdpSessionConfig(
                     rdpFilePath,
@@ -546,9 +489,6 @@ public final class AppState {
         return configManager;
     }
 
-    public RdpProcessSupervisor getRdpSupervisor() {
-        return rdpSupervisor;
-    }
 
     public BooleanProperty authenticatedProperty() {
         return authenticated;
@@ -586,9 +526,6 @@ public final class AppState {
         return detectedFreeRdp;
     }
 
-    public ObjectProperty<BrowserInfo> detectedEdgeProperty() {
-        return detectedEdge;
-    }
 
     private void setLoading(boolean isLoading, String message) {
         runOnFxThread(() -> {

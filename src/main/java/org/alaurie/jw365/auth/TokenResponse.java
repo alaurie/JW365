@@ -27,27 +27,6 @@ public record TokenResponse(
         }
     }
 
-    /**
-     * Creates a new TokenResponse with the current epoch timestamp stamped.
-     */
-    public static TokenResponse of(
-        String accessToken,
-        String refreshToken,
-        String idToken,
-        String tokenType,
-        long expiresIn,
-        String scope
-    ) {
-        return new TokenResponse(
-            accessToken,
-            refreshToken,
-            idToken,
-            tokenType,
-            expiresIn,
-            scope,
-            Instant.now().getEpochSecond()
-        );
-    }
 
     @JsonIgnore
     public Instant expiresAt() {

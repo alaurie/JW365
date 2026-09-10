@@ -86,10 +86,8 @@ class OAuthFlowTest {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.sendResponseHeaders(status, bytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
+        try (exchange; OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
-        } finally {
-            exchange.close();
         }
     }
 

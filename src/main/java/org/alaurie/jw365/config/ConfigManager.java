@@ -31,9 +31,6 @@ public final class ConfigManager {
         this.configFile = Objects.requireNonNull(configFile, "configFile must not be null");
     }
 
-    public Path getConfigFile() {
-        return configFile;
-    }
 
     /**
      * Loads the current configuration from disk, creating default if not found.

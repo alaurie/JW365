@@ -63,9 +63,10 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+val versionExpansion = mapOf("version" to cleanVersion)
 tasks.named<ProcessResources>("processResources") {
     filesMatching("**/version.properties") {
-        expand(mapOf("version" to cleanVersion))
+        expand(versionExpansion)
     }
 }
 
@@ -81,13 +82,46 @@ tasks.withType<JavaExec>().configureEach {
 // Packaging: jlink minimal runtime + jpackage .deb, .rpm & portable tarball
 // --------------------------------------------------------------------------
 
-val javaHome = javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
+val javaHome: String = javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
 val jpackageJvmOptions = jvmFlags.flatMap { listOf("--java-options", it) }
 val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
 val resourceDir = file("packaging")
 val inputDir = layout.buildDirectory.dir("install/jw365/lib")
+val flatpakManifest = file("io.github.alaurie.JW365.yml")
+val flatpakBuildDir = layout.buildDirectory.dir("flatpak")
+val flatpakRepoDir = layout.buildDirectory.dir("flatpak-repo")
+val flatpakBundleFile = layout.buildDirectory.file("distributions/jw365.flatpak")
+
+tasks.register<Exec>("flatpakBuild") {
+    group = "distribution"
+    description = "Builds the Flatpak application"
+    dependsOn("test")
+    commandLine(
+        "flatpak-builder",
+        "--force-clean",
+        "--repo=${flatpakRepoDir.get().asFile.absolutePath}",
+        flatpakBuildDir.get().asFile.absolutePath,
+        flatpakManifest.absolutePath
+    )
+}
+
+tasks.register<Exec>("flatpakBundle") {
+    group = "distribution"
+    description = "Creates the distributable Flatpak bundle"
+    dependsOn("flatpakBuild")
+    doFirst { flatpakBundleFile.get().asFile.parentFile.mkdirs() }
+    commandLine(
+        "flatpak",
+        "build-bundle",
+        flatpakRepoDir.get().asFile.absolutePath,
+        flatpakBundleFile.get().asFile.absolutePath,
+        "io.github.alaurie.JW365"
+    )
+}
 
 tasks.register<Exec>("createRuntimeImage") {
+    group = "distribution"
+    description = "Creates the minimized Java runtime image used by application packages"
     dependsOn("jar")
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
     outputs.dir(runtimeDir)
@@ -110,6 +144,8 @@ tasks.register<Exec>("createRuntimeImage") {
 }
 
 tasks.register<Exec>("packageDeb") {
+    group = "distribution"
+    description = "Builds the native Debian package"
     dependsOn("installDist", "createRuntimeImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
@@ -142,6 +178,8 @@ tasks.register<Exec>("packageDeb") {
 }
 
 tasks.register<Exec>("packageAppImage") {
+    group = "distribution"
+    description = "Builds the Linux application image"
     dependsOn("installDist", "createRuntimeImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
@@ -172,6 +210,8 @@ tasks.register<Exec>("packageAppImage") {
 }
 
 tasks.register<Exec>("packagePortableTar") {
+    group = "distribution"
+    description = "Builds the portable Linux tarball"
     dependsOn("packageAppImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val tarFile = File(distDir, "jw365-$cleanVersion-linux-x64.tar.gz")
@@ -202,6 +242,8 @@ tasks.register("deb") {
 }
 
 tasks.register<Exec>("packageRpm") {
+    group = "distribution"
+    description = "Builds the native RPM package"
     dependsOn("installDist", "createRuntimeImage")
     val distDir = layout.buildDirectory.dir("distributions").get().asFile
     val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile

@@ -54,7 +54,7 @@ class PersistentCookieManagerTest {
         List<HttpCookie> loadedCookies = store2.getCookies();
         assertThat(loadedCookies).hasSize(1);
 
-        HttpCookie restored = loadedCookies.get(0);
+        HttpCookie restored = loadedCookies.getFirst();
         assertThat(restored.getName()).isEqualTo("ESTSAUTH");
         assertThat(restored.getValue()).isEqualTo("mock_session_token_123");
         assertThat(restored.getDomain()).isEqualTo("login.microsoftonline.com");

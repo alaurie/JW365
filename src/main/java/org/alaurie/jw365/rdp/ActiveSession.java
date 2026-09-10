@@ -1,7 +1,5 @@
 package org.alaurie.jw365.rdp;
 
-import java.nio.file.Path;
-import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -14,8 +12,6 @@ public final class ActiveSession {
     private final String sessionId;
     private final String resourceTitle;
     private final Process process;
-    private final Path logFile;
-    private final Instant startTime;
     private final AtomicReference<SessionStatus> status;
     private final java.util.concurrent.atomic.AtomicBoolean userInitiatedStop = new java.util.concurrent.atomic.AtomicBoolean(false);
 
@@ -23,14 +19,11 @@ public final class ActiveSession {
         String sessionId,
         String resourceTitle,
         Process process,
-        Path logFile,
         SessionStatus initialStatus
     ) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId must not be null");
         this.resourceTitle = Objects.requireNonNull(resourceTitle, "resourceTitle must not be null");
         this.process = Objects.requireNonNull(process, "process must not be null");
-        this.logFile = logFile;
-        this.startTime = Instant.now();
         this.status = new AtomicReference<>(initialStatus != null ? initialStatus : SessionStatus.STARTING);
     }
 
@@ -42,17 +35,6 @@ public final class ActiveSession {
         return resourceTitle;
     }
 
-    public Process process() {
-        return process;
-    }
-
-    public Path logFile() {
-        return logFile;
-    }
-
-    public Instant startTime() {
-        return startTime;
-    }
 
     public SessionStatus status() {
         return status.get();

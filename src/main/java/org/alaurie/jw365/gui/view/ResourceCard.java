@@ -28,7 +28,6 @@ public final class ResourceCard extends VBox {
 
     private final WorkspaceResource resource;
     private final AppState state;
-    private final ImageView iconView;
     private final Label statusBadge;
     private final Button actionButton;
     private final javafx.collections.MapChangeListener<String, SessionStatus> statusListener;
@@ -49,14 +48,14 @@ public final class ResourceCard extends VBox {
         iconContainer.setPrefSize(64, 64);
         iconContainer.setMaxSize(64, 64);
 
-        iconView = new ImageView();
+        ImageView iconView = new ImageView();
         iconView.setFitWidth(48);
         iconView.setFitHeight(48);
         iconView.setPreserveRatio(true);
         iconContainer.getChildren().add(iconView);
 
         // Load icon via AppState
-        state.loadResourceIcon(resource, icon -> iconView.setImage(icon));
+        state.loadResourceIcon(resource, iconView::setImage);
 
         // Badges Row (Type badge & Status badge)
         HBox badgesBox = new HBox(6);
@@ -121,27 +120,22 @@ public final class ResourceCard extends VBox {
         }
     }
 
-    public WorkspaceResource getResource() {
-        return resource;
-    }
 
     private void handleActionClick() {
         SessionStatus current = state.getSessionStatuses().get(resource.id());
         if (current != null && current.isActive()) {
             state.disconnectResource(resource);
         } else {
-            state.connectResource(resource, error -> {
-                Platform.runLater(() -> {
-                    javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                        javafx.scene.control.Alert.AlertType.ERROR,
-                        error,
-                        javafx.scene.control.ButtonType.OK
-                    );
-                    alert.setHeaderText("Connection Failed");
-                    alert.setTitle("JW365");
-                    alert.showAndWait();
-                });
-            });
+            state.connectResource(resource, error -> Platform.runLater(() -> {
+                javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.ERROR,
+                    error,
+                    javafx.scene.control.ButtonType.OK
+                );
+                alert.setHeaderText("Connection Failed");
+                alert.setTitle("JW365");
+                alert.showAndWait();
+            }));
         }
     }
 

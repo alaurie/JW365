@@ -36,10 +36,8 @@ public final class MainView extends BorderPane {
     private final TextField searchField;
     private final Label userPillLabel;
     private final Label resourceCountLabel;
-    private final Label statusMessageLabel;
     private final Label rdpEngineLabel;
     private final Label lastSyncedLabel;
-    private final ProgressIndicator refreshIndicator;
     private final java.util.Map<String, ResourceCard> cardCache = new java.util.HashMap<>();
     public MainView(AppState state) {
         this.state = state;
@@ -62,7 +60,7 @@ public final class MainView extends BorderPane {
         searchField.setPromptText("Search Cloud PCs and Apps...");
         searchField.textProperty().addListener((obs, oldV, newV) -> updateWorkspaceGrid());
 
-        refreshIndicator = new ProgressIndicator();
+        ProgressIndicator refreshIndicator = new ProgressIndicator();
         refreshIndicator.setMaxSize(16, 16);
         refreshIndicator.visibleProperty().bind(state.loadingProperty());
 
@@ -124,7 +122,7 @@ public final class MainView extends BorderPane {
         resourceCountLabel = new Label("0 resources");
         resourceCountLabel.getStyleClass().add("status-bar-text");
 
-        statusMessageLabel = new Label();
+        Label statusMessageLabel = new Label();
         statusMessageLabel.getStyleClass().add("status-bar-text");
         statusMessageLabel.textProperty().bind(state.statusMessageProperty());
 

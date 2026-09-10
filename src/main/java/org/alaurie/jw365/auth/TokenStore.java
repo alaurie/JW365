@@ -44,9 +44,6 @@ public final class TokenStore {
         }
     }
 
-    public Path getTokenFile() {
-        return encryptedFile;
-    }
 
     /**
      * Loads the cached token response.

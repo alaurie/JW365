@@ -1,12 +1,7 @@
 package org.alaurie.jw365.auth;
 
-import java.awt.Desktop;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.nio.file.Files;
+import org.alaurie.jw365.util.ExecutableLocator;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +41,7 @@ public final class BrowserLocator {
      */
     public static Optional<BrowserInfo> findEdge() {
         for (String candidate : EDGE_CANDIDATES) {
-            Optional<Path> found = findOnPath(candidate);
+            Optional<Path> found = ExecutableLocator.findOnPath(candidate);
             if (found.isPresent()) {
                 return Optional.of(new BrowserInfo(
                     BrowserInfo.BrowserType.EDGE,
@@ -60,7 +55,7 @@ public final class BrowserLocator {
         }
 
         // Check flatpak
-        if (isFlatpakInstalled("com.microsoft.Edge")) {
+        if (isEdgeFlatpakInstalled()) {
             return Optional.of(new BrowserInfo(
                 BrowserInfo.BrowserType.EDGE,
                 "Microsoft Edge (Flatpak)",
@@ -72,17 +67,14 @@ public final class BrowserLocator {
         }
 
         return Optional.empty();
+
     }
 
     /**
      * Finds the recommended browser for authentication, preferring Microsoft Edge for M365 SSO.
      */
     public static BrowserInfo findBestBrowser() {
-        Optional<BrowserInfo> edge = findEdge();
-        if (edge.isPresent()) {
-            return edge.get();
-        }
-        return BrowserInfo.systemDefault();
+        return findEdge().orElseGet(BrowserInfo::systemDefault);
     }
 
     /**
@@ -94,7 +86,7 @@ public final class BrowserLocator {
         findEdge().ifPresent(list::add);
 
         for (String c : CHROME_CANDIDATES) {
-            Optional<Path> found = findOnPath(c);
+            Optional<Path> found = ExecutableLocator.findOnPath(c);
             if (found.isPresent()) {
                 list.add(new BrowserInfo(BrowserInfo.BrowserType.CHROME, "Google Chrome", found.get(), false, false, null));
                 break;
@@ -102,7 +94,7 @@ public final class BrowserLocator {
         }
 
         for (String c : CHROMIUM_CANDIDATES) {
-            Optional<Path> found = findOnPath(c);
+            Optional<Path> found = ExecutableLocator.findOnPath(c);
             if (found.isPresent()) {
                 list.add(new BrowserInfo(BrowserInfo.BrowserType.CHROMIUM, "Chromium", found.get(), false, false, null));
                 break;
@@ -110,7 +102,7 @@ public final class BrowserLocator {
         }
 
         for (String c : FIREFOX_CANDIDATES) {
-            Optional<Path> found = findOnPath(c);
+            Optional<Path> found = ExecutableLocator.findOnPath(c);
             if (found.isPresent()) {
                 list.add(new BrowserInfo(BrowserInfo.BrowserType.FIREFOX, "Mozilla Firefox", found.get(), false, false, null));
                 break;
@@ -123,80 +115,14 @@ public final class BrowserLocator {
         return list;
     }
 
-    /**
-     * Launches the specified browser to open the target URI.
-     *
-     * @param browser target browser info
-     * @param uri     the URI to navigate to
-     * @param appMode if true and browser is Chromium/Edge, opens as dedicated app window (--app=URL)
-     */
-    public static void launch(BrowserInfo browser, URI uri, boolean appMode) throws IOException {
-        if (browser == null || browser.type() == BrowserInfo.BrowserType.SYSTEM_DEFAULT) {
-            launchDefault(uri);
-            return;
-        }
 
-        List<String> command = new ArrayList<>();
-
-        if (browser.isFlatpak()) {
-            command.add("flatpak");
-            command.add("run");
-            command.add(browser.flatpakAppId());
-            command.add(uri.toString());
-        } else if (browser.executablePath() != null) {
-            command.add(browser.executablePath().toString());
-            if (appMode && (browser.isEdge() || browser.type() == BrowserInfo.BrowserType.CHROME || browser.type() == BrowserInfo.BrowserType.CHROMIUM)) {
-                command.add("--app=" + uri);
-            } else {
-                command.add("--new-window");
-                command.add(uri.toString());
-            }
-        } else {
-            launchDefault(uri);
-            return;
-        }
-
-        new ProcessBuilder(command).start();
-    }
-
-    private static void launchDefault(URI uri) throws IOException {
-        Optional<Path> xdgOpen = findOnPath("xdg-open");
-        if (xdgOpen.isPresent()) {
-            new ProcessBuilder(xdgOpen.get().toString(), uri.toString()).start();
-            return;
-        }
-
-        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            Desktop.getDesktop().browse(uri);
-            return;
-        }
-
-        throw new IOException("No supported mechanism to open browser for URI: " + uri);
-    }
-
-    private static Optional<Path> findOnPath(String executableName) {
-        String pathEnv = System.getenv("PATH");
-        if (pathEnv == null || pathEnv.isBlank()) {
-            return Optional.empty();
-        }
-
-        String[] dirs = pathEnv.split(File.pathSeparator);
-        for (String dir : dirs) {
-            Path p = Paths.get(dir, executableName);
-            if (Files.isExecutable(p) && !Files.isDirectory(p)) {
-                return Optional.of(p.toAbsolutePath());
-            }
-        }
-        return Optional.empty();
-    }
-
-    private static boolean isFlatpakInstalled(String appId) {
-        Optional<Path> flatpakBin = findOnPath("flatpak");
+    private static boolean isEdgeFlatpakInstalled() {
+        Optional<Path> flatpakBin = ExecutableLocator.findOnPath("flatpak");
         if (flatpakBin.isEmpty()) {
             return false;
         }
         try {
-            Process p = new ProcessBuilder("flatpak", "info", appId).start();
+            Process p = new ProcessBuilder("flatpak", "info", "com.microsoft.Edge").start();
             return p.waitFor() == 0;
         } catch (Exception ignored) {
             return false;

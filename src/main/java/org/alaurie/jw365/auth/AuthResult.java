@@ -1,6 +1,5 @@
 package org.alaurie.jw365.auth;
 
-import java.net.URI;
 
 /**
  * Sealed result type representing the outcome of an authentication attempt.
@@ -13,16 +12,6 @@ public sealed interface AuthResult {
     record Success(TokenResponse tokens, UserClaims claims) implements AuthResult {
     }
 
-    /**
-     * Device code authorization is waiting for the user to complete sign-in.
-     */
-    record DeviceCodeRequired(
-        String userCode,
-        URI verificationUri,
-        String message,
-        DeviceCodeResponse rawResponse
-    ) implements AuthResult {
-    }
 
     /**
      * Authentication failed with an error message.

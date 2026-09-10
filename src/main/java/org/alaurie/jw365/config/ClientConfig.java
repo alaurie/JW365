@@ -86,15 +86,4 @@ public record ClientConfig(
             Collections.emptyList()
         );
     }
-    public DisplaySettings displaySettings() {
-        return new DisplaySettings(fullscreen, multiMonitor, scalePercent, dynamicResolution);
-    }
-
-    public RedirectionSettings redirectionSettings() {
-        return new RedirectionSettings(sound, microphone, clipboard, usbRedirection, smartcard);
-    }
-
-    public record DisplaySettings(boolean fullscreen, boolean multiMonitor, int scalePercent, boolean dynamicResolution) {}
-
-    public record RedirectionSettings(boolean sound, boolean microphone, boolean clipboard, boolean usb, boolean smartcard) {}
 }

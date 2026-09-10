@@ -14,13 +14,8 @@ import org.alaurie.jw365.gui.state.AppState;
  */
 public final class SignInView extends StackPane {
 
-    private final AppState state;
-    private final ProgressIndicator progressIndicator;
-    private final Label statusLabel;
-    private final Button signInBtn;
 
     public SignInView(AppState state) {
-        this.state = state;
 
         getStyleClass().add("signin-container");
 
@@ -44,7 +39,7 @@ public final class SignInView extends StackPane {
         headerBox.getChildren().addAll(title, badge, subtitle);
 
         // Direct Sign-in Button (Opens embedded login window with 0 copying)
-        signInBtn = new Button("Sign in with Microsoft");
+        Button signInBtn = new Button("Sign in with Microsoft");
         signInBtn.getStyleClass().add("btn-primary");
         signInBtn.setPrefWidth(280);
         signInBtn.setPrefHeight(44);
@@ -65,11 +60,11 @@ public final class SignInView extends StackPane {
         });
 
         // Status & Progress Indicator
-        progressIndicator = new ProgressIndicator();
+        ProgressIndicator progressIndicator = new ProgressIndicator();
         progressIndicator.setMaxSize(24, 24);
         progressIndicator.visibleProperty().bind(state.loadingProperty());
 
-        statusLabel = new Label();
+        Label statusLabel = new Label();
         statusLabel.getStyleClass().add("status-bar-text");
         statusLabel.textProperty().bind(state.statusMessageProperty());
 

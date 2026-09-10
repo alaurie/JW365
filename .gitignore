@@ -83,3 +83,16 @@ Thumbs.db
 # ------------------------------------------------------------------------------
 *.tmp
 *.tmp.*
+
+# ------------------------------------------------------------------------------
+# Local Flatpak and distribution build outputs
+# ------------------------------------------------------------------------------
+.flatpak-builder/
+flatpak-repo/
+repo/
+Project_Default.xml
+bin/
+build-flatpak/
+*.flatpak
+*.deb
+*.rpm

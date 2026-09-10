@@ -2,9 +2,6 @@ package org.alaurie.jw365.rdp;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Path;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -14,8 +11,7 @@ class RdpProcessSupervisorLifecycleTest {
 
     @Test
     @DisplayName("ActiveSession accurately tracks state, writes input, and terminates cleanly")
-    void testActiveSessionLifecycle(@TempDir Path tempDir) throws Exception {
-        Path logFile = tempDir.resolve("test_session.log");
+    void testActiveSessionLifecycle() throws Exception {
 
         // Spawn a lightweight long-running echo process
         Process process = new ProcessBuilder("cat").start();
@@ -24,7 +20,6 @@ class RdpProcessSupervisorLifecycleTest {
             "test-res-1",
             "Test Cloud PC",
             process,
-            logFile,
             SessionStatus.STARTING
         );
 
@@ -54,7 +49,7 @@ class RdpProcessSupervisorLifecycleTest {
         AtomicBoolean authHandled = new AtomicBoolean(false);
         AtomicReference<String> passedUrl = new AtomicReference<>();
 
-        SessionEvent event = new SessionEvent.AuthRequired(
+        SessionEvent.AuthRequired event = new SessionEvent.AuthRequired(
             "session-abc",
             "https://login.microsoftonline.com/authorize?foo=bar",
             url -> {
@@ -65,18 +60,8 @@ class RdpProcessSupervisorLifecycleTest {
 
         assertThat(event.sessionId()).isEqualTo("session-abc");
 
-        // Pattern match
-        switch (event) {
-            case SessionEvent.AuthRequired(var id, var url, var submitter) -> {
-                assertThat(id).isEqualTo("session-abc");
-                assertThat(url).contains("https://login.microsoftonline.com");
-                submitter.accept("https://login.microsoftonline.com/nativeclient?code=12345");
-            }
-            case SessionEvent.Started s -> throw new AssertionError("Unexpected event: " + s);
-            case SessionEvent.StatusChanged sc -> throw new AssertionError("Unexpected event: " + sc);
-            case SessionEvent.OutputLine ol -> throw new AssertionError("Unexpected event: " + ol);
-            case SessionEvent.Exited ex -> throw new AssertionError("Unexpected event: " + ex);
-        }
+        assertThat(event.authUrl()).contains("https://login.microsoftonline.com");
+        event.submitRedirectUrl().accept("https://login.microsoftonline.com/nativeclient?code=12345");
 
         assertThat(authHandled.get()).isTrue();
         assertThat(passedUrl.get()).isEqualTo("https://login.microsoftonline.com/nativeclient?code=12345");
