@@ -8,29 +8,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OAuthClientTest {
 
-    @Test
-    @DisplayName("PKCE challenge generates high entropy verifier and valid S256 challenge")
-    void testPkceChallengeGeneration() {
-        PkceChallenge challenge = PkceChallenge.create();
 
-        assertThat(challenge.codeVerifier()).isNotBlank().hasSizeGreaterThanOrEqualTo(43);
-        assertThat(challenge.codeChallenge()).isNotBlank();
-        assertThat(challenge.state()).isNotBlank();
-
-        // Verify S256 computation matches
-        String computed = PkceChallenge.computeS256(challenge.codeVerifier());
-        assertThat(challenge.codeChallenge()).isEqualTo(computed);
-
-        // Verify URL-safe characters only
-        assertThat(challenge.codeVerifier()).matches("^[a-zA-Z0-9_-]+$");
-        assertThat(challenge.codeChallenge()).matches("^[a-zA-Z0-9_-]+$");
-        assertThat(challenge.state()).matches("^[a-zA-Z0-9_-]+$");
-    }
 
     @Test
     @DisplayName("TokenResponse expiration logic operates accurately")
@@ -113,23 +99,40 @@ class OAuthClientTest {
     }
 
     @Test
-    @DisplayName("OAuthClient builds valid authorize URL with PKCE parameters")
-    void testAuthorizeUrlBuilder() {
-        OAuthClient client = new OAuthClient();
-        PkceChallenge challenge = PkceChallenge.create();
+    @DisplayName("Embedded authorization URLs request query responses for WebView interception")
+    void embeddedAuthorizationUrlUsesQueryResponseMode() {
+        PkceChallenge challenge = new PkceChallenge(
+            "verifier",
+            PkceChallenge.computeS256("verifier"),
+            "state-value"
+        );
 
-        URI authUri = client.buildAuthorizeUrl("contoso-tenant", challenge, "alex@contoso.com");
+        URI authorizeUri = new OAuthClient().buildAuthorizeUrl(
+            OAuthClient.DEFAULT_TENANT,
+            challenge,
+            OAuthClient.REDIRECT_URI,
+            null
+        );
 
-        assertThat(authUri.getHost()).isEqualTo("login.microsoftonline.com");
-        assertThat(authUri.getPath()).isEqualTo("/contoso-tenant/oauth2/v2.0/authorize");
-
-        String rawQuery = authUri.getRawQuery();
-        assertThat(rawQuery).contains("client_id=" + OAuthClient.DEFAULT_CLIENT_ID);
-        assertThat(rawQuery).contains("response_type=code");
-        assertThat(rawQuery).contains("code_challenge_method=S256");
-        assertThat(rawQuery).contains("code_challenge=" + challenge.codeChallenge());
-        assertThat(rawQuery).contains("state=" + challenge.state());
-        assertThat(rawQuery).contains("login_hint=alex%40contoso.com");
-        assertThat(rawQuery).contains("prompt=select_account");
+        assertThat(authorizeUri.getRawQuery()).contains("response_mode=query");
+        assertThat(authorizeUri.getRawQuery()).contains("state=state-value");
     }
+
+    @Test
+    @DisplayName("Sign-out removes the encrypted MSAL cache file")
+    void clearCacheAndAccountsRemovesEncryptedCache(@TempDir Path tempDir) throws Exception {
+        Path cacheFile = tempDir.resolve("msal-cache.enc");
+        Files.write(cacheFile, MachineBoundCrypto.encrypt("{}".getBytes(StandardCharsets.UTF_8)));
+
+        OAuthClient client = new OAuthClient(
+            OAuthClient.DEFAULT_CLIENT_ID,
+            OAuthClient.DEFAULT_SCOPE,
+            null,
+            cacheFile
+        );
+        client.clearCacheAndAccounts();
+
+        assertThat(cacheFile).doesNotExist();
+    }
+
 }

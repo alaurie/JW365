@@ -1,19 +1,25 @@
 package org.alaurie.jw365.auth;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
+import com.microsoft.aad.msal4j.AuthorizationCodeParameters;
+import com.microsoft.aad.msal4j.AuthorizationRequestUrlParameters;
+import com.microsoft.aad.msal4j.IAuthenticationResult;
+import com.microsoft.aad.msal4j.IAccount;
+import com.microsoft.aad.msal4j.ITokenCacheAccessAspect;
+import com.microsoft.aad.msal4j.ITokenCacheAccessContext;
+import com.microsoft.aad.msal4j.PublicClientApplication;
+import com.microsoft.aad.msal4j.SilentParameters;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
+import java.util.Map;
 
+import org.alaurie.jw365.config.XdgPaths;
 /**
  * HTTP client for Entra ID OAuth 2.0 authentication.
  */
@@ -24,164 +30,157 @@ public final class OAuthClient {
      */
     public static final String DEFAULT_CLIENT_ID = "a85cf173-4192-42f8-81fa-777a763e6e2c";
     public static final String DEFAULT_TENANT = "organizations";
-    public static final String DEFAULT_SCOPE = "https://www.wvd.microsoft.com/.default offline_access openid profile";
     public static final String REDIRECT_URI = "https://login.microsoftonline.com/common/oauth2/nativeclient";
+    public static final String DEFAULT_SCOPE = "https://www.wvd.microsoft.com/.default offline_access openid profile";
     private static final String LOGIN_BASE = "https://login.microsoftonline.com/%s/oauth2/v2.0";
-
     private final String clientId;
     private final String scope;
-    private final HttpClient httpClient;
-    private final ObjectMapper mapper;
-
+    private final PublicClientApplication msalApplication;
+    private final FileTokenCacheAspect tokenCacheAspect;
     public OAuthClient() {
-        this(DEFAULT_CLIENT_ID, DEFAULT_SCOPE, HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_2)
-            .connectTimeout(Duration.ofSeconds(15))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build());
+        this(DEFAULT_CLIENT_ID, DEFAULT_SCOPE, null);
     }
 
-    public OAuthClient(String clientId, String scope, HttpClient httpClient) {
+    public OAuthClient(String clientId, String scope, HttpClient ignoredHttpClient) {
+        this(clientId, scope, ignoredHttpClient, XdgPaths.dataDir().resolve("msal-cache.enc"));
+    }
+
+    OAuthClient(String clientId, String scope, HttpClient ignoredHttpClient, Path msalCacheFile) {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
         this.scope = Objects.requireNonNull(scope, "scope must not be null");
-        this.httpClient = Objects.requireNonNull(httpClient, "httpClient must not be null");
-        this.mapper = new ObjectMapper();
+        this.tokenCacheAspect = new FileTokenCacheAspect(Objects.requireNonNull(msalCacheFile, "msalCacheFile must not be null"));
+        this.msalApplication = createMsalApplication(clientId, DEFAULT_TENANT, tokenCacheAspect);
     }
 
-
-    /**
-     * Builds the interactive PKCE authorization URL to present to the user or embedded WebView.
-     */
-    public URI buildAuthorizeUrl(String tenant, PkceChallenge challenge, String loginHint) {
-        return buildAuthorizeUrl(tenant, challenge, REDIRECT_URI, loginHint);
-    }
-
-    /**
-     * Builds the interactive PKCE authorization URL with a specific redirect URI.
-     */
     public URI buildAuthorizeUrl(String tenant, PkceChallenge challenge, String redirectUri, String loginHint) {
-        String effectiveRedirect = (redirectUri != null && !redirectUri.isBlank()) ? redirectUri : REDIRECT_URI;
-        URI baseUri = buildEndpointUri(tenant, "authorize");
-
-        StringBuilder sb = new StringBuilder(baseUri.toString());
-        sb.append("?client_id=").append(urlEncode(clientId));
-        sb.append("&response_type=code");
-        sb.append("&redirect_uri=").append(urlEncode(effectiveRedirect));
-        sb.append("&scope=").append(urlEncode(scope));
-        sb.append("&code_challenge=").append(urlEncode(challenge.codeChallenge()));
-        sb.append("&code_challenge_method=S256");
-        sb.append("&state=").append(urlEncode(challenge.state()));
-        sb.append("&prompt=select_account");
-
-        if (loginHint != null && !loginHint.isBlank()) {
-            sb.append("&login_hint=").append(urlEncode(loginHint));
-        }
-
-        return URI.create(sb.toString());
-    }
-
-    /**
-     * Exchanges an authorization code and PKCE verifier for OAuth tokens with the default nativeclient redirect.
-     */
-    public AuthResult exchangeCodeForTokens(String tenant, String authorizationCode, String codeVerifier) {
-        return exchangeCodeForTokens(tenant, authorizationCode, codeVerifier, REDIRECT_URI);
-    }
-
-    /**
-     * Exchanges an authorization code and PKCE verifier for OAuth tokens with a specific redirect URI.
-     */
-    public AuthResult exchangeCodeForTokens(String tenant, String authorizationCode, String codeVerifier, String redirectUri) {
-        String effectiveRedirect = (redirectUri != null && !redirectUri.isBlank()) ? redirectUri : REDIRECT_URI;
-        URI tokenUri = buildEndpointUri(tenant, "token");
-
-        Map<String, String> params = new HashMap<>();
-        params.put("client_id", clientId);
-        params.put("grant_type", "authorization_code");
-        params.put("code", authorizationCode);
-        params.put("redirect_uri", effectiveRedirect);
-        params.put("code_verifier", codeVerifier);
-        params.put("scope", scope);
-
-        return executeTokenRequest(tokenUri, params);
-    }
-
-    /**
-     * Performs a silent token refresh using a cached refresh token.
-     */
-    public AuthResult refreshToken(String tenant, String refreshToken) {
-        if (refreshToken == null || refreshToken.isBlank()) {
-            return new AuthResult.Failure("missing_refresh_token", "No refresh token available");
-        }
-
-        URI tokenUri = buildEndpointUri(tenant, "token");
-
-        Map<String, String> params = new HashMap<>();
-        params.put("client_id", clientId);
-        params.put("grant_type", "refresh_token");
-        params.put("refresh_token", refreshToken);
-        params.put("scope", scope);
-
-        return executeTokenRequest(tokenUri, params);
-    }
-
-
-    private static URI buildEndpointUri(String tenant, String endpoint) {
-        String effectiveTenant = (tenant != null && !tenant.isBlank()) ? tenant : DEFAULT_TENANT;
-        if (effectiveTenant.startsWith("http://") || effectiveTenant.startsWith("https://")) {
-            URI tenantUri = URI.create(effectiveTenant);
-            String scheme = tenantUri.getScheme();
-            boolean localHttp = "http".equalsIgnoreCase(scheme)
-                && ("localhost".equalsIgnoreCase(tenantUri.getHost())
-                    || "127.0.0.1".equalsIgnoreCase(tenantUri.getHost())
-                    || "::1".equalsIgnoreCase(tenantUri.getHost()));
-            if (!"https".equalsIgnoreCase(scheme) && !localHttp) {
-                throw new IllegalArgumentException("Tenant endpoint must use HTTPS");
-            }
-            return URI.create(effectiveTenant + "/oauth2/v2.0/" + endpoint);
-        }
-        return URI.create(String.format(LOGIN_BASE, effectiveTenant) + "/" + endpoint);
-    }
-
-    private AuthResult executeTokenRequest(URI tokenUri, Map<String, String> params) {
         try {
-            String formBody = encodeFormData(params);
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(tokenUri)
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Accept", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(formBody, StandardCharsets.UTF_8))
-                .timeout(Duration.ofSeconds(20))
+            var parameters = AuthorizationRequestUrlParameters.builder(redirectUri, Set.of(scope.split("\\s+")))
+                .codeChallenge(challenge.codeChallenge())
+                .codeChallengeMethod("S256")
+                .state(challenge.state())
+                .extraQueryParameters(Map.of("response_mode", "query"))
+                .loginHint(loginHint)
                 .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() == 200) {
-                TokenResponse tokens = mapper.readValue(response.body(), TokenResponse.class);
-                UserClaims claims = JwtClaimsParser.parseIdToken(tokens.idToken());
-                return new AuthResult.Success(tokens, claims);
-            }
-
-            JsonNode errorNode = mapper.readTree(response.body());
-            String error = errorNode.has("error") ? errorNode.get("error").asString() : "http_" + response.statusCode();
-            String errorDesc = errorNode.has("error_description") ? errorNode.get("error_description").asString() : response.body();
-
-            return new AuthResult.Failure(error, errorDesc);
+            return applicationFor(tenant).getAuthorizationRequestUrl(parameters).toURI();
         } catch (Exception e) {
-            return new AuthResult.Failure("network_error", "Failed to communicate with identity provider: " + e.getMessage(), e);
+            throw new IllegalStateException("Unable to build Microsoft authorization URL", e);
+        }
+    }
+    public synchronized AuthResult exchangeAuthorizationCode(String tenant, String code, String verifier, String redirectUri) {
+        try {
+            AuthorizationCodeParameters parameters = AuthorizationCodeParameters.builder(code, URI.create(redirectUri))
+                .scopes(Set.of(scope.split("\\s+")))
+                .codeVerifier(verifier)
+                .tenant(tenant)
+                .build();
+            return toAuthResult(applicationFor(tenant).acquireToken(parameters).join());
+        } catch (Exception e) {
+            return new AuthResult.Failure("authorization_code_failed", e.getMessage(), e);
         }
     }
 
-    private static String encodeFormData(Map<String, String> params) {
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            if (!sb.isEmpty()) {
-                sb.append('&');
+    public synchronized AuthResult refreshTokenWithMsal(String tenant) {
+        try {
+            IAccount account = applicationFor(tenant).getAccounts().join().stream().findFirst().orElse(null);
+            if (account == null) {
+                return new AuthResult.Failure("missing_account", "No cached Microsoft account is available");
             }
-            sb.append(urlEncode(entry.getKey())).append('=').append(urlEncode(entry.getValue()));
+            SilentParameters parameters = SilentParameters.builder(Set.of(scope.split("\\s+")), account)
+                .tenant(tenant)
+                .forceRefresh(true)
+                .build();
+            return toAuthResult(applicationFor(tenant).acquireTokenSilently(parameters).join());
+        } catch (Exception e) {
+            return new AuthResult.Failure("token_refresh_failed", e.getMessage(), e);
         }
-        return sb.toString();
     }
 
-    private static String urlEncode(String value) {
-        return URLEncoder.encode(value != null ? value : "", StandardCharsets.UTF_8);
+    /** Removes all MSAL accounts and the encrypted serialized cache. */
+    public synchronized void clearCacheAndAccounts() {
+        try {
+            for (IAccount account : msalApplication.getAccounts().join()) {
+                msalApplication.removeAccount(account).join();
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Could not clear Microsoft authentication cache: " + e.getMessage());
+        } finally {
+            tokenCacheAspect.clear();
+        }
+    }
+
+    private AuthResult toAuthResult(IAuthenticationResult result) {
+        long expiresIn = Math.max(0, (result.expiresOnDate().getTime() - System.currentTimeMillis()) / 1000);
+        TokenResponse tokens = new TokenResponse(result.accessToken(), null, result.idToken(), "Bearer", expiresIn, scope, System.currentTimeMillis() / 1000);
+        return new AuthResult.Success(tokens, JwtClaimsParser.parseIdToken(result.idToken()));
+    }
+
+    private PublicClientApplication createMsalApplication(String applicationId, String tenant, FileTokenCacheAspect cacheAspect) {
+        try {
+            return PublicClientApplication.builder(applicationId)
+                .authority(String.format(LOGIN_BASE, normalizeTenant(tenant)))
+                .setTokenCacheAccessAspect(cacheAspect)
+                .build();
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to initialize Microsoft authentication", e);
+        }
+    }
+    private PublicClientApplication applicationFor(String tenant) {
+        return createMsalApplication(clientId, normalizeTenant(tenant), tokenCacheAspect);
+    }
+
+    private static String normalizeTenant(String tenant) {
+        return tenant == null || tenant.isBlank() ? DEFAULT_TENANT : tenant;
+    }
+
+
+    private static final class FileTokenCacheAspect implements ITokenCacheAccessAspect {
+        private final Path file;
+
+        private FileTokenCacheAspect(Path file) {
+            this.file = file;
+        }
+
+        @Override
+        public synchronized void beforeCacheAccess(ITokenCacheAccessContext context) {
+            try {
+                if (Files.exists(file) && Files.size(file) > 0) {
+                    context.tokenCache().deserialize(new String(MachineBoundCrypto.decrypt(Files.readAllBytes(file)), StandardCharsets.UTF_8));
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        @Override
+        public synchronized void afterCacheAccess(ITokenCacheAccessContext context) {
+            if (!context.hasCacheChanged()) return;
+            try {
+                Path parent = file.getParent();
+                if (parent != null) Files.createDirectories(parent);
+                byte[] encrypted = MachineBoundCrypto.encrypt(context.tokenCache().serialize().getBytes(StandardCharsets.UTF_8));
+                Path tempFile = file.resolveSibling(file.getFileName() + ".tmp." + System.nanoTime());
+                try {
+                    Files.write(tempFile, encrypted);
+                    try {
+                        Files.setPosixFilePermissions(tempFile, PosixFilePermissions.fromString("rw-------"));
+                    } catch (UnsupportedOperationException ignored) {
+                    }
+                    try {
+                        Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                        Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } finally {
+                    Files.deleteIfExists(tempFile);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        private synchronized void clear() {
+            try {
+                Files.deleteIfExists(file);
+            } catch (Exception ignored) {
+            }
+        }
     }
 }

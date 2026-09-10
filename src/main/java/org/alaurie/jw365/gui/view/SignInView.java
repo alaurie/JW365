@@ -46,6 +46,8 @@ public final class SignInView extends StackPane {
         signInBtn.setStyle("-fx-font-size: 14px; -fx-padding: 10 20 10 20;");
 
         signInBtn.setOnAction(e -> {
+            // The bundled Microsoft client only permits the fixed nativeclient
+            // redirect, so all sign-in preferences use this embedded flow.
             AuthDialog dialog = new AuthDialog(getScene().getWindow(), state);
             dialog.showAndWait();
         });

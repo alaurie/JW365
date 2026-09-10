@@ -16,7 +16,6 @@ public record ClientConfig(
     @JsonProperty("defaultTenant") String defaultTenant,
     @JsonProperty("freerdpSource") FreeRdpSource freerdpSource,
     @JsonProperty("preferredFreeRdpPath") String preferredFreeRdpPath,
-    @JsonProperty("preferredBrowser") String preferredBrowser,
     @JsonProperty("scalePercent") int scalePercent,
     @JsonProperty("fullscreen") boolean fullscreen,
     @JsonProperty("sound") boolean sound,
@@ -46,10 +45,10 @@ public record ClientConfig(
         extraArgs = extraArgs != null ? List.copyOf(extraArgs) : Collections.emptyList();
     }
 
+
     public ClientConfig(
         String defaultTenant,
         String preferredFreeRdpPath,
-        String preferredBrowser,
         int scalePercent,
         boolean fullscreen,
         boolean sound,
@@ -59,14 +58,13 @@ public record ClientConfig(
         int autoRefreshMinutes,
         List<String> extraArgs
     ) {
-        this(defaultTenant, FreeRdpSource.AUTO, preferredFreeRdpPath, preferredBrowser, scalePercent, fullscreen, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, false, false, autoRefreshMinutes, extraArgs);
+        this(defaultTenant, FreeRdpSource.AUTO, preferredFreeRdpPath, scalePercent, fullscreen, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, false, false, false, autoRefreshMinutes, extraArgs);
     }
 
     public static ClientConfig defaultConfig() {
         return new ClientConfig(
             OAuthClient.DEFAULT_TENANT,
             FreeRdpSource.AUTO,
-            null,
             null,
             0,
             false,

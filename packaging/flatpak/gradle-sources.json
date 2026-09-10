@@ -115,6 +115,12 @@
   },
   {
     "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.12.2/junit-bom-5.12.2.pom",
+    "sha256": "cef80fec86454f6806bfb0df24669b5c6f32e2cb728539ea859f47dfdc9bbc17",
+    "dest": "offline-repository/org/junit/junit-bom/5.12.2"
+  },
+  {
+    "type": "file",
     "url": "https://repo.maven.apache.org/maven2/org/openjfx/javafx-base/25.0.4/javafx-base-25.0.4-linux.jar",
     "sha256": "c4fdfd2b5845edbcaa83928a85fb38dd4c63a337229728fac36d2b6c816763a6",
     "dest": "offline-repository/org/openjfx/javafx-base/25.0.4"
@@ -238,5 +244,59 @@
     "url": "https://repo.maven.apache.org/maven2/tools/jackson/jackson-bom/3.2.2/jackson-bom-3.2.2.pom",
     "sha256": "1d6ca81311534231b34da71f0c8b2b08b0888333069d56edb05b9c5c00f51c29",
     "dest": "offline-repository/tools/jackson/jackson-bom/3.2.2"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/microsoft/azure/msal4j/1.26.0/msal4j-1.26.0.jar",
+    "sha256": "2536ab4e804d79bcf86529e3413e27edca540bdfe2030f501ea52a0de1312a70",
+    "dest": "offline-repository/com/microsoft/azure/msal4j/1.26.0"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/microsoft/azure/msal4j/1.26.0/msal4j-1.26.0.pom",
+    "sha256": "68a7c1782628a027a2aa4c684cf7b5981f2ea2577a9b775c526ef11987e4ad13",
+    "dest": "offline-repository/com/microsoft/azure/msal4j/1.26.0"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/azure/azure-json/1.4.0/azure-json-1.4.0.jar",
+    "sha256": "c50bc998cd1a6c689f8644b51c206217bf2da09d5b949e777490a60290cc3a0d",
+    "dest": "offline-repository/com/azure/azure-json/1.4.0"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/azure/azure-json/1.4.0/azure-json-1.4.0.pom",
+    "sha256": "8bcb096939195ae0510fa00c4503fd7d3606b4f874df51f0033b1f8e4d7a3117",
+    "dest": "offline-repository/com/azure/azure-json/1.4.0"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
+    "sha256": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0",
+    "dest": "offline-repository/org/slf4j/slf4j-api/1.7.36"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.pom",
+    "sha256": "fb046a9c229437928bb11c2d27c8b5d773eb8a25e60cbd253d985210dedc2684",
+    "dest": "offline-repository/org/slf4j/slf4j-api/1.7.36"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-parent/1.7.36/slf4j-parent-1.7.36.pom",
+    "sha256": "bb388d37fbcdd3cde64c3cede21838693218dc451f04040c5df360a78ed7e812",
+    "dest": "offline-repository/org/slf4j/slf4j-parent/1.7.36"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/azure/azure-client-sdk-parent/1.7.0/azure-client-sdk-parent-1.7.0.pom",
+    "sha256": "c1e7e7565442303ff54c3e863574eb7a1f69211d845fa435fed84283134bd14a",
+    "dest": "offline-repository/com/azure/azure-client-sdk-parent/1.7.0"
+  },
+  {
+    "type": "file",
+    "url": "https://repo.maven.apache.org/maven2/com/azure/azure-sdk-parent/1.6.0/azure-sdk-parent-1.6.0.pom",
+    "sha256": "9833f9ef397bc21775b389be816b56a6899188220a25ad2a4389b09365039c96",
+    "dest": "offline-repository/com/azure/azure-sdk-parent/1.6.0"
   }
 ]

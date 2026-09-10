@@ -48,6 +48,7 @@ application {
 
 dependencies {
     implementation("tools.jackson.core:jackson-databind:3.2.2")
+    implementation("com.microsoft.azure:msal4j:1.26.0")
 
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -88,6 +89,7 @@ val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
 val resourceDir = file("packaging")
 val inputDir = layout.buildDirectory.dir("install/jw365/lib")
 val flatpakManifest = file("io.github.alaurie.JW365.yml")
+val flatpakSourceDir = layout.buildDirectory.dir("flatpak-source")
 val flatpakBuildDir = layout.buildDirectory.dir("flatpak")
 val flatpakRepoDir = layout.buildDirectory.dir("flatpak-repo")
 val flatpakBundleFile = layout.buildDirectory.file("distributions/jw365.flatpak")
@@ -96,14 +98,87 @@ tasks.register<Exec>("flatpakBuild") {
     group = "distribution"
     description = "Builds the Flatpak application"
     dependsOn("test")
+    environment("APP_VERSION", cleanVersion)
+    val sourceDir = flatpakSourceDir.get().asFile
+    doFirst {
+        sourceDir.deleteRecursively()
+        copy {
+            from(projectDir)
+            into(sourceDir)
+            exclude(
+                ".git/**",
+                ".flatpak-builder/**",
+                ".gradle/**",
+                ".idea/**",
+                ".vscode/**",
+                "bin/**",
+                "build/**",
+                "build-flatpak*/**",
+                "flatpak-repo*/**",
+                "repo/**",
+                "**/*.iml",
+                "Project_Default.xml"
+            )
+        }
+    }
     commandLine(
         "flatpak-builder",
         "--force-clean",
+        "--disable-cache",
+        "--disable-rofiles-fuse",
         "--repo=${flatpakRepoDir.get().asFile.absolutePath}",
         flatpakBuildDir.get().asFile.absolutePath,
-        flatpakManifest.absolutePath
+        sourceDir.resolve(flatpakManifest.name).absolutePath
     )
+    doLast {
+        val appRoot = flatpakBuildDir.get().asFile.resolve("files")
+        val required = mutableListOf(
+            appRoot.resolve("runtime/bin/java"),
+            appRoot.resolve("runtime/lib/modules"),
+            appRoot.resolve("lib/jw365-$cleanVersion.jar")
+        )
+        if (appRoot.resolve("lib").listFiles()?.none {
+                it.isFile && it.name.startsWith("javafx-web-") && it.name.endsWith(".jar")
+            } != false) {
+            required += appRoot.resolve("lib/javafx-web-*.jar")
+        }
+        val missing = required.filterNot { it.isFile }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Flatpak staging is missing required artifacts: " +
+                    missing.joinToString(", ") { it.relativeTo(appRoot).path }
+            )
+        }
+    }
 }
+
+tasks.register("validateFlatpakArtifacts") {
+    group = "distribution"
+    description = "Validates the Java runtime and application libraries for Flatpak"
+    dependsOn("createRuntimeImage", "installDist")
+    doLast {
+        val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
+        val appLibDir = layout.buildDirectory.dir("install/jw365/lib").get().asFile
+        val required = mutableListOf(
+            runtimeDir.resolve("bin/java"),
+            runtimeDir.resolve("lib/modules"),
+            appLibDir.resolve("jw365-$cleanVersion.jar")
+        )
+        if (appLibDir.listFiles()?.none {
+                it.isFile && it.name.startsWith("javafx-web-") && it.name.endsWith(".jar")
+            } != false) {
+            required += appLibDir.resolve("javafx-web-*.jar")
+        }
+        val missing = required.filterNot { it.isFile }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Flatpak build artifacts are missing: " +
+                    missing.joinToString(", ") { it.relativeTo(projectDir).path }
+            )
+        }
+    }
+}
+
 
 tasks.register<Exec>("flatpakBundle") {
     group = "distribution"

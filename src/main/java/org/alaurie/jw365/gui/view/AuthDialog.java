@@ -21,17 +21,15 @@ import org.alaurie.jw365.config.ClientConfig;
 import org.alaurie.jw365.gui.state.AppState;
 
 import java.net.URI;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.Objects;
+import org.alaurie.jw365.auth.OAuthCallback;
 
 /**
  * JavaFX WebView dialog for Entra ID OAuth 2.0 PKCE sign-in.
  */
 public final class AuthDialog extends Stage {
 
-    private static final Pattern CODE_PATTERN = Pattern.compile("[?&]code=([^&]+)");
-
+    private static final URI CALLBACK_URI = URI.create(OAuthClient.REDIRECT_URI);
     private final AppState state;
     private final PkceChallenge challenge;
     private final WebView webView;
@@ -124,17 +122,37 @@ public final class AuthDialog extends Stage {
     }
 
     private void checkLocationForAuthCode(String url) {
-        if (codeIntercepted) return;
+        if (codeIntercepted || !isExpectedRedirect(url)) return;
 
-        if (url.startsWith(OAuthClient.REDIRECT_URI) || url.contains("code=")) {
-            String code = extractCodeFromText(url);
-            if (code != null && !code.isBlank()) {
-                codeIntercepted = true;
-                handleAuthorizationCode(code);
-            }
+        OAuthCallback callback = OAuthCallback.parse(url).orElse(null);
+        if (callback == null) return;
+
+        if (!callback.matchesState(challenge.state())) {
+            codeIntercepted = true;
+            showCallbackFailure("Invalid Microsoft sign-in response");
+            return;
+        }
+        if (callback.hasError()) {
+            codeIntercepted = true;
+            showCallbackFailure("Microsoft sign-in failed: " + callback.errorMessage());
+            return;
+        }
+        if (callback.isSuccess()) {
+            codeIntercepted = true;
+            handleAuthorizationCode(callback.code());
         }
     }
 
+    private static boolean isExpectedRedirect(String url) {
+        return OAuthCallback.isRedirect(url, CALLBACK_URI);
+    }
+    private void showCallbackFailure(String message) {
+        Platform.runLater(() -> {
+            statusLabel.setText(message);
+            progressBar.setVisible(false);
+            webView.setDisable(false);
+        });
+    }
     private void handleAuthorizationCode(String code) {
         if (code == null || code.isBlank()) return;
 
@@ -144,21 +162,16 @@ public final class AuthDialog extends Stage {
             webView.setDisable(true);
         });
 
-        state.signInWithCode(code, challenge.codeVerifier(), OAuthClient.REDIRECT_URI,
-            () -> Platform.runLater(this::close),
-            error -> Platform.runLater(() -> {
+        state.signInWithCode(code, challenge.codeVerifier(), OAuthClient.REDIRECT_URI, () -> {
+            Platform.runLater(this::close);
+        }, error -> {
+            Platform.runLater(() -> {
                 codeIntercepted = false;
                 statusLabel.setText("Authentication failed: " + error);
                 progressBar.setVisible(false);
                 webView.setDisable(false);
-            }));
+            });
+        });
     }
 
-    private static String extractCodeFromText(String text) {
-        Matcher m = CODE_PATTERN.matcher(text);
-        if (m.find()) {
-            return m.group(1);
-        }
-        return null;
-    }
 }

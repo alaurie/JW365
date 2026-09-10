@@ -12,8 +12,6 @@ import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.scene.image.Image;
 import org.alaurie.jw365.auth.AuthResult;
-import org.alaurie.jw365.auth.BrowserInfo;
-import org.alaurie.jw365.auth.BrowserLocator;
 import org.alaurie.jw365.auth.OAuthClient;
 import org.alaurie.jw365.auth.JwtClaimsParser;
 import org.alaurie.jw365.auth.TokenResponse;
@@ -37,10 +35,10 @@ import org.alaurie.jw365.rdp.SessionStatus;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -69,11 +67,11 @@ public final class AppState {
     private final StringProperty searchFilter = new SimpleStringProperty("");
     private final ObjectProperty<Instant> lastSynced = new SimpleObjectProperty<>(null);
     private final ObjectProperty<FreeRdpInfo> detectedFreeRdp = new SimpleObjectProperty<>(null);
-    private final ObjectProperty<BrowserInfo> detectedEdge = new SimpleObjectProperty<>(null);
+    private final Map<String, Image> iconMemoryCache = new ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicBoolean autoConnectTriggered = new java.util.concurrent.atomic.AtomicBoolean(false);
     private final AtomicBoolean refreshInProgress = new AtomicBoolean(false);
     private final AtomicLong operationGeneration = new AtomicLong();
-    private final Map<String, Image> iconMemoryCache = new ConcurrentHashMap<>();
+    private final Object authOperationLock = new Object();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "jw365-scheduler");
         t.setDaemon(true);
@@ -137,14 +135,12 @@ public final class AppState {
     }
 
     public void initialize() {
-        // 1. Locate FreeRDP and Edge Browser
+        // 1. Locate FreeRDP
         ClientConfig config = configManager.get();
         String source = XdgPaths.isFlatpak() ? "BUNDLED" : config.freerdpSource().name();
         Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(source, config.preferredFreeRdpPath());
         runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
 
-        Optional<BrowserInfo> edgeInfo = BrowserLocator.findEdge();
-        runOnFxThread(() -> detectedEdge.set(edgeInfo.orElse(null)));
 
         // 2. Load cached workspaces to immediately populate UI
         List<Workspace> cached = workspaceCache.loadWorkspaces();
@@ -176,57 +172,64 @@ public final class AppState {
         }, refreshMin, refreshMin, TimeUnit.MINUTES);
     }
 
-
     public void signInWithCode(String authorizationCode, String codeVerifier, String redirectUri, Runnable onSuccess, Consumer<String> onError) {
         long generation = operationGeneration.get();
         setLoading(true, "Authenticating with Microsoft Entra ID...");
-
-        Thread.ofVirtual().name("jw365-auth-worker").start(() -> {
-            try {
-                ClientConfig config = configManager.get();
-                AuthResult result = oauthClient.exchangeCodeForTokens(config.defaultTenant(), authorizationCode, codeVerifier, redirectUri);
-
-                switch (result) {
-                    case AuthResult.Success(var tokens, var claims) -> {
-                        if (generation != operationGeneration.get()) {
-                            return;
-                        }
+        Thread.ofVirtual().start(() -> {
+            AuthResult result = oauthClient.exchangeAuthorizationCode(configManager.get().defaultTenant(), authorizationCode, codeVerifier, redirectUri);
+            if (result instanceof AuthResult.Success(var tokens, var claims)) {
+                synchronized (authOperationLock) {
+                    if (generation != operationGeneration.get()) return;
+                    try {
                         tokenStore.save(tokens);
+                    } catch (Exception e) {
+                        if (generation != operationGeneration.get()) return;
                         runOnFxThread(() -> {
-                            currentUser.set(claims);
-                            authenticated.set(true);
-                            setLoading(false, "Signed in as " + claims.displayIdentity());
-                            if (onSuccess != null) {
-                                onSuccess.run();
-                            }
-                            refreshWorkspacesAsync(false);
+                            setLoading(false, "Authentication failed: " + e.getMessage());
+                            if (onError != null) onError.accept(e.getMessage());
                         });
+                        return;
                     }
-                    case AuthResult.Failure(var code, var msg, _) -> runOnFxThread(() -> {
-                        setLoading(false, "Authentication failed");
-                        if (onError != null) {
-                            onError.accept(msg != null ? msg : code);
-                        }
+                    runOnFxThread(() -> {
+                        currentUser.set(claims);
+                        authenticated.set(true);
+                        setLoading(false, "Signed in as " + claims.displayIdentity());
+                        if (onSuccess != null) onSuccess.run();
+                        refreshWorkspacesAsync(false);
                     });
                 }
-            } catch (Exception e) {
+            } else if (result instanceof AuthResult.Failure failure) {
+                if (generation != operationGeneration.get()) return;
                 runOnFxThread(() -> {
-                    setLoading(false, "Error: " + e.getMessage());
-                    if (onError != null) {
-                        onError.accept(e.getMessage());
-                    }
+                    setLoading(false, "Authentication failed: " + failure.errorMessage());
+                    if (onError != null) onError.accept(failure.errorMessage());
                 });
             }
         });
     }
 
+    /**
+     * Opens the nativeclient PKCE flow in the embedded WebView. The bundled
+     * Microsoft client registration does not permit MSAL4J's dynamic
+     * localhost redirect used by external-browser interactive auth.
+     */
+    public void signInWithEmbeddedWebView() {
+        runOnFxThread(() -> {
+            setLoading(false, "Opening embedded Microsoft sign-in...");
+            new org.alaurie.jw365.gui.view.AuthDialog(null, this).show();
+        });
+    }
 
+    /** Clears local credentials, MSAL accounts, and in-flight authentication state. */
     public void signOut() {
-        operationGeneration.incrementAndGet();
+        synchronized (authOperationLock) {
+            operationGeneration.incrementAndGet();
+            tokenStore.clear();
+            oauthClient.clearCacheAndAccounts();
+            workspaceCache.clear();
+            iconMemoryCache.clear();
+        }
         rdpSupervisor.stopAllSessions();
-        tokenStore.clear();
-        workspaceCache.clear();
-        iconMemoryCache.clear();
 
         runOnFxThread(() -> {
             authenticated.set(false);
@@ -238,7 +241,9 @@ public final class AppState {
     }
 
     public void shutdown() {
-        operationGeneration.incrementAndGet();
+        synchronized (authOperationLock) {
+            operationGeneration.incrementAndGet();
+        }
         scheduler.shutdownNow();
         rdpSupervisor.stopAllSessions();
     }
@@ -269,16 +274,21 @@ public final class AppState {
                 ClientConfig config = configManager.get();
 
                 if (forceTokenRefresh || tokens.isExpiringSoon()) {
-                    runOnFxThread(() -> statusMessage.set("Refreshing authentication token..."));
-                    AuthResult refreshResult = oauthClient.refreshToken(config.defaultTenant(), tokens.refreshToken());
+                    AuthResult refreshResult = oauthClient.refreshTokenWithMsal(config.defaultTenant());
                     if (refreshResult instanceof AuthResult.Success(var newTokens, var claims)) {
-                        tokenStore.save(newTokens);
-                        tokens = newTokens;
+                        synchronized (authOperationLock) {
+                            if (generation != operationGeneration.get()) return;
+                            tokens = mergeTokenResponses(tokens, newTokens);
+                            tokenStore.save(tokens);
+                        }
                         if (generation == operationGeneration.get()) {
                             runOnFxThread(() -> currentUser.set(claims));
                         }
                     } else if (refreshResult instanceof AuthResult.Failure f) {
                         System.err.println("Warning: Token refresh failed: " + f.errorMessage());
+                        if (generation != operationGeneration.get()) return;
+                        signInWithEmbeddedWebView();
+                        return;
                     }
                 }
 
@@ -330,6 +340,21 @@ public final class AppState {
                 refreshInProgress.set(false);
             }
         });
+    }
+
+    private static TokenResponse mergeTokenResponses(TokenResponse previous, TokenResponse refreshed) {
+        String refreshToken = refreshed.hasRefreshToken()
+            ? refreshed.refreshToken()
+            : previous.hasRefreshToken() ? previous.refreshToken() : null;
+        return new TokenResponse(
+            refreshed.accessToken(),
+            refreshToken,
+            refreshed.idToken(),
+            refreshed.tokenType(),
+            refreshed.expiresIn(),
+            refreshed.scope(),
+            refreshed.obtainedEpochSec()
+        );
     }
 
     public enum DisplayMode {

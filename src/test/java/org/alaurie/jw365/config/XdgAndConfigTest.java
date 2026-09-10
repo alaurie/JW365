@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +43,6 @@ class XdgAndConfigTest {
         ClientConfig custom = new ClientConfig(
             "custom-tenant-uuid",
             "/usr/bin/sdl-freerdp",
-            "EDGE",
             150,
             true,
             true,
@@ -69,6 +69,20 @@ class XdgAndConfigTest {
         assertThat(loaded.extraArgs()).containsExactly("/bpp:24");
     }
 
+
+    @Test
+    @DisplayName("Legacy preferredBrowser config is ignored on load and save")
+    void legacyBrowserSettingIsIgnored(@TempDir Path tempDir) throws IOException {
+        Path configFile = tempDir.resolve("config.json");
+        Files.writeString(configFile, "{\"defaultTenant\":\"organizations\",\"preferredBrowser\":\"EDGE\"}");
+
+        ConfigManager manager = new ConfigManager(configFile);
+        ClientConfig loaded = manager.load();
+        assertThat(loaded.defaultTenant()).isEqualTo("organizations");
+
+        manager.save(loaded);
+        assertThat(Files.readString(configFile)).doesNotContain("preferredBrowser");
+    }
     @Test
     @DisplayName("WorkspaceCache persists and loads workspaces and cached icons")
     void testWorkspaceCache(@TempDir Path tempDir) {

@@ -17,25 +17,29 @@ import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import javafx.util.Duration;
-import org.alaurie.jw365.rdp.SessionEvent;
+import org.alaurie.jw365.auth.OAuthCallback;
+import org.alaurie.jw365.auth.OAuthClient;
 import org.alaurie.jw365.config.XdgPaths;
+import org.alaurie.jw365.rdp.SessionEvent;
 
+import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 import java.util.Objects;
-
+import javafx.util.Duration;
 /**
  * Resolves FreeRDP Entra ID redirects using persisted WebView session data.
  * Shows a modal WebView when silent authentication does not complete.
  */
 public final class SessionAuthDialog extends Stage {
 
+    private static final URI CALLBACK_URI = URI.create(OAuthClient.REDIRECT_URI);
     private final String authUrl;
     private final Consumer<String> submitRedirectUrl;
     private final String resourceTitle;
+    private final String expectedState;
     private final WebView webView;
     private final WebEngine webEngine;
     private final AtomicBoolean completed = new AtomicBoolean(false);
@@ -46,6 +50,7 @@ public final class SessionAuthDialog extends Stage {
         this.authUrl = authReq.authUrl();
         this.submitRedirectUrl = authReq.submitRedirectUrl();
         this.resourceTitle = resourceTitle;
+        this.expectedState = OAuthCallback.parse(this.authUrl).map(OAuthCallback::state).orElse(null);
 
         if (owner != null) {
             initOwner(owner);
@@ -99,23 +104,29 @@ public final class SessionAuthDialog extends Stage {
     }
 
     private void checkLocationForRedirect(String url) {
-        if (completed.get()) return;
+        if (completed.get() || !isExpectedRedirect(url)) return;
 
-        if (url.contains("code=") && (url.contains("nativeclient") || url.contains("login.microsoftonline.com"))) {
-            if (completed.compareAndSet(false, true)) {
-                cancelTimer();
+        OAuthCallback callback = OAuthCallback.parse(url).orElse(null);
+        if (callback == null || (!callback.isSuccess() && !callback.hasError())) return;
+        if (expectedState != null && !callback.matchesState(expectedState)) return;
 
-                // Submit redirect URL back to FreeRDP's stdin
-                submitRedirectUrl.accept(url);
+        if (completed.compareAndSet(false, true)) {
+            cancelTimer();
 
-                // If window was visible, close it
-                Platform.runLater(() -> {
-                    if (isShowing()) {
-                        close();
-                    }
-                });
-            }
+            // Submit a validated success or error redirect back to FreeRDP's stdin.
+            submitRedirectUrl.accept(url);
+
+            // If window was visible, close it
+            Platform.runLater(() -> {
+                if (isShowing()) {
+                    close();
+                }
+            });
         }
+    }
+
+    private static boolean isExpectedRedirect(String url) {
+        return OAuthCallback.isRedirect(url, CALLBACK_URI);
     }
 
     private void constructAndShowWindow() {

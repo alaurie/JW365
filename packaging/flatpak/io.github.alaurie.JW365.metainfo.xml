@@ -26,7 +26,7 @@
     <binary>jw365</binary>
   </provides>
   <releases>
-    <release version="0.2.2" date="2026-09-09" />
+    <release version="0.2.2" date="2026-09-10" />
   </releases>
   <content_rating type="oars-1.1" />
 </component>

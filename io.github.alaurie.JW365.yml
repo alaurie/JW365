@@ -23,7 +23,7 @@ finish-args:
   - --socket=pulseaudio
   - --socket=pcsc
   - --device=dri
-  - --env=OPENSSL_CONF=/app/share/legacy-openssl.cnf
+  - --talk-name=org.freedesktop.Flatpak
 modules:
   - packaging/flatpak/modules/cJSON.json
   - packaging/flatpak/modules/pcsc.json
@@ -75,14 +75,28 @@ modules:
         JAVA_HOME: /usr/lib/sdk/openjdk25
     build-commands:
       - unzip -q gradle-dist/gradle-9.7.1-bin.zip -d gradle-dist-extracted
-      - GRADLE_USER_HOME=gradle-home gradle-dist-extracted/gradle-9.7.1/bin/gradle --offline --no-daemon createRuntimeImage installDist -PappVersion=0.2.2
-      - install -d /app/runtime /app/lib /app/bin
-      - cp -a build/runtime/. /app/runtime/
-      - cp -a build/install/jw365/lib/. /app/lib/
-      - install -m 0755 packaging/flatpak/jw365-launcher.sh /app/bin/jw365
-      - install -Dm0644 packaging/flatpak/io.github.alaurie.JW365.desktop /app/share/applications/io.github.alaurie.JW365.desktop
-      - install -Dm0644 packaging/flatpak/io.github.alaurie.JW365.metainfo.xml /app/share/metainfo/io.github.alaurie.JW365.metainfo.xml
-      - install -Dm0644 src/main/resources/org/alaurie/jw365/gui/icon.png /app/share/icons/hicolor/256x256/apps/io.github.alaurie.JW365.png
+      - |
+        set -eu
+        VERSION="${APP_VERSION:-$(sed -n 's/^version=//p' src/main/resources/org/alaurie/jw365/version.properties)}"
+        GRADLE_USER_HOME=gradle-home gradle-dist-extracted/gradle-9.7.1/bin/gradle --offline --no-daemon createRuntimeImage installDist validateFlatpakArtifacts -PappVersion="$VERSION"
+        test -x build/runtime/bin/java
+        test -f build/runtime/lib/modules
+        test -f build/install/jw365/lib/javafx-web-25.0.4-linux.jar
+        set -- build/install/jw365/lib/*.jar
+        test -f "$1"
+        install -d /app/runtime /app/lib /app/bin
+        cp -a build/runtime/. /app/runtime/
+        cp -a build/install/jw365/lib/. /app/lib/
+        test -x /app/runtime/bin/java
+        test -f /app/runtime/lib/modules
+        test -f /app/lib/javafx-web-25.0.4-linux.jar
+        set -- /app/lib/*.jar
+        test -f "$1"
+        install -m 0755 packaging/flatpak/jw365-launcher.sh /app/bin/jw365
+        install -Dm0644 packaging/flatpak/io.github.alaurie.JW365.desktop /app/share/applications/io.github.alaurie.JW365.desktop
+        install -Dm0644 packaging/flatpak/io.github.alaurie.JW365.metainfo.xml /app/share/metainfo/io.github.alaurie.JW365.metainfo.xml
+        sed -i "s/version=\"[^\"]*\" date=/version=\"$VERSION\" date=/" /app/share/metainfo/io.github.alaurie.JW365.metainfo.xml
+        install -Dm0644 src/main/resources/org/alaurie/jw365/gui/icon.png /app/share/icons/hicolor/256x256/apps/io.github.alaurie.JW365.png
     sources:
       - type: file
         url: https://services.gradle.org/distributions/gradle-9.7.1-bin.zip

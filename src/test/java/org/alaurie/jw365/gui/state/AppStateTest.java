@@ -37,7 +37,6 @@ class AppStateTest {
         ClientConfig customConfig = new ClientConfig(
             "test-tenant-id",
             null,
-            "EDGE",
             125,
             true,
             true,
@@ -55,5 +54,20 @@ class AppStateTest {
         assertThat(active.scalePercent()).isEqualTo(125);
         assertThat(active.fullscreen()).isTrue();
         assertThat(active.autoRefreshMinutes()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("Sign-out clears the encrypted TokenStore cache")
+    void signOutClearsTokenStore(@TempDir Path tempDir) throws Exception {
+        org.alaurie.jw365.auth.TokenStore store = new org.alaurie.jw365.auth.TokenStore(tempDir.resolve("token-cache.json"));
+        store.save(new org.alaurie.jw365.auth.TokenResponse(
+            "access-token", null, "id-token", "Bearer", 3600, "scope", java.time.Instant.now().getEpochSecond()
+        ));
+        AppState state = new AppState(null, store, new ConfigManager(tempDir.resolve("config.json")), null, null, null);
+
+        state.signOut();
+
+        assertThat(store.load()).isEmpty();
+        state.shutdown();
     }
 }

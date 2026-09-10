@@ -36,7 +36,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * Settings configuration dialog for FreeRDP parameters, display scaling, browser preferences,
+ * Settings configuration dialog for FreeRDP parameters, display scaling,
  * and Entra ID tenant preferences.
  */
 public final class SettingsDialog extends Stage {
@@ -44,7 +44,6 @@ public final class SettingsDialog extends Stage {
     private final AppState state;
 
     private final TextField tenantField;
-    private final ChoiceBox<String> browserChoice;
     private final ChoiceBox<String> freerdpSourceChoice;
     private final TextField customRdpPathField;
     private final ChoiceBox<String> scalingChoice;
@@ -98,21 +97,10 @@ public final class SettingsDialog extends Stage {
         GridPane.setHgrow(tenantField, Priority.ALWAYS);
 
         tenantGrid.addRow(0, tenantLabel, tenantField);
+        Label authHint = new Label("Sign-in uses the embedded WebView required by the current Microsoft registration.");
+        authHint.getStyleClass().add("status-bar-text");
+        authHint.setWrapText(true);
 
-        Label browserLabel = new Label("Auth Browser:");
-        browserLabel.getStyleClass().add("form-label");
-
-        browserChoice = new ChoiceBox<>();
-        browserChoice.getItems().addAll(
-            "Microsoft Edge (Recommended for M365 SSO)",
-            "System Default Browser (xdg-open)",
-            "Embedded In-App WebView",
-            "Google Chrome",
-            "Mozilla Firefox"
-        );
-        browserChoice.setValue(browserCodeToLabel(currentConfig.preferredBrowser()));
-
-        tenantGrid.addRow(1, browserLabel, browserChoice);
 
         // 2. FreeRDP Binary Section
         Label rdpSection = new Label("FreeRDP Client Engine");
@@ -226,8 +214,7 @@ public final class SettingsDialog extends Stage {
         advGrid.addRow(1, extraArgsLabel, extraArgsField);
 
         contentBox.getChildren().addAll(
-            tenantSection, tenantGrid,
-            new Separator(),
+            tenantSection, tenantGrid, authHint,
             rdpSection, detectedLabel, sourceBox, customRdpBox,
             new Separator(),
             displaySection, displayGrid,
@@ -311,13 +298,10 @@ public final class SettingsDialog extends Stage {
             customPath = null;
         }
 
-        String preferredBrowser = labelToBrowserCode(browserChoice.getValue());
-
         ClientConfig newConfig = new ClientConfig(
             tenant,
-            FreeRdpSource.valueOf(browserCodeToSource(freerdpSourceChoice.getValue())),
+            FreeRdpSource.valueOf(sourceLabelToCode(freerdpSourceChoice.getValue())),
             customPath,
-            preferredBrowser,
             scale,
             fullscreenCheck.isSelected(),
             soundCheck.isSelected(),
@@ -348,7 +332,7 @@ public final class SettingsDialog extends Stage {
         return "Automatic (Flatpak first)";
     }
 
-    private static String browserCodeToSource(String label) {
+    private static String sourceLabelToCode(String label) {
         if (label != null && label.startsWith("System")) return "SYSTEM";
         if (label != null && label.startsWith("Flatpak")) return "FLATPAK";
         if (label != null && label.startsWith("Bundled")) return "BUNDLED";
@@ -363,22 +347,6 @@ public final class SettingsDialog extends Stage {
         alert.showAndWait();
     }
 
-    private static String browserCodeToLabel(String code) {
-        if (code == null || code.equalsIgnoreCase("EDGE")) return "Microsoft Edge (Recommended for M365 SSO)";
-        if (code.equalsIgnoreCase("CHROME")) return "Google Chrome";
-        if (code.equalsIgnoreCase("FIREFOX")) return "Mozilla Firefox";
-        if (code.equalsIgnoreCase("WEBVIEW")) return "Embedded In-App WebView";
-        return "System Default Browser (xdg-open)";
-    }
-
-    private static String labelToBrowserCode(String label) {
-        if (label == null) return "EDGE";
-        if (label.contains("Edge")) return "EDGE";
-        if (label.contains("Chrome")) return "CHROME";
-        if (label.contains("Firefox")) return "FIREFOX";
-        if (label.contains("WebView")) return "WEBVIEW";
-        return "DEFAULT";
-    }
 
     private static String scalePercentToString(int scale) {
         if (scale <= 0 || scale == 100) return "100%";

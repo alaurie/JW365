@@ -12,7 +12,6 @@ public sealed interface AuthResult {
     record Success(TokenResponse tokens, UserClaims claims) implements AuthResult {
     }
 
-
     /**
      * Authentication failed with an error message.
      */

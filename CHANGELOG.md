@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-09-10
+
+### Changed
+- Authentication now uses only the embedded JavaFX WebView; external browser choices and their unused detection code were removed. Legacy `preferredBrowser` settings are ignored safely.
+
+---
+
 ## [0.1.7] - 2026-09-07
 
 ### Added

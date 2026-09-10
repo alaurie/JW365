@@ -80,6 +80,7 @@ cd jw365
 
 1. **Launch the App**: Open **JW365** from your application menu or terminal (`jw365`).
 2. **Sign In**: Click **"Sign in with Microsoft"** and enter your work or school account credentials.
+   Authentication runs in the app's embedded WebView because the current Microsoft registration only permits the nativeclient redirect.
 3. **Connect**: Your assigned Cloud PCs will appear on screen. Click **"Connect"** (or double-click the tile) to launch your session.
 4. **Right-Click Context Menu**: Right-click any Cloud PC tile to:
    - Connect in **Fullscreen** or **Windowed** mode.
@@ -103,7 +104,7 @@ For developers, sysadmins, and technical users:
 - **Concurrency**: Project Loom **Virtual Threads** handle all background network discovery, token renewal, and FreeRDP output streaming.
 - **Authentication Handshake**: Embedded WebEngine completes Microsoft Entra ID OAuth 2.0 PKCE (`a85cf173-4192-42f8-81fa-777a763e6e2c`) with direct `nativeclient?code=` interception.
 - **Session Auth Piping**: Real-time output watcher intercepts FreeRDP's `/sec:aad` token prompt and feeds authorization codes directly to FreeRDP's stdin over a native Linux pseudo-terminal (PTY).
-- **Token Security at Rest**: Refresh tokens are encrypted with machine-bound **AES-256-GCM** (keyed to `/etc/machine-id` + user identity via 100,000 rounds of PBKDF2-HMAC-SHA256) with POSIX `0600` file permissions (`~/.local/share/jw365/token-cache.enc`).
+- **Token Security at Rest**: Refresh tokens are encrypted with machine-bound **AES-256-GCM** (keyed to `/etc/machine-id` + user identity via 100,000 rounds of PBKDF2-HMAC-SHA256) with POSIX `0600` file permissions (`~/.local/share/jw365/msal-cache.enc`).
 - **Memory Tuning**: Uses Serial GC (`-XX:+UseSerialGC`), strict heap bounds (`-Xms24m -Xmx192m`), and aggressive memory uncommitting (`-XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=20`) to keep resident memory ~20–25 MB.
 - **Wayland Window Management**: Sets `StartupWMClass=org.alaurie.jw365.gui.Jw365App` and uses native Wayland environment hints (`SDL_VIDEODRIVER=wayland,x11`).
 
