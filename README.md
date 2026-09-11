@@ -1,135 +1,141 @@
-# JW365 - Windows 365 Linux Client
+# JW365 — Windows 365 & AVD Linux Client
 
-**JW365** is a native desktop client for Linux that connects to your **Windows 365 Cloud PC** with a single click.
+Native desktop client for Linux to connect to Microsoft Windows 365 Cloud PCs and Azure Virtual Desktop workspaces.
 
-Microsoft does not provide an official Windows 365 desktop app for Linux. JW365 fills that gap by giving you a clean, dedicated application: sign in with your corporate Microsoft account, see your assigned Cloud PCs, and launch into your Windows desktop with full audio, microphone, multi-monitor, and clipboard support.
+![JW365 Main View](packaging/flatpak/screenshots/main.png)
 
----
+## Features
 
-## Why JW365?
+- **Embedded Entra ID Authentication**: Direct Microsoft work/school account sign-in via embedded WebView with OAuth 2.0 PKCE.
+- **Silent Session Re-auth**: Injects session identity into FreeRDP `/sec:aad` token requests with encrypted, machine-bound cookie persistence.
+- **Optimized FreeRDP 3 Engine**: H.264 video decoding (`/gfx:AVC420,progressive`), RemoteFX (`+rfx`), software GDI compositing, and VSync enabled by default to prevent tearing and flicker.
+- **Dynamic Resolution & Multi-Monitor**: Automatically adapts remote resolution to Linux window size; supports multi-monitor spanning and fullscreen modes.
+- **Audio & Peripheral Redirection**: PulseAudio/PipeWire 48kHz audio output and microphone input, clipboard synchronization, smartcard redirection.
+- **Self-Contained Packages**: Bundled Java 25 runtime image via `jlink`. No local JRE installation required. Available as Flatpak, `.deb`, `.rpm`, and portable `.tar.gz`.
 
-- **True 1-Click Sign-In**: Sign in directly with your Microsoft work or school account inside the app. No terminal commands, no copying URLs from browser address bars, and no manual token pasting.
-- **Stay Logged In**: Remembers your work session securely so you don't have to authenticate or approve MFA prompts every time you open the app.
-- **Dynamic Window Resizing**: Resize your remote desktop window on Linux and your Windows resolution instantly adapts on the fly—no reconnecting or blurry scaling.
-- **Full Multi-Monitor Support**: Spans across multiple displays, including mixed setups with vertical/portrait and landscape screens.
-- **Seamless Copy & Paste**: Copy and paste text, screenshots, and files seamlessly between your Linux desktop and your Cloud PC.
-- **Smooth, Low-Lag Display**: Hardware-accelerated graphics (H.264 video, smooth scrolling, and ClearType font smoothing) are enabled by default for video calls and daily work.
-- **Audio & Microphone Ready**: Redirection configured out of the box for PipeWire and PulseAudio—ideal for Microsoft Teams, Slack, and browser calls.
-- **Automatic Reconnection**: Recovers silently if your Wi-Fi drops or your VPN reconnects without kicking you out of your session.
-- **Lean on Resources**: Keeps active memory usage tiny (~20–25 MB), freeing up your RAM for your local workflow.
-- **Ready to Use (No Java Required)**: Available as self-contained **`.deb`** (Debian/Ubuntu), **`.rpm`** (Fedora/RHEL), and portable **`.tar.gz`** packages with an icon in your app launcher. You do not need to install Java.
+![JW365 Active Session](packaging/flatpak/screenshots/session.png)
 
 ---
 
-## Prerequisites
+## Installation
 
-JW365 uses the open-source **FreeRDP 3** engine to render the remote Windows session. You can install it either through your Linux distribution's package manager or via **Flathub** (recommended for the newest upstream version):
+Download packages from the **[GitHub Releases](https://github.com/alaurie/JW365/releases)** page.
 
-### Option A: Via Flathub (Recommended for the Latest FreeRDP 3.31+)
-Install directly without `sudo`:
+### Flatpak (Recommended)
+
+Flatpak bundle bundles FreeRDP 3.31+ and requires no system dependencies:
+
 ```bash
-flatpak install --user flathub com.freerdp.FreeRDP
+flatpak install --user build/distributions/jw365.flatpak
+flatpak run io.github.alaurie.JW365
 ```
-*JW365 automatically detects and integrates with the Flathub package using secure sandbox file-forwarding.*
 
-### Option B: Via Native Package Manager
+### Ubuntu / Debian (`.deb`)
+
+```bash
+sudo apt install ./jw365_*_amd64.deb
+```
+
+### Fedora / RHEL (`.rpm`)
+
+```bash
+sudo dnf install ./jw365-*.x86_64.rpm
+```
+
+### Portable Tarball (`.tar.gz`)
+
+```bash
+tar -xzf jw365-*-linux-x64.tar.gz
+cd jw365
+
+# Optional: register desktop launcher and icon
+./install-desktop.sh
+
+# Run directly
+./bin/jw365
+```
+
+---
+
+## Prerequisites (Native Packages Only)
+
+The Flatpak package includes its own FreeRDP engine. If using `.deb`, `.rpm`, or `.tar.gz`, install FreeRDP 3:
+
 ```bash
 # Ubuntu / Debian
 sudo apt update && sudo apt install freerdp3-sdl freerdp3-x11
 
-# Fedora / RHEL
+# Fedora
 sudo dnf install freerdp
 
 # Arch Linux
 sudo pacman -S freerdp
 ```
 
-JW365 can use the newest available FreeRDP through Flatpak. In **Settings > FreeRDP Client Engine**, choose **Automatic (Flatpak first)**, **System FreeRDP**, **Flatpak FreeRDP**, or a custom executable.
----
-
-## Quick Install
-
-Download the latest release from the **[Releases Page](https://github.com/alaurie/JW365/releases)**:
-
-### Ubuntu / Debian (`.deb`)
+You can also use Flathub's FreeRDP:
 ```bash
-sudo apt install ./jw365_*_amd64.deb
+flatpak install --user flathub com.freerdp.FreeRDP
 ```
-JW365 will appear in your application launcher menu.
-
-### Fedora / RHEL (`.rpm`)
-```bash
-sudo dnf install ./jw365-*.x86_64.rpm
-```
-
-### Any Linux Distribution (`.tar.gz` portable)
-```bash
-tar -xzf jw365-*-linux-x64.tar.gz
-cd jw365
-
-# (Optional) Add JW365 to your desktop app launcher:
-./install-desktop.sh
-
-# Run directly:
-./bin/jw365
-```
+In **Settings > FreeRDP Client Engine**, choose between system, Flatpak, or custom binaries.
 
 ---
 
-## Using JW365
+## Usage
 
-1. **Launch the App**: Open **JW365** from your application menu or terminal (`jw365`).
-2. **Sign In**: Click **"Sign in with Microsoft"** and enter your work or school account credentials.
-   Authentication runs in the app's embedded WebView because the current Microsoft registration only permits the nativeclient redirect.
-3. **Connect**: Your assigned Cloud PCs will appear on screen. Click **"Connect"** (or double-click the tile) to launch your session.
-4. **Right-Click Context Menu**: Right-click any Cloud PC tile to:
-   - Connect in **Fullscreen** or **Windowed** mode.
-   - Connect in **Multi-Monitor** mode.
-   - **Restart Session** with one click.
-   - View recent connection logs for troubleshooting.
+1. Open **JW365** from app launcher or run `jw365`.
+2. Click **Sign in with Microsoft** and authenticate.
+3. Assigned Cloud PCs and workspaces display automatically.
+4. Click **Connect** (or double-click the tile).
+5. Right-click any tile for:
+   - **Fullscreen** or **Windowed** modes.
+   - **Multi-Monitor** mode.
+   - **Restart Session**.
+   - **View Session Logs**.
 
+### Shortcuts (SDL FreeRDP)
 
-When using fullscreen or multi-monitor mode with SDL FreeRDP:
-- Press **F12** to disconnect.
-- Press **F11** to minimize.
-- Press **F10** to toggle fullscreen.
-- Press **Ctrl + Alt + Enter** to toggle FreeRDP fullscreen when supported.
+- **Right Ctrl + Enter**: Toggle fullscreen
+- **F10**: Toggle fullscreen
+- **F11**: Minimize window
+- **F12**: Disconnect session
+
+*(Client modifier defaults to Right Control to avoid conflicts with typing capital letters).*
+
 ---
 
-## Under the Hood (Technical Architecture)
+## Architecture
 
-For developers, sysadmins, and technical users:
-
-- **Runtime**: Built with **Java 25+** and **OpenJFX 25**, bundled via `jlink` minimal runtime (~100 MB total package).
-- **Concurrency**: Project Loom **Virtual Threads** handle all background network discovery, token renewal, and FreeRDP output streaming.
-- **Authentication Handshake**: Embedded WebEngine completes Microsoft Entra ID OAuth 2.0 PKCE (`a85cf173-4192-42f8-81fa-777a763e6e2c`) with direct `nativeclient?code=` interception.
-- **Session Auth Piping**: Real-time output watcher intercepts FreeRDP's `/sec:aad` token prompt and feeds authorization codes directly to FreeRDP's stdin over a native Linux pseudo-terminal (PTY).
-- **Token Security at Rest**: Refresh tokens are encrypted with machine-bound **AES-256-GCM** (keyed to `/etc/machine-id` + user identity via 100,000 rounds of PBKDF2-HMAC-SHA256) with POSIX `0600` file permissions (`~/.local/share/jw365/msal-cache.enc`).
-- **Memory Tuning**: Uses Serial GC (`-XX:+UseSerialGC`), strict heap bounds (`-Xms24m -Xmx192m`), and aggressive memory uncommitting (`-XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=20`) to keep resident memory ~20–25 MB.
-- **Wayland Window Management**: Sets `StartupWMClass=org.alaurie.jw365.gui.Jw365App` and uses native Wayland environment hints (`SDL_VIDEODRIVER=wayland,x11`).
+- **Runtime**: Java 25 (`jlink` minimal image, ~90 MB).
+- **UI Toolkit**: OpenJFX 25 (JavaFX) with custom dark stylesheet.
+- **Concurrency**: Loom Virtual Threads for workspace discovery, feed parsing, and FreeRDP output streaming.
+- **Session Auth**: Intercepts FreeRDP AAD token requests on stdout, authenticates silently in WebView, and feeds redirect codes to FreeRDP over a PTY.
+- **Token Storage**: AES-256-GCM encrypted local store keyed to host machine ID and user identity (`0600` permissions), with Secret Service (`secret-tool`) fallback.
+- **Resource Tuning**: Serial GC (`-XX:+UseSerialGC`) with aggressive heap uncommit bounds (`-Xms24m -Xmx192m`).
 
 ---
 
 ## Building from Source
 
+Requirements: JDK 25, Linux x86_64.
+
 ```bash
-# Run the 30-test unit suite
+# Run unit & integration test suite (55 tests)
 ./gradlew test
 
-# Run in development mode
-./jw365
-# or
+# Run application in dev mode
 ./gradlew run
 
-# Build distribution packages (outputs to build/distributions/)
-./gradlew deb       # Native .deb
-./gradlew rpm       # Native .rpm (requires rpmbuild)
-./gradlew portable  # Portable .tar.gz
-./gradlew packageAll
+# Build release packages (outputs to build/distributions/)
+./gradlew packageDeb
+./gradlew packageRpm
+./gradlew packagePortableTar
+
+# Build Flatpak bundle
+./gradlew flatpakBuild flatpakBundle
 ```
 
 ---
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+Apache License 2.0. See [LICENSE](LICENSE) for details.
