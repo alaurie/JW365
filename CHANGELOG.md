@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.4] - 2026-09-11
+
+### Fixed
+- Remapped default FreeRDP SDL shortcut modifier to `Right Ctrl` (`KMOD_RCTRL`) to avoid keyboard typing collisions with `Right Shift`.
+- Auto-seed `freerdp/sdl-freerdp.json` configuration on session launch across all package platforms.
+- Resolved connected session status marker detection for FreeRDP 3.31+.
+- Refreshed application and window icon assets with a borderless transparent squircle.
+- Unified GitHub Actions release pipeline to publish all packages (.deb, .rpm, .tar.gz, .flatpak) under a single release.
+
 ## [0.2.3] - 2026-09-11
 
 ### Fixed

@@ -29,6 +29,6 @@ public final class AppVersion {
         if (pkg != null && pkg.getImplementationVersion() != null && !pkg.getImplementationVersion().isBlank()) {
             return pkg.getImplementationVersion().trim();
         }
-        return "0.2.3";
+        return "0.2.4";
     }
 }
