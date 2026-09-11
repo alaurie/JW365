@@ -1,4 +1,4 @@
-# JW365 — Windows 365 & AVD Linux Client
+# JW365 - Windows 365 & AVD Linux Client
 
 Native desktop client for Linux to connect to Microsoft Windows 365 Cloud PCs and Azure Virtual Desktop workspaces.
 
@@ -77,32 +77,17 @@ You can also use Flathub's FreeRDP:
 flatpak install --user flathub com.freerdp.FreeRDP
 ```
 In **Settings > FreeRDP Client Engine**, choose between system, Flatpak, or custom binaries.
-
----
-
-## Usage
-
-1. Open **JW365** from app launcher or run `jw365`.
-2. Click **Sign in with Microsoft** and authenticate.
-3. Assigned Cloud PCs and workspaces display automatically.
-4. Click **Connect** (or double-click the tile).
-5. Right-click any tile for:
-   - **Fullscreen** or **Windowed** modes.
-   - **Multi-Monitor** mode.
-   - **Restart Session**.
-   - **View Session Logs**.
-
 ### Shortcuts (SDL FreeRDP)
 
-- **Right Ctrl + Enter**: Toggle fullscreen
-- **F10**: Toggle fullscreen
-- **F11**: Minimize window
-- **F12**: Disconnect session
+FreeRDP uses `Right Ctrl` as the local client modifier key:
 
-*(Client modifier defaults to Right Control to avoid conflicts with typing capital letters).*
+- **Right Ctrl + Return**: Toggle fullscreen
+- **Right Ctrl + M**: Minimize window
+- **Right Ctrl + D**: Disconnect session
+- **Right Ctrl + G**: Toggle keyboard and mouse grab
+- **Right Ctrl + R**: Toggle resizable window
 
----
-
+*(The modifier was remapped from Right Shift to Right Control so typing capital letters like G and D does not trigger local shortcuts).*
 ## Architecture
 
 - **Runtime**: Java 25 (`jlink` minimal image, ~90 MB).
