@@ -61,7 +61,7 @@ jobs:
           ls -lh build/distributions/
           sha256sum build/distributions/*.deb build/distributions/*.rpm build/distributions/*.tar.gz > build/distributions/checksums-native-sha256.txt
       - name: Upload native packages artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: native-dist
           path: |
@@ -89,7 +89,7 @@ jobs:
           cache: true
 
       - name: Upload flatpak artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flatpak-dist
           path: jw365.flatpak
@@ -116,13 +116,13 @@ jobs:
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Download native packages artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: native-dist
           path: dist/
 
       - name: Download flatpak artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: flatpak-dist
           path: dist/

@@ -197,11 +197,8 @@ public final class RdpProcessSupervisor {
         List<String> rawCommand = buildCommandLine(freeRdp, config);
         if (config.multiMonitor() && !freeRdp.isFlatpak()) {
             detectMonitorSelection(freeRdp).ifPresent(selection -> rawCommand.add("/monitors:" + selection));
-        } else if (config.fullscreen() && freeRdp.isFlatpak()) {
-            detectMonitorSelection(freeRdp).map(selection -> selection.split(",")[0])
-                .ifPresent(primary -> rawCommand.add("/monitors:" + primary));
         }
-        // Use script PTY wrapper if available to provide a valid terminal for FreeRDP
+        ensureSdlConfig();
         List<String> processCommand;
         if (Files.isExecutable(Path.of("/usr/bin/script"))) {
             String joined = rawCommand.stream()
@@ -508,6 +505,30 @@ public final class RdpProcessSupervisor {
         } catch (Exception e) {
             if (process != null && process.isAlive()) process.destroyForcibly();
             return Optional.empty();
+        }
+    }
+
+    private static void ensureSdlConfig() {
+        try {
+            String configHome = System.getenv("XDG_CONFIG_HOME");
+            Path base = (configHome != null && !configHome.isBlank())
+                ? Path.of(configHome)
+                : Path.of(System.getProperty("user.home"), ".config");
+            Path freerdpDir = base.resolve("freerdp");
+            Files.createDirectories(freerdpDir);
+            Path sdlJson = freerdpDir.resolve("sdl-freerdp.json");
+            if (!Files.exists(sdlJson)) {
+                String content = """
+                    {
+                      "SDL_KeyModMask": ["KMOD_RCTRL"],
+                      "SDL_Disconnect": ["SDL_SCANCODE_F12"],
+                      "SDL_Minimize": ["SDL_SCANCODE_F11"],
+                      "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
+                    }
+                    """;
+                Files.writeString(sdlJson, content, StandardCharsets.UTF_8);
+            }
+        } catch (Exception ignored) {
         }
     }
 }
