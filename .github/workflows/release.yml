@@ -95,10 +95,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder ostree
 
-      - name: Configure Flatpak and disable HTTP/2 for Flathub
-        run: |
           sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          sudo ostree --repo=/var/lib/flatpak/repo config set 'remote "flathub"' http2 false
+          sudo ostree --repo=/var/lib/flatpak/repo config --group='remote "flathub"' set http2 false
           for i in 1 2 3 4 5; do
             echo "Installing runtimes (attempt $i)..."
             sudo flatpak install -y --noninteractive flathub \
