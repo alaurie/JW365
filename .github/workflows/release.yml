@@ -91,6 +91,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Disable HTTP/2 for Flathub to avoid CDN framing drop
+        run: |
+          ostree --repo=/var/lib/flatpak/repo config --group='remote "flathub"' set http2 false 2>/dev/null || true
+          mkdir -p /etc/flatpak
+          echo "http.version=HTTP/1.1" >> /etc/flatpak/flatpak.conf
 
       - name: Build Flatpak with official action
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
