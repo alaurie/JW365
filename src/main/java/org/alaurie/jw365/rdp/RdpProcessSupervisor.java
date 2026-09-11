@@ -27,8 +27,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Supervises the lifecycle, execution, and output logging of FreeRDP processes.
  */
 public final class RdpProcessSupervisor {
+    private static final long MAX_SESSION_LOG_BYTES = 2L * 1024 * 1024;
+    private static final String REDACTED = "[REDACTED]";
+
 
     private final Map<String, ActiveSession> activeSessions = new ConcurrentHashMap<>();
+    private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
+    private static final Map<Path, Object> LOG_LOCKS = new ConcurrentHashMap<>();
     private final List<SessionListener> globalListeners = new CopyOnWriteArrayList<>();
 
     public RdpProcessSupervisor() {
@@ -117,12 +122,16 @@ public final class RdpProcessSupervisor {
             cmd.add("+dynamic-resolution");
         }
 
-        // Network auto-optimization
+        // Network auto-optimization and compression
         cmd.add("/network:auto");
+        cmd.add("+compression");
 
-        // Async updates and channel processing
+        // Font smoothing (ClearType) and desktop composition
+        cmd.add("+fonts");
+        cmd.add("+aero");
+
+        // Asynchronous channel processing (FreeRDP 3 deactivated +async-update due to race conditions / stalls)
         if (config.asyncUpdate()) {
-            cmd.add("+async-update");
             cmd.add("+async-channels");
         }
 
@@ -132,15 +141,17 @@ public final class RdpProcessSupervisor {
             cmd.add("/auto-reconnect-max-retries:10");
         }
 
-        // H.264 / RDP8 progressive rendering pipeline
+        // H.264 / AVC420 and Progressive graphics pipeline with RemoteFX
         if (config.gfxProgressive()) {
-            cmd.add("/gfx:progressive");
+            cmd.add("/gfx:AVC420,progressive");
+            cmd.add("+rfx");
         }
 
-        // Display color depth and GDI renderer.
-        cmd.add("/gdi:hw");
+        // Display color depth and software GDI renderer.
+        // GDI software rendering draws into a software surface which the GFX channel composites
+        // directly into the SDL OpenGL texture, eliminating buffer-swapping flicker caused by /gdi:hw.
+        cmd.add("/gdi:sw");
         cmd.add("/bpp:32");
-
         // Log level
         cmd.add("/log-level:info");
         // Custom extra arguments
@@ -173,10 +184,15 @@ public final class RdpProcessSupervisor {
         Objects.requireNonNull(freeRdp, "freeRdp must not be null");
         Objects.requireNonNull(resource, "resource must not be null");
         Objects.requireNonNull(config, "config must not be null");
-
-        String sessionId = resource.id();
-        // Stop any existing session for this resource ID first
-        stopSession(sessionId);
+        String sessionId = resource.identityKey();
+        Object sessionLock = sessionLocks.computeIfAbsent(sessionId, ignored -> new Object());
+        Path logFile;
+        Process process;
+        ActiveSession session;
+        synchronized (sessionLock) {
+            ActiveSession existing = activeSessions.get(sessionId);
+            if (existing != null) existing.stop();
+            stopSession(sessionId);
 
         List<String> rawCommand = buildCommandLine(freeRdp, config);
         if (config.multiMonitor() && !freeRdp.isFlatpak()) {
@@ -196,12 +212,18 @@ public final class RdpProcessSupervisor {
             processCommand = rawCommand;
         }
 
-        Path logFile = XdgPaths.logsDir().resolve("session_" + resource.sanitizedFileName() + "_" + System.currentTimeMillis() + ".log");
-
+        logFile = XdgPaths.logsDir().resolve("session_" + resource.sanitizedFileName() + "_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID() + ".log");
         ProcessBuilder pb = new ProcessBuilder(processCommand);
         pb.redirectErrorStream(true);
-
-        // Pass through Wayland and X11 display environment
+        Path logDir = logFile.getParent();
+        if (logDir != null) {
+            Files.createDirectories(logDir);
+            try { Files.setPosixFilePermissions(logDir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); } catch (Exception ignored) { }
+        }
+        if (!Files.exists(logFile)) {
+            Files.createFile(logFile);
+        }
+        try { Files.setPosixFilePermissions(logFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); } catch (Exception ignored) { }
         Map<String, String> env = pb.environment();
         String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
         String display = System.getenv("DISPLAY");
@@ -210,10 +232,11 @@ public final class RdpProcessSupervisor {
         }
         if (waylandDisplay != null && !waylandDisplay.isBlank()) {
             env.put("WAYLAND_DISPLAY", waylandDisplay);
-            boolean x11Fullscreen = freeRdp.isFlatpak() && config.fullscreen();
-            if ((config.multiMonitor() || x11Fullscreen) && display != null && !display.isBlank()) {
-                // Flatpak SDL fullscreen is more stable through XWayland on mixed Wayland/X11 desktops.
-                env.put("SDL_VIDEODRIVER", "x11");
+            boolean isFlatpakEnv = freeRdp.isFlatpak() || System.getenv("FLATPAK_ID") != null;
+            if (display != null && !display.isBlank()) {
+                // In Flatpak or when XWayland is available, SDL3 client on X11 avoids the Wayland buffer-swap
+                // tearing and double-buffering flickering anomalies.
+                env.put("SDL_VIDEODRIVER", isFlatpakEnv ? "x11" : "wayland,x11");
             } else {
                 env.put("SDL_VIDEODRIVER", "wayland,x11");
             }
@@ -222,6 +245,11 @@ public final class RdpProcessSupervisor {
         if (xdgRuntime != null && !xdgRuntime.isBlank()) {
             env.put("XDG_RUNTIME_DIR", xdgRuntime);
         }
+        // Synchronize SDL presentation with vertical refresh rate and force immediate double buffering
+        // to eliminate tearing, buffer swapping flickering, and presentation lag.
+        env.put("SDL_RENDER_VSYNC", "1");
+        env.put("SDL_VIDEO_DOUBLE_BUFFER", "1");
+
 
         // PipeWire / PulseAudio direct native socket path
         String pulseServer = System.getenv("PULSE_SERVER");
@@ -230,9 +258,9 @@ public final class RdpProcessSupervisor {
         } else if (xdgRuntime != null && !xdgRuntime.isBlank() && Files.exists(Path.of(xdgRuntime, "pulse", "native"))) {
             env.put("PULSE_SERVER", "unix:" + xdgRuntime + "/pulse/native");
         }
-        Process process = pb.start();
+        process = pb.start();
 
-        ActiveSession session = new ActiveSession(
+        session = new ActiveSession(
             sessionId,
             resource.title(),
             process,
@@ -240,6 +268,7 @@ public final class RdpProcessSupervisor {
         );
 
         activeSessions.put(sessionId, session);
+        }
 
         // Notify started
         emitEvent(listener, new SessionEvent.Started(sessionId, process.toHandle()));
@@ -247,83 +276,129 @@ public final class RdpProcessSupervisor {
 
         // Start Virtual Thread to monitor output and lifecycle
         Thread.ofVirtual().name("rdp-watcher-" + resource.sanitizedFileName()).start(() -> {
+            Object logLock = LOG_LOCKS.computeIfAbsent(logFile.toAbsolutePath(), ignored -> new Object());
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
                  BufferedWriter logWriter = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 
-                logWriter.write("=== JW365 Session Log for " + resource.title() + " ===\n");
-                logWriter.write("Command: " + String.join(" ", rawCommand) + "\n");
-                logWriter.write("Started: " + Instant.now() + "\n\n");
-                logWriter.flush();
+                long[] logBytes;
+                synchronized (logLock) {
+                    logBytes = new long[] {Files.size(logFile)};
+                }
+                writeLogLine(logWriter, logBytes, "=== JW365 Session Log for " + resource.title() + " ===", logLock);
+                writeLogLine(logWriter, logBytes, "Started: " + Instant.now(), logLock);
+                writeLogLine(logWriter, logBytes, "", logLock);
 
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    logWriter.write(line);
-                    logWriter.newLine();
-                    logWriter.flush();
-
+                    writeLogLine(logWriter, logBytes, redactLogLine(line), logLock);
                     emitEvent(listener, new SessionEvent.OutputLine(sessionId, line, false));
 
-                    // Intercept FreeRDP OAuth authorization prompt
                     if (line.contains("Browse to: ")) {
-                        String authUrl = line.substring(line.indexOf("Browse to: ") + "Browse to: ".length()).trim();
+                        String rawAuth = line.substring(line.indexOf("Browse to: ") + "Browse to: ".length()).trim();
+                        String authUrl = rawAuth.replaceAll("\u001B\\[[;?0-9]*[a-zA-Z]", "").trim();
+                        int spaceIdx = authUrl.indexOf(' ');
+                        if (spaceIdx > 0) {
+                            authUrl = authUrl.substring(0, spaceIdx).trim();
+                        }
                         updateStatus(session, listener, SessionStatus.CONNECTING, "Authenticating Cloud PC session...");
-                        emitEvent(listener, new SessionEvent.AuthRequired(sessionId, authUrl, redirectUrl -> {
-                            session.writeInput(redirectUrl + "\n");
-                            // Verify session remains alive after auth submission and transition to Connected
-                            Thread.ofVirtual().name("auth-confirm-" + sessionId).start(() -> {
-                                try {
-                                    Thread.sleep(3000);
-                                    if (session.isAlive() && session.status() != SessionStatus.CONNECTED) {
-                                        updateStatus(session, listener, SessionStatus.CONNECTED, "Connected");
-                                    }
-                                } catch (InterruptedException ignored) {
-                                }
-                            });
+                        final String cleanAuthUrl = authUrl;
+                        emitEvent(listener, new SessionEvent.AuthRequired(sessionId, cleanAuthUrl, redirectUrl -> {
+                            String toSend = redirectUrl != null ? redirectUrl.trim() : "";
+                            session.writeInput(toSend + "\n");
                         }));
                     }
 
-                    // Inspect line for connection established state
-                    String lower = line.toLowerCase();
+                    String lower = line.toLowerCase(java.util.Locale.ROOT);
                     if (lower.contains("reconnect") || lower.contains("reconnecting")) {
                         updateStatus(session, listener, SessionStatus.RECONNECTING, "Reconnecting...");
                     }
-                    if (lower.contains("activated") ||
-                        lower.contains("channelconnected") ||
-                        lower.contains("logon info") ||
-                        lower.contains("connection established") ||
-                        lower.contains("connected to") ||
-                        lower.contains("successfully connected") ||
-                        lower.contains("displaycontrolcapspdu") ||
-                        lower.contains("tsg_state_connected") ||
-                        lower.contains("display driver in the remote session started up successfully") ||
-                        lower.contains("sdl_event_window_shown")) {
-                        if (session.status() != SessionStatus.CONNECTED) {
-                            updateStatus(session, listener, SessionStatus.CONNECTED, "Connected");
-                        }
+                    if (isConnectedMarker(line) && session.status() != SessionStatus.CONNECTED) {
+                        updateStatus(session, listener, SessionStatus.CONNECTED, "Connected");
                     }
                 }
                 int exitCode = process.waitFor();
-                logWriter.write("\n=== Process exited with code " + exitCode + " at " + Instant.now() + " ===\n");
-                logWriter.flush();
+                writeLogLine(logWriter, logBytes, "", logLock);
+                writeLogLine(logWriter, logBytes, "=== Process exited with code " + exitCode + " at " + Instant.now() + " ===", logLock);
 
                 if (session.isUserInitiatedStop() || exitCode == 0 || exitCode == 143 || exitCode == 130 || exitCode == 129) {
                     updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
                 } else {
                     updateStatus(session, listener, SessionStatus.FAILED, "Session exited with error code " + exitCode);
                 }
-
-                emitEvent(listener, new SessionEvent.Exited(sessionId, exitCode, "Exit code " + exitCode));
+                emitEvent(listener, new SessionEvent.Exited(sessionId, exitCode, session.isUserInitiatedStop() ? "Session disconnected" : "Session exited with error code " + exitCode));
+            } catch (InterruptedException e) {
+                destroyAndAwait(process);
+                Thread.currentThread().interrupt();
+                updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session monitoring interrupted");
+                emitEvent(listener, new SessionEvent.Exited(sessionId, -1, "Session monitoring interrupted"));
             } catch (Exception e) {
+                destroyAndAwait(process);
                 if (session.isUserInitiatedStop()) {
                     updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
+                    emitEvent(listener, new SessionEvent.Exited(sessionId, 0, "Session disconnected"));
                 } else {
                     updateStatus(session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
+                    emitEvent(listener, new SessionEvent.Exited(sessionId, -1, "Session monitoring error: " + e.getMessage()));
                 }
             } finally {
+                LOG_LOCKS.remove(logFile.toAbsolutePath(), logLock);
+                XdgPaths.pruneOldLogs(10);
                 activeSessions.remove(sessionId, session);
             }
         });
+    }
 
+    private static void destroyAndAwait(Process process) {
+        if (!process.isAlive()) return;
+        process.destroy();
+        try {
+            if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly();
+        } catch (InterruptedException e) {
+            process.destroyForcibly();
+            Thread.currentThread().interrupt();
+        }
+    }
+    private static void writeLogLine(BufferedWriter writer, long[] bytes, String line, Object logLock) throws IOException {
+        synchronized (logLock) {
+            if (bytes[0] >= MAX_SESSION_LOG_BYTES) {
+                return;
+            }
+            byte[] encoded = (line + "\n").getBytes(StandardCharsets.UTF_8);
+            if (bytes[0] + encoded.length > MAX_SESSION_LOG_BYTES) {
+                return;
+            }
+            writer.write(line);
+            writer.newLine();
+            writer.flush();
+            bytes[0] += encoded.length;
+        }
+    }
+    static boolean isConnectedMarker(String line) {
+        if (line == null || line.isBlank()) {
+            return false;
+        }
+        String lower = line.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("logon info v2")
+            || lower.contains("logon info")
+            || lower.contains("channelconnected")
+            || lower.contains("tsg_state_connected")
+            || lower.contains("displaycontrolcapspdu")
+            || lower.contains("sdl_event_window_shown")
+            || lower.contains("successfully connected")
+            || lower.contains("postconnect")
+            || lower.contains("rdp_client_connect_demand_active")
+            || lower.contains("logoninfov1")
+            || lower.contains("logoninfov2")
+            || lower.contains("demand_active")
+            || lower.contains("connection_state_active")
+            || lower.contains("handleshow")
+            || lower.contains("activated");
+    }
+
+    static String redactLogLine(String line) {
+        String redacted = line.replaceAll("(?i)(Authorization\\s*(?:[:=]\\s*|\\s+)Bearer\\s+)[^\\s,]+", "$1" + REDACTED);
+        redacted = redacted.replaceAll("(?i)(password|passwd|token|secret|authorization|bearer)([=:]\\s*|\\s+)(?!Bearer\\s+\\[REDACTED\\])[^\\s]+", "$1$2" + REDACTED);
+        return redacted.replaceAll("(?i)([?&](?:code|token|access_token|refresh_token|id_token|secret|password)=)[^&\\s]+", "$1" + REDACTED);
     }
 
     /**
@@ -347,21 +422,20 @@ public final class RdpProcessSupervisor {
      * Stops an active session by resource ID.
      */
     public void stopSession(String resourceId) {
-        ActiveSession session = activeSessions.remove(resourceId);
-        if (session != null) {
-            session.stop();
-            updateStatus(session, null, SessionStatus.DISCONNECTED, "Session disconnected");
+        if (resourceId == null) return;
+        Object lock = sessionLocks.computeIfAbsent(resourceId, ignored -> new Object());
+        synchronized (lock) {
+            ActiveSession session = activeSessions.remove(resourceId);
+            if (session != null) {
+                session.stop();
+                updateStatus(session, null, SessionStatus.DISCONNECTED, "Session disconnected");
+            }
         }
     }
 
-    /**
-     * Stops all active sessions.
-     */
+    /** Stops all active sessions. */
     public void stopAllSessions() {
-        for (ActiveSession session : activeSessions.values()) {
-            session.stop();
-        }
-        activeSessions.clear();
+        for (String id : List.copyOf(activeSessions.keySet())) stopSession(id);
     }
 
     private void updateStatus(ActiveSession session, SessionListener listener, SessionStatus newStatus, String message) {
@@ -395,15 +469,20 @@ public final class RdpProcessSupervisor {
         String executable = freeRdp.binaryPath() != null
             ? freeRdp.binaryPath().toString()
             : freeRdp.flavor().getExecutableName();
+        Process process = null;
         try {
-            Process process = new ProcessBuilder(executable, "/list:monitor")
+            process = new ProcessBuilder(executable, "/list:monitor")
                 .redirectErrorStream(true)
                 .start();
             if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
                 process.destroyForcibly();
+                process.waitFor(1, java.util.concurrent.TimeUnit.SECONDS);
                 return Optional.empty();
             }
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String output;
+            try (var input = process.getInputStream()) {
+                output = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            }
             Pattern idPattern = Pattern.compile("\\[(\\d+)]");
             List<String> ids = new ArrayList<>();
             String primary = null;
@@ -422,7 +501,12 @@ public final class RdpProcessSupervisor {
                 ids.addFirst(primary);
             }
             return ids.isEmpty() ? Optional.empty() : Optional.of(String.join(",", ids));
-        } catch (Exception ignored) {
+        } catch (InterruptedException e) {
+            if (process != null) process.destroyForcibly();
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (Exception e) {
+            if (process != null && process.isAlive()) process.destroyForcibly();
             return Optional.empty();
         }
     }

@@ -66,11 +66,10 @@ public final class MainView extends BorderPane {
 
         Button refreshBtn = new Button("Refresh");
         refreshBtn.getStyleClass().add("btn-secondary");
+        refreshBtn.setOnAction(e -> state.refreshWorkspacesAsync(true));
         Button helpBtn = new Button("Help");
         helpBtn.getStyleClass().add("btn-secondary");
         helpBtn.setOnAction(e -> showHelp());
-        refreshBtn.setOnAction(e -> state.refreshWorkspacesAsync(false));
-
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
@@ -96,6 +95,7 @@ public final class MainView extends BorderPane {
             brandTitle,
             brandBadge,
             searchField,
+            refreshBtn,
             helpBtn,
             refreshIndicator,
             spacer,
@@ -122,10 +122,51 @@ public final class MainView extends BorderPane {
         resourceCountLabel = new Label("0 resources");
         resourceCountLabel.getStyleClass().add("status-bar-text");
 
+        ProgressIndicator sessionProgressIndicator = new ProgressIndicator();
+        sessionProgressIndicator.setMaxSize(14, 14);
+        sessionProgressIndicator.setMinSize(14, 14);
+        sessionProgressIndicator.setPrefSize(14, 14);
+        sessionProgressIndicator.setVisible(false);
+        sessionProgressIndicator.setManaged(false);
+
+        Runnable updateSessionProgress = () -> {
+            boolean hasActiveProgress = state.getSessionStatuses().values().stream()
+                .anyMatch(s -> s == org.alaurie.jw365.rdp.SessionStatus.STARTING
+                            || s == org.alaurie.jw365.rdp.SessionStatus.CONNECTING
+                            || s == org.alaurie.jw365.rdp.SessionStatus.RECONNECTING
+                            || s == org.alaurie.jw365.rdp.SessionStatus.DISCONNECTING);
+            sessionProgressIndicator.setVisible(hasActiveProgress);
+            sessionProgressIndicator.setManaged(hasActiveProgress);
+        };
+        state.getSessionStatuses().addListener((javafx.collections.MapChangeListener<String, org.alaurie.jw365.rdp.SessionStatus>) change -> updateSessionProgress.run());
+        updateSessionProgress.run();
+
         Label statusMessageLabel = new Label();
         statusMessageLabel.getStyleClass().add("status-bar-text");
         statusMessageLabel.textProperty().bind(state.statusMessageProperty());
+        state.statusMessageProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                String lower = newV.toLowerCase(Locale.ROOT);
+                if (lower.contains("failed") || lower.contains("error") || lower.contains("cancelled")) {
+                    statusMessageLabel.getStyleClass().remove("status-bar-text-active");
+                    if (!statusMessageLabel.getStyleClass().contains("status-bar-text-error")) {
+                        statusMessageLabel.getStyleClass().add("status-bar-text-error");
+                    }
+                } else if (lower.contains("connecting") || lower.contains("authenticating") || lower.contains("starting") || lower.contains("downloading") || lower.contains("reconnecting")) {
+                    statusMessageLabel.getStyleClass().remove("status-bar-text-error");
+                    if (!statusMessageLabel.getStyleClass().contains("status-bar-text-active")) {
+                        statusMessageLabel.getStyleClass().add("status-bar-text-active");
+                    }
+                } else {
+                    statusMessageLabel.getStyleClass().removeAll("status-bar-text-error", "status-bar-text-active");
+                }
+            } else {
+                statusMessageLabel.getStyleClass().removeAll("status-bar-text-error", "status-bar-text-active");
+            }
+        });
 
+        HBox statusMessageBox = new HBox(6, sessionProgressIndicator, statusMessageLabel);
+        statusMessageBox.setAlignment(Pos.CENTER_LEFT);
         HBox footerSpacer = new HBox();
         HBox.setHgrow(footerSpacer, Priority.ALWAYS);
 
@@ -141,7 +182,7 @@ public final class MainView extends BorderPane {
         statusBar.getChildren().addAll(
             appVersionLabel,
             resourceCountLabel,
-            statusMessageLabel,
+            statusMessageBox,
             footerSpacer,
             rdpEngineLabel,
             lastSyncedLabel
@@ -207,7 +248,7 @@ public final class MainView extends BorderPane {
             java.util.Set<String> activeIds = new java.util.HashSet<>();
             for (Workspace ws : allWorkspaces) {
                 for (WorkspaceResource r : ws.resources()) {
-                    activeIds.add(r.id());
+                    activeIds.add(r.identityKey());
                 }
             }
             cardCache.entrySet().removeIf(entry -> {
@@ -242,7 +283,7 @@ public final class MainView extends BorderPane {
                     flowPane.setPrefWrapLength(800);
 
                     for (WorkspaceResource res : filtered) {
-                        ResourceCard card = cardCache.computeIfAbsent(res.id(), id -> new ResourceCard(res, state));
+                        ResourceCard card = cardCache.computeIfAbsent(res.identityKey(), id -> new ResourceCard(res, state));
                         flowPane.getChildren().add(card);
                     }
 
@@ -260,12 +301,18 @@ public final class MainView extends BorderPane {
 
                 Label emptyTitle = new Label(query.isEmpty() ? "No Cloud PCs or Apps Found" : "No matches for \"" + query + "\"");
                 emptyTitle.getStyleClass().add("signin-title");
-
                 Label emptySubtitle = new Label(query.isEmpty() ? "Click Refresh to check for available Windows 365 or AVD resources." : "Try adjusting your search terms.");
                 emptySubtitle.getStyleClass().add("signin-subtitle");
 
-                emptyBox.getChildren().addAll(emptyTitle, emptySubtitle);
-                workspaceContainer.getChildren().add(emptyBox);
+                Button emptyRefreshBtn = new Button("Refresh Workspaces");
+                emptyRefreshBtn.getStyleClass().add("btn-primary");
+                emptyRefreshBtn.setOnAction(e -> state.refreshWorkspacesAsync(true));
+
+                if (query.isEmpty()) {
+                    emptyBox.getChildren().addAll(emptyTitle, emptySubtitle, emptyRefreshBtn);
+                } else {
+                    emptyBox.getChildren().addAll(emptyTitle, emptySubtitle);
+                }
             }
         });
     }

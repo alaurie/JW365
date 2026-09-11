@@ -40,6 +40,10 @@ class PersistentCookieManagerTest {
         expiredCookie.setPath("/");
         expiredCookie.setMaxAge(0); // already expired
         store1.add(uri, expiredCookie);
+        HttpCookie externalCookie = new HttpCookie("TRACKING", "must-not-persist");
+        externalCookie.setDomain("example.com");
+        externalCookie.setPath("/");
+        store1.add(URI.create("https://example.com"), externalCookie);
 
         // Save to disk
         manager1.persistCookies();
@@ -60,5 +64,75 @@ class PersistentCookieManagerTest {
         assertThat(restored.getDomain()).isEqualTo("login.microsoftonline.com");
         assertThat(restored.getSecure()).isTrue();
         assertThat(restored.isHttpOnly()).isTrue();
+    }
+
+    @Test
+    @DisplayName("PersistentCookieManager preserves session cookies without max-age and host-only cookies")
+    void testSessionCookiesAndHostOnlyCookies(@TempDir Path tempDir) throws Exception {
+        Path cookieFile = tempDir.resolve("session-cookies.enc");
+
+        PersistentCookieManager manager1 = new PersistentCookieManager(cookieFile);
+        CookieStore store1 = manager1.getCookieStore();
+
+        URI uri = URI.create("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
+
+        // Session cookie (maxAge = -1, standard for ESTSAUTH)
+        HttpCookie sessionCookie = new HttpCookie("ESTSAUTH", "session_abc_123");
+        sessionCookie.setDomain("login.microsoftonline.com");
+        sessionCookie.setPath("/");
+        sessionCookie.setSecure(true);
+        sessionCookie.setHttpOnly(true);
+        sessionCookie.setMaxAge(-1);
+        store1.add(uri, sessionCookie);
+
+        // Host-only cookie (no domain set)
+        HttpCookie hostOnly = new HttpCookie("SignInStateCookie", "state_val_456");
+        hostOnly.setPath("/");
+        hostOnly.setSecure(true);
+        hostOnly.setHttpOnly(true);
+        store1.add(uri, hostOnly);
+
+        // Subdomain cookie (.microsoftonline.com)
+        HttpCookie subdomainCookie = new HttpCookie("buid", "buid_val_789");
+        subdomainCookie.setDomain(".microsoftonline.com");
+        subdomainCookie.setPath("/");
+        subdomainCookie.setSecure(true);
+        store1.add(uri, subdomainCookie);
+
+        manager1.persistCookies();
+
+        // Reload from disk
+        PersistentCookieManager manager2 = new PersistentCookieManager(cookieFile);
+        var requestHeaders = manager2.get(uri, java.util.Collections.emptyMap());
+        List<String> cookieHeaders = requestHeaders.get("Cookie");
+        assertThat(cookieHeaders).isNotNull().isNotEmpty();
+        String joined = String.join("; ", cookieHeaders);
+        assertThat(joined).contains("ESTSAUTH=").contains("session_abc_123");
+        assertThat(joined).contains("SignInStateCookie=").contains("state_val_456");
+        assertThat(joined).contains("buid=").contains("buid_val_789");
+    }
+
+    @Test
+    @DisplayName("PersistentCookieManager auto-persists cookies when put is invoked with Set-Cookie")
+    void testAutoPersistOnPut(@TempDir Path tempDir) throws Exception {
+        Path cookieFile = tempDir.resolve("auto-cookies.enc");
+        PersistentCookieManager manager = new PersistentCookieManager(cookieFile);
+
+        URI uri = URI.create("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
+        manager.put(uri, java.util.Map.of(
+            "Set-Cookie", List.of("ESTSAUTH=auto_val_999; path=/; secure; HttpOnly")
+        ));
+
+        long deadline = System.currentTimeMillis() + 2000;
+        while ((!Files.exists(cookieFile) || Files.size(cookieFile) == 0) && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+        }
+        assertThat(Files.exists(cookieFile)).isTrue();
+        assertThat(Files.size(cookieFile)).isGreaterThan(0);
+
+        PersistentCookieManager reloaded = new PersistentCookieManager(cookieFile);
+        var headers = reloaded.get(uri, java.util.Collections.emptyMap());
+        String joined = String.join("; ", headers.get("Cookie"));
+        assertThat(joined).contains("ESTSAUTH=").contains("auto_val_999");
     }
 }

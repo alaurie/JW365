@@ -28,6 +28,7 @@ class WorkspaceFeedClientTest {
     private static HttpServer server;
     private static int port;
     private static final AtomicBoolean authHeaderReceived = new AtomicBoolean(false);
+    private static final AtomicBoolean redirectAuthHeaderReceived = new AtomicBoolean(false);
     private static final AtomicBoolean userAgentHeaderReceived = new AtomicBoolean(false);
 
     private static final String MOCK_DISCOVERY_XML = """
@@ -91,6 +92,16 @@ class WorkspaceFeedClientTest {
             byte[] pngBytes = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
             sendResponse(exchange, 200, "image/png", pngBytes);
         });
+        server.createContext("/api/redirect", exchange -> {
+            exchange.getResponseHeaders().set("Location", "http://127.0.0.1:" + port + "/api/redirect-target");
+            sendResponse(exchange, 302, "text/plain", new byte[0]);
+        });
+        server.createContext("/api/redirect-target", exchange -> {
+            if (exchange.getRequestHeaders().getFirst("Authorization") != null) {
+                redirectAuthHeaderReceived.set(true);
+            }
+            sendResponse(exchange, 200, "image/png", new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
+        });
 
         // 5. Error endpoint
         server.createContext("/api/error/unauthorized", exchange -> sendResponse(exchange, 401, "application/json", "{\"error\": \"Unauthorized\"}".getBytes(StandardCharsets.UTF_8)));
@@ -126,10 +137,10 @@ class WorkspaceFeedClientTest {
     }
 
     @Test
-    @DisplayName("WorkspaceFeedClient discovers tenant feeds sending required authentication and user-agent headers")
+    @DisplayName("WorkspaceFeedClient does not send bearer credentials to localhost")
     void testDiscoverTenantFeeds() throws Exception {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         List<TenantFeed> feeds = client.discoverTenantFeeds("test_token_xyz");
 
@@ -139,7 +150,7 @@ class WorkspaceFeedClientTest {
         assertThat(feed.tenantDisplayName()).isEqualTo("Contoso Workspace");
         assertThat(feed.feedUrl().toString()).contains("http://localhost:" + port + "/api/feed/tenant-123");
 
-        assertThat(authHeaderReceived.get()).isTrue();
+        assertThat(authHeaderReceived.get()).isFalse();
         assertThat(userAgentHeaderReceived.get()).isTrue();
     }
 
@@ -147,14 +158,16 @@ class WorkspaceFeedClientTest {
     @DisplayName("WorkspaceFeedClient fetches workspace resources and handles concurrent virtual thread fan-out")
     void testFetchAllWorkspaces() {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         TenantFeed tenant = new TenantFeed("tenant-123", "Contoso Workspace", URI.create("http://localhost:" + port + "/api/feed/tenant-123"));
+        TenantFeed failedTenant = new TenantFeed("tenant-failed", "Failed Workspace", URI.create("http://localhost:" + port + "/api/error/unauthorized"));
 
-        List<Workspace> workspaces = client.fetchAllWorkspaces("test_token_xyz", List.of(tenant));
+        List<Workspace> workspaces = client.fetchAllWorkspaces("test_token_xyz", List.of(tenant, failedTenant));
 
         assertThat(workspaces).hasSize(1);
         Workspace ws = workspaces.getFirst();
+        assertThat(ws.tenantId()).isEqualTo("tenant-123");
         assertThat(ws.resources()).hasSize(1);
 
         WorkspaceResource res = ws.resources().getFirst();
@@ -167,7 +180,7 @@ class WorkspaceFeedClientTest {
     @DisplayName("WorkspaceFeedClient downloads RDP files and icons atomically")
     void testDownloads(@TempDir Path tempDir) throws Exception {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         Path targetRdp = tempDir.resolve("test-download.rdp");
         URI rdpUri = URI.create("http://localhost:" + port + "/api/rdp/cloudpc1.rdp");
@@ -183,12 +196,25 @@ class WorkspaceFeedClientTest {
         byte[] iconBytes = client.downloadIconBytes("test_token_xyz", iconUri);
         assertThat(iconBytes).isNotNull().startsWith(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
     }
+    @Test
+    @DisplayName("WorkspaceFeedClient rejects hostile icon hosts and strips bearer on cross-origin redirects")
+    void rejectsHostileIconAndRedirect() {
+        URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
+        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
+
+        assertThat(client.downloadIconBytes("test_token_xyz", URI.create("https://attacker.example/icon.png"))).isNull();
+        byte[] redirected = client.downloadIconBytes("test_token_xyz", URI.create("http://localhost:" + port + "/api/redirect"));
+
+        assertThat(redirected).isNotNull();
+        assertThat(redirectAuthHeaderReceived).isFalse();
+    }
+
 
     @Test
     @DisplayName("WorkspaceFeedClient throws IOException on HTTP error response")
     void testHttpError() {
         URI errorUri = URI.create("http://localhost:" + port + "/api/error/unauthorized");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(errorUri, HttpClient.newHttpClient());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(errorUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         assertThatThrownBy(() -> client.discoverTenantFeeds("invalid_token"))
             .isInstanceOf(IOException.class)

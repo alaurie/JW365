@@ -114,7 +114,7 @@ class OAuthClientTest {
             null
         );
 
-        assertThat(authorizeUri.getRawQuery()).contains("response_mode=query");
+        assertThat(authorizeUri.getRawQuery().split("&")).as(authorizeUri.toString()).filteredOn(query -> query.startsWith("response_mode=")).containsExactly("response_mode=query");
         assertThat(authorizeUri.getRawQuery()).contains("state=state-value");
     }
 

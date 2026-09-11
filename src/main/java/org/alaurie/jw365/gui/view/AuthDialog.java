@@ -19,15 +19,20 @@ import org.alaurie.jw365.auth.OAuthClient;
 import org.alaurie.jw365.auth.PkceChallenge;
 import org.alaurie.jw365.config.ClientConfig;
 import org.alaurie.jw365.gui.state.AppState;
+import org.alaurie.jw365.auth.OAuthCallback;
+import org.alaurie.jw365.auth.PersistentCookieManager;
+import org.alaurie.jw365.config.XdgPaths;
 
+import java.net.CookieHandler;
 import java.net.URI;
 import java.util.Objects;
-import org.alaurie.jw365.auth.OAuthCallback;
-
 /**
  * JavaFX WebView dialog for Entra ID OAuth 2.0 PKCE sign-in.
  */
 public final class AuthDialog extends Stage {
+
+    public static final String BROWSER_USER_AGENT =
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
     private static final URI CALLBACK_URI = URI.create(OAuthClient.REDIRECT_URI);
     private final AppState state;
@@ -80,7 +85,12 @@ public final class AuthDialog extends Stage {
         webView = new WebView();
         WebEngine webEngine = webView.getEngine();
         webEngine.setJavaScriptEnabled(true);
-        webEngine.setUserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
+        webEngine.setUserAgent(BROWSER_USER_AGENT);
+        try {
+            webEngine.setUserDataDirectory(XdgPaths.webViewDataDir().toFile());
+        } catch (Exception e) {
+            System.err.println("Warning: Could not configure WebEngine userDataDirectory: " + e.getMessage());
+        }
         root.setCenter(webView);
 
         // Build Authorize URL with nativeclient redirect
@@ -163,6 +173,9 @@ public final class AuthDialog extends Stage {
         });
 
         state.signInWithCode(code, challenge.codeVerifier(), OAuthClient.REDIRECT_URI, () -> {
+            if (CookieHandler.getDefault() instanceof PersistentCookieManager pcm) {
+                pcm.persistCookies();
+            }
             Platform.runLater(this::close);
         }, error -> {
             Platform.runLater(() -> {

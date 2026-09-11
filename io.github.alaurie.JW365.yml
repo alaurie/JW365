@@ -23,7 +23,6 @@ finish-args:
   - --socket=pulseaudio
   - --socket=pcsc
   - --device=dri
-  - --talk-name=org.freedesktop.Flatpak
 modules:
   - packaging/flatpak/modules/cJSON.json
   - packaging/flatpak/modules/pcsc.json
@@ -81,7 +80,8 @@ modules:
         GRADLE_USER_HOME=gradle-home gradle-dist-extracted/gradle-9.7.1/bin/gradle --offline --no-daemon createRuntimeImage installDist validateFlatpakArtifacts -PappVersion="$VERSION"
         test -x build/runtime/bin/java
         test -f build/runtime/lib/modules
-        test -f build/install/jw365/lib/javafx-web-25.0.4-linux.jar
+        set -- build/install/jw365/lib/javafx-web-*.jar
+        test -f "$1"
         set -- build/install/jw365/lib/*.jar
         test -f "$1"
         install -d /app/runtime /app/lib /app/bin
@@ -89,7 +89,8 @@ modules:
         cp -a build/install/jw365/lib/. /app/lib/
         test -x /app/runtime/bin/java
         test -f /app/runtime/lib/modules
-        test -f /app/lib/javafx-web-25.0.4-linux.jar
+        set -- /app/lib/javafx-web-*.jar
+        test -f "$1"
         set -- /app/lib/*.jar
         test -f "$1"
         install -m 0755 packaging/flatpak/jw365-launcher.sh /app/bin/jw365

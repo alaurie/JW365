@@ -31,18 +31,21 @@ public record WorkspaceResource(
         }
     }
 
-    /**
-     * Sanitizes resource ID for use as a filesystem file name.
-     */
+    /** Stable identity for a resource across tenants. */
     @JsonIgnore
-    public String sanitizedFileName() {
-        return id.replaceAll("[^a-zA-Z0-9._-]", "_");
+    public String identityKey() {
+        return (tenantId == null ? "" : tenantId) + ":" + id;
     }
 
+    /** Sanitizes tenant-qualified identity for use as a file name. */
+    @JsonIgnore
+    public String sanitizedFileName() {
+        return identityKey().replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
 
     @JsonIgnore
     public String cacheFileName() {
-        return (tenantId + "_" + id).replaceAll("[^a-zA-Z0-9._-]", "_");
+        return identityKey().replaceAll("[^a-zA-Z0-9._-]", "_");
     }
     /**
      * Display label combining title and publisher if available.

@@ -30,6 +30,14 @@ public final class ResourceCard extends VBox {
     private final AppState state;
     private final Label statusBadge;
     private final Button actionButton;
+    private static final javafx.scene.image.Image DEFAULT_ICON;
+    static {
+        javafx.scene.image.Image img = null;
+        try (var is = ResourceCard.class.getResourceAsStream("/org/alaurie/jw365/gui/icons/icon_48.png")) {
+            if (is != null) img = new javafx.scene.image.Image(is);
+        } catch (Exception ignored) { }
+        DEFAULT_ICON = img;
+    }
     private final javafx.collections.MapChangeListener<String, SessionStatus> statusListener;
     public ResourceCard(WorkspaceResource resource, AppState state) {
         this.resource = resource;
@@ -52,11 +60,17 @@ public final class ResourceCard extends VBox {
         iconView.setFitWidth(48);
         iconView.setFitHeight(48);
         iconView.setPreserveRatio(true);
+        if (DEFAULT_ICON != null) {
+            iconView.setImage(DEFAULT_ICON);
+        }
         iconContainer.getChildren().add(iconView);
 
         // Load icon via AppState
-        state.loadResourceIcon(resource, iconView::setImage);
-
+        state.loadResourceIcon(resource, img -> {
+            if (img != null && !img.isError()) {
+                iconView.setImage(img);
+            }
+        });
         // Badges Row (Type badge & Status badge)
         HBox badgesBox = new HBox(6);
         badgesBox.setAlignment(Pos.CENTER);
@@ -103,14 +117,14 @@ public final class ResourceCard extends VBox {
 
         // Listen for session status changes
         this.statusListener = change -> {
-            if (resource.id().equals(change.getKey())) {
+            if (resource.identityKey().equals(change.getKey())) {
                 updateStatus(change.getValueAdded());
             }
         };
         state.getSessionStatuses().addListener(this.statusListener);
 
         // Initialize status
-        SessionStatus currentStatus = state.getSessionStatuses().get(resource.id());
+        SessionStatus currentStatus = state.getSessionStatuses().get(resource.identityKey());
         updateStatus(currentStatus != null ? currentStatus : SessionStatus.IDLE);
     }
 
@@ -122,7 +136,7 @@ public final class ResourceCard extends VBox {
 
 
     private void handleActionClick() {
-        SessionStatus current = state.getSessionStatuses().get(resource.id());
+        SessionStatus current = state.getSessionStatuses().get(resource.identityKey());
         if (current != null && current.isActive()) {
             state.disconnectResource(resource);
         } else {
@@ -259,7 +273,7 @@ public final class ResourceCard extends VBox {
     }
 
     private void copyDiagnostics() {
-        SessionStatus status = state.getSessionStatuses().get(resource.id());
+        SessionStatus status = state.getSessionStatuses().get(resource.identityKey());
         var engine = state.detectedFreeRdpProperty().get();
         String diagnostics = "JW365 " + AppVersion.VERSION + "\n"
             + "Resource: " + resource.title() + " (" + resource.id() + ")\n"

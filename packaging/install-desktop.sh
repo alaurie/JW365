@@ -23,6 +23,7 @@ Categories=Network;RemoteAccess;
 StartupNotify=true
 StartupWMClass=org.alaurie.jw365.gui.Jw365App
 Keywords=Windows 365;Azure Virtual Desktop;RDP;Remote Desktop;
+EOF
 
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$APPS" 2>/dev/null || true

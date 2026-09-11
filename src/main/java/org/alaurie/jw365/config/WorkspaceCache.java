@@ -72,7 +72,11 @@ public final class WorkspaceCache {
         Path tempFile = cacheFile.resolveSibling(cacheFile.getFileName() + ".tmp." + System.nanoTime());
         try {
             MAPPER.writeValue(tempFile.toFile(), workspaces);
-            Files.move(tempFile, cacheFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            try {
+                Files.move(tempFile, cacheFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tempFile, cacheFile, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (Exception e) {
             System.err.println("Warning: Failed to save workspace cache: " + e.getMessage());
         } finally {
@@ -109,25 +113,40 @@ public final class WorkspaceCache {
      */
     public boolean hasCachedIcon(WorkspaceResource resource) {
         Path p = getIconPath(resource);
-        return Files.exists(p) && p.toFile().length() > 0;
+        try {
+            return Files.exists(p) && Files.size(p) > 0 && Files.size(p) <= 2 * 1024 * 1024;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /**
      * Saves icon bytes into the local cache.
      */
     public void saveIcon(WorkspaceResource resource, byte[] iconBytes) {
-        if (iconBytes == null || iconBytes.length == 0) {
+        if (iconBytes == null || iconBytes.length == 0 || iconBytes.length > 2 * 1024 * 1024) {
             return;
         }
 
         Path target = getIconPath(resource);
+        Path temp = target.resolveSibling(target.getFileName() + ".tmp." + System.nanoTime());
         try {
             if (!Files.exists(iconsDirectory)) {
                 Files.createDirectories(iconsDirectory);
             }
-            Files.write(target, iconBytes);
+            Files.write(temp, iconBytes);
+            try {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             System.err.println("Warning: Failed to write icon for " + resource.title() + ": " + e.getMessage());
+        } finally {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException ignored) {
+            }
         }
     }
 
@@ -138,7 +157,10 @@ public final class WorkspaceCache {
         Path target = getIconPath(resource);
         if (Files.exists(target)) {
             try {
-                return Optional.of(Files.readAllBytes(target));
+                long size = Files.size(target);
+                if (size > 0 && size <= 2 * 1024 * 1024) {
+                    return Optional.of(Files.readAllBytes(target));
+                }
             } catch (IOException ignored) {
             }
         }

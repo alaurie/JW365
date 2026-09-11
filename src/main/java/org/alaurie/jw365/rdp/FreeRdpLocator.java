@@ -115,7 +115,8 @@ public final class FreeRdpLocator {
             Process p = new ProcessBuilder("flatpak", "info", "com.freerdp.FreeRDP").start();
             boolean finished = p.waitFor(3, TimeUnit.SECONDS);
             if (finished && p.exitValue() == 0) {
-                String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                String out;
+                try (var input = p.getInputStream()) { out = new String(input.readAllBytes(), StandardCharsets.UTF_8); }
                 String version = "v3.31.1";
                 var matcher = VERSION_PATTERN.matcher(out);
                 if (matcher.find()) {
@@ -133,9 +134,10 @@ public final class FreeRdpLocator {
             Process process = new ProcessBuilder(command).start();
             boolean finished = process.waitFor(2, TimeUnit.SECONDS);
             if (finished) {
-                String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+                String out;
+                try (var input = process.getInputStream()) { out = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim(); }
                 if (out.isBlank()) {
-                    out = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+                    try (var error = process.getErrorStream()) { out = new String(error.readAllBytes(), StandardCharsets.UTF_8).trim(); }
                 }
                 for (String line : out.lines().toList()) {
                     var matcher = VERSION_PATTERN.matcher(line);

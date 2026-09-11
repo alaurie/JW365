@@ -80,34 +80,52 @@ public final class XdgPaths {
         ensureDir(dir);
         return dir;
     }
+    /**
+     * Path to persistent WebView user data (localStorage, sessionStorage, IndexedDB, WebKit cache).
+     */
+    public static Path webViewDataDir() {
+        Path dir = dataDir().resolve("webview");
+        ensureDir(dir);
+        try {
+            Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+        } catch (Exception ignored) { }
+        return dir;
+    }
 
     /**
      * Retains the most recent log files and prunes older session logs to prevent disk clutter.
      */
-    public static void pruneOldLogs(int maxFilesToKeep) {
-        Path dir = logsDir();
-        try (var stream = Files.list(dir)) {
-            java.util.List<Path> logFiles = stream
-                .filter(p -> p.getFileName().toString().startsWith("session_") && p.getFileName().toString().endsWith(".log"))
-                .sorted((a, b) -> {
-                    try {
-                        return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
-                    } catch (IOException e) {
-                        return 0;
-                    }
-                })
-                .toList();
+    public static synchronized void pruneOldLogs(int maxFilesToKeep) {
+        pruneOldLogs(logsDir(), maxFilesToKeep);
+    }
 
-            if (logFiles.size() > maxFilesToKeep) {
-                for (int i = maxFilesToKeep; i < logFiles.size(); i++) {
-                    try {
-                        Files.deleteIfExists(logFiles.get(i));
-                    } catch (IOException ignored) {
+    /** Prunes only the supplied directory; useful for isolated callers and tests. */
+    public static synchronized void pruneOldLogs(Path dir, int maxFilesToKeep) {
+        if (dir == null || maxFilesToKeep < 0) return;
+        ensureDir(dir);
+        try {
+            try { Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); }
+            catch (UnsupportedOperationException ignored) { }
+            try (var stream = Files.list(dir)) {
+                java.util.List<Path> logFiles = stream.filter(p -> p.getFileName().toString().startsWith("session_")
+                        && p.getFileName().toString().endsWith(".log"))
+                    .sorted((a, b) -> {
+                        try { return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a)); }
+                        catch (IOException e) { return 0; }
+                    }).toList();
+                long retainedBytes = 0;
+                for (int i = 0; i < logFiles.size(); i++) {
+                    Path log = logFiles.get(i);
+                    long size = Files.size(log);
+                    if (i >= maxFilesToKeep || retainedBytes + size > 32L * 1024 * 1024) Files.deleteIfExists(log);
+                    else {
+                        retainedBytes += size;
+                        try { Files.setPosixFilePermissions(log, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); }
+                        catch (UnsupportedOperationException ignored) { }
                     }
                 }
             }
-        } catch (IOException ignored) {
-        }
+        } catch (IOException ignored) { }
     }
 
     /**

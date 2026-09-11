@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.3] - 2026-09-11
+
+### Fixed
+- FreeRDP session authentication hang: handled AAD login prompt without requiring `state` query parameter and enabled silent SSO with auto-injected `login_hint`.
+- Missing Cloud PC tile icon: added XML element content parsing, Base64 support, and SVG desktop fallback icon.
+- Graphic rendering: resolved screen flicker and tearing using `/gdi:sw`, `SDL_RENDER_VSYNC=1`, `SDL_VIDEO_DOUBLE_BUFFER=1`, and modern AVC420 video pipeline.
+- Status indicator: fixed "Connected" state marker detection for FreeRDP 3.31+.
+- Cookie persistence: enabled runtime `CookiePolicy.ACCEPT_ALL` for live WebView auth while persisting only Microsoft session cookies under AES-GCM encryption.
+- Refresh button: restored missing refresh buttons to header navigation and empty state view.
+
 ## [0.2.2] - 2026-09-10
 
 ### Changed

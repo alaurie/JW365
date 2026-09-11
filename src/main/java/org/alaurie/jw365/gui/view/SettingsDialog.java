@@ -163,10 +163,10 @@ public final class SettingsDialog extends Stage {
         dynamicResCheck = new CheckBox("Dynamic Desktop Resizing (+dynamic-resolution)");
         dynamicResCheck.setSelected(currentConfig.dynamicResolution());
 
-        gfxProgressiveCheck = new CheckBox("H.264 / RDP8 Progressive Graphics Acceleration (/gfx:progressive)");
+        gfxProgressiveCheck = new CheckBox("H.264 / AVC420 & Progressive Graphics Acceleration (/gfx:AVC420,progressive)");
         gfxProgressiveCheck.setSelected(currentConfig.gfxProgressive());
 
-        asyncUpdateCheck = new CheckBox("Asynchronous Rendering & Network Channel I/O (+async-update)");
+        asyncUpdateCheck = new CheckBox("Asynchronous Channel Processing (+async-channels)");
         asyncUpdateCheck.setSelected(currentConfig.asyncUpdate());
 
         autoReconnectCheck = new CheckBox("Automatic Reconnection on Network Interruption (+auto-reconnect)");

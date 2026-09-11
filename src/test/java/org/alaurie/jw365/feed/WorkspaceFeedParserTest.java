@@ -120,4 +120,66 @@ class WorkspaceFeedParserTest {
         Workspace ws = WorkspaceFeedParser.parseFeedXml(feedWithBom, feeds.getFirst());
         assertThat(ws.resources()).hasSize(2);
     }
+    @Test
+    @DisplayName("parseFeedXml resolves relative icon and RDP URLs against tenant feed URL")
+    void testRelativeUrlResolution() {
+        String xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <ResourceCollection xmlns="http://schemas.microsoft.com/2008/11/msts/radc">
+                <Publisher Name="Contoso Enterprise">
+                    <Resources>
+                        <Resource ID="res-rel" Title="Relative App" Type="Desktop">
+                            <ResourceFile URL="/api/arm/rdp/rel.rdp" />
+                            <Icon64 FileURL="/api/arm/icons/rel64.png" />
+                        </Resource>
+                    </Resources>
+                </Publisher>
+            </ResourceCollection>
+            """;
+        TenantFeed tenant = new TenantFeed("t1", "Contoso", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
+        Workspace ws = WorkspaceFeedParser.parseFeedXml(xml, tenant);
+        assertThat(ws.resources()).hasSize(1);
+        WorkspaceResource r = ws.resources().getFirst();
+        assertThat(r.rdpUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/rdp/rel.rdp"));
+        assertThat(r.iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/rel64.png"));
+    }
+
+    @Test
+    @DisplayName("parseFeedXml parses nested Icons and prefers higher resolution icon tags")
+    void testNestedIconsAndResolutionPreference() {
+        String xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <ResourceCollection xmlns="http://schemas.microsoft.com/2008/11/msts/radc">
+                <Publisher Name="Contoso Enterprise">
+                    <Resources>
+                        <Resource ID="res-nested" Title="Nested Icon App" Type="RemoteApp">
+                            <ResourceFile URL="https://rdweb.wvd.microsoft.com/api/arm/rdp/app.rdp" />
+                            <Icons>
+                                <IconRaw FileURL="https://rdweb.wvd.microsoft.com/api/arm/icons/app.ico" />
+                                <Icon32 FileURL="https://rdweb.wvd.microsoft.com/api/arm/icons/app32.png" />
+                                <Icon64 FileURL="https://rdweb.wvd.microsoft.com/api/arm/icons/app64.png" />
+                            </Icons>
+                        </Resource>
+                        <Resource ID="res-text" Title="Text Tag App" Type="RemoteApp">
+                            <ResourceFile URL="https://rdweb.wvd.microsoft.com/api/arm/rdp/text.rdp" />
+                            <Icon32>https://rdweb.wvd.microsoft.com/api/arm/icons/text32.png</Icon32>
+                        </Resource>
+                        <Resource ID="res-attr" Title="Attribute App" Type="RemoteApp" IconUrl="https://rdweb.wvd.microsoft.com/api/arm/icons/attr.png">
+                            <ResourceFile URL="https://rdweb.wvd.microsoft.com/api/arm/rdp/attr.rdp" />
+                        </Resource>
+                    </Resources>
+                </Publisher>
+            </ResourceCollection>
+            """;
+        TenantFeed tenant = new TenantFeed("t1", "Contoso", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
+        Workspace ws = WorkspaceFeedParser.parseFeedXml(xml, tenant);
+        assertThat(ws.resources()).hasSize(3);
+
+        // Prefers Icon64 over Icon32 and IconRaw
+        assertThat(ws.resources().get(0).iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/app64.png"));
+        // Parses text content of icon tag
+        assertThat(ws.resources().get(1).iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/text32.png"));
+        // Parses IconUrl attribute directly on Resource element
+        assertThat(ws.resources().get(2).iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/attr.png"));
+    }
 }

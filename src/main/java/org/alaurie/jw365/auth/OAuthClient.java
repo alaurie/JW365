@@ -17,8 +17,7 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.Objects;
-import java.util.Map;
-
+import java.io.IOException;
 import org.alaurie.jw365.config.XdgPaths;
 /**
  * HTTP client for Entra ID OAuth 2.0 authentication.
@@ -37,6 +36,7 @@ public final class OAuthClient {
     private final String scope;
     private final PublicClientApplication msalApplication;
     private final FileTokenCacheAspect tokenCacheAspect;
+    private final Path signedIdentityFile;
     public OAuthClient() {
         this(DEFAULT_CLIENT_ID, DEFAULT_SCOPE, null);
     }
@@ -49,6 +49,7 @@ public final class OAuthClient {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
         this.scope = Objects.requireNonNull(scope, "scope must not be null");
         this.tokenCacheAspect = new FileTokenCacheAspect(Objects.requireNonNull(msalCacheFile, "msalCacheFile must not be null"));
+        this.signedIdentityFile = msalCacheFile.resolveSibling(msalCacheFile.getFileName() + ".identity");
         this.msalApplication = createMsalApplication(clientId, DEFAULT_TENANT, tokenCacheAspect);
     }
 
@@ -58,10 +59,10 @@ public final class OAuthClient {
                 .codeChallenge(challenge.codeChallenge())
                 .codeChallengeMethod("S256")
                 .state(challenge.state())
-                .extraQueryParameters(Map.of("response_mode", "query"))
                 .loginHint(loginHint)
                 .build();
-            return applicationFor(tenant).getAuthorizationRequestUrl(parameters).toURI();
+            URI authorizationUri = applicationFor(tenant).getAuthorizationRequestUrl(parameters).toURI();
+            return URI.create(authorizationUri.toString().replace("response_mode=form_post", "response_mode=query"));
         } catch (Exception e) {
             throw new IllegalStateException("Unable to build Microsoft authorization URL", e);
         }
@@ -81,15 +82,38 @@ public final class OAuthClient {
 
     public synchronized AuthResult refreshTokenWithMsal(String tenant) {
         try {
-            IAccount account = applicationFor(tenant).getAccounts().join().stream().findFirst().orElse(null);
-            if (account == null) {
-                return new AuthResult.Failure("missing_account", "No cached Microsoft account is available");
+            String expectedIdentity = null;
+            if (Files.exists(signedIdentityFile)) {
+                try {
+                    expectedIdentity = Files.readString(signedIdentityFile, StandardCharsets.UTF_8).trim();
+                } catch (IOException ignored) {
+                }
             }
-            SilentParameters parameters = SilentParameters.builder(Set.of(scope.split("\\s+")), account)
+
+            PublicClientApplication app = applicationFor(tenant);
+            Set<IAccount> accounts = app.getAccounts().join();
+            if (accounts.isEmpty()) {
+                return new AuthResult.Failure("no_cached_account", "No cached Microsoft account found", null);
+            }
+
+            final String targetIdentity = expectedIdentity;
+            IAccount targetAccount = null;
+            if (targetIdentity != null && !targetIdentity.isBlank()) {
+                targetAccount = accounts.stream()
+                    .filter(a -> targetIdentity.equalsIgnoreCase(a.username())
+                              || (a.homeAccountId() != null && targetIdentity.equalsIgnoreCase(a.homeAccountId())))
+                    .findFirst()
+                    .orElse(null);
+            }
+            if (targetAccount == null) {
+                targetAccount = accounts.iterator().next();
+            }
+
+            SilentParameters parameters = SilentParameters.builder(Set.of(scope.split("\\s+")), targetAccount)
                 .tenant(tenant)
                 .forceRefresh(true)
                 .build();
-            return toAuthResult(applicationFor(tenant).acquireTokenSilently(parameters).join());
+            return toAuthResult(app.acquireTokenSilently(parameters).join());
         } catch (Exception e) {
             return new AuthResult.Failure("token_refresh_failed", e.getMessage(), e);
         }
@@ -105,15 +129,20 @@ public final class OAuthClient {
             System.err.println("Warning: Could not clear Microsoft authentication cache: " + e.getMessage());
         } finally {
             tokenCacheAspect.clear();
+            try { Files.deleteIfExists(signedIdentityFile); } catch (IOException ignored) { }
         }
     }
 
     private AuthResult toAuthResult(IAuthenticationResult result) {
+        try {
+            if (result.account() != null && result.account().username() != null) {
+                Files.writeString(signedIdentityFile, result.account().username(), StandardCharsets.UTF_8);
+            }
+        } catch (IOException ignored) { }
         long expiresIn = Math.max(0, (result.expiresOnDate().getTime() - System.currentTimeMillis()) / 1000);
         TokenResponse tokens = new TokenResponse(result.accessToken(), null, result.idToken(), "Bearer", expiresIn, scope, System.currentTimeMillis() / 1000);
         return new AuthResult.Success(tokens, JwtClaimsParser.parseIdToken(result.idToken()));
     }
-
     private PublicClientApplication createMsalApplication(String applicationId, String tenant, FileTokenCacheAspect cacheAspect) {
         try {
             return PublicClientApplication.builder(applicationId)

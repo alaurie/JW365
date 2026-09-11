@@ -15,7 +15,6 @@ import java.security.SecureRandom;
 
 /**
  * Machine-bound AES-256-GCM authenticated encryption for persistent token caching.
- * Derives keys from the host machine identifier (/etc/machine-id) and user account identity
  * using 100,000 rounds of PBKDF2-HMAC-SHA256 with unique random salts and IVs.
  */
 public final class MachineBoundCrypto {

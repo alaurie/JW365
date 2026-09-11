@@ -273,6 +273,17 @@
     -fx-font-size: 11px;
 }
 
+.status-bar-text-error {
+    -fx-text-fill: #f87171;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.status-bar-text-active {
+    -fx-text-fill: #60a5fa;
+    -fx-font-size: 11px;
+}
+
 /* Sign-In View */
 .signin-container {
     -fx-background-color: -color-bg-canvas;

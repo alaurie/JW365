@@ -68,6 +68,24 @@ class RdpProcessSupervisorLifecycleTest {
     }
 
     @Test
+    @DisplayName("Connected status requires a known positive marker")
+    void connectedMarkerValidation() {
+        assertThat(RdpProcessSupervisor.isConnectedMarker("channelConnected: RDPDR")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("[11:43:18:631] [701252:000ab344] [INFO][com.freerdp.core] - Successfully connected to 10.0.0.1:3389")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("[INFO][com.freerdp.client.SDL] - postConnect: completed")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("Activated")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("connection established to hostile text")).isFalse();
+    }
+
+    @Test
+    @DisplayName("RDP logs redact Authorization bearer values")
+    void authorizationBearerRedaction() {
+        String redacted = RdpProcessSupervisor.redactLogLine("Authorization: Bearer sensitive-token");
+        assertThat(redacted).isEqualTo("Authorization: Bearer [REDACTED]");
+        assertThat(redacted).doesNotContain("sensitive-token");
+    }
+
+    @Test
     @DisplayName("RdpProcessSupervisor registers listeners and manages session handles")
     void testSupervisorListeners() {
         RdpProcessSupervisor supervisor = new RdpProcessSupervisor();

@@ -14,6 +14,7 @@ import org.alaurie.jw365.gui.view.SignInView;
 import java.io.InputStream;
 import java.net.CookieHandler;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Main JavaFX Application entrypoint for the JW365 Windows 365 & AVD Linux Client.
@@ -25,6 +26,7 @@ public final class Jw365App extends Application {
     private SignInView signInView;
     private MainView mainView;
     private PersistentCookieManager cookieManager;
+    private final AtomicBoolean cleanedUp = new AtomicBoolean(false);
 
     @Override
     public void init() {
@@ -92,12 +94,9 @@ public final class Jw365App extends Application {
     }
 
     private void cleanup() {
-        if (state != null) {
-            state.shutdown();
-        }
-        if (cookieManager != null) {
-            cookieManager.persistCookies();
-        }
+        if (!cleanedUp.compareAndSet(false, true)) return;
+        if (state != null) state.shutdown();
+        if (cookieManager != null) cookieManager.persistCookies();
     }
 
     private void updateActiveView(boolean isAuthenticated) {

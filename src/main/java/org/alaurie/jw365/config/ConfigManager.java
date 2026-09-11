@@ -79,7 +79,11 @@ public final class ConfigManager {
         Path tempFile = configFile.resolveSibling(configFile.getFileName() + ".tmp." + System.nanoTime());
         try {
             MAPPER.writeValue(tempFile.toFile(), config);
-            Files.move(tempFile, configFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            try {
+                Files.move(tempFile, configFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tempFile, configFile, StandardCopyOption.REPLACE_EXISTING);
+            }
             cachedConfig.set(config);
         } finally {
             if (Files.exists(tempFile)) {

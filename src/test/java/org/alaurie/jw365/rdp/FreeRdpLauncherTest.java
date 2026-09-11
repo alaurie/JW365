@@ -62,11 +62,16 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("+clipboard");
         assertThat(cmd).doesNotContain("+dynamic-resolution");
         assertThat(cmd).contains("/network:auto");
-        assertThat(cmd).contains("+async-update");
+        assertThat(cmd).contains("+compression");
+        assertThat(cmd).contains("+fonts");
+        assertThat(cmd).contains("+aero");
+        assertThat(cmd).doesNotContain("+async-update");
         assertThat(cmd).contains("+async-channels");
         assertThat(cmd).contains("+auto-reconnect");
-        assertThat(cmd).contains("/gfx:progressive");
-        assertThat(cmd).contains("/gdi:hw");
+        assertThat(cmd).contains("/gfx:AVC420,progressive");
+        assertThat(cmd).contains("+rfx");
+        assertThat(cmd).contains("/gdi:sw");
+        assertThat(cmd).doesNotContain("/gdi:hw");
         assertThat(cmd).contains("/bpp:32");
         assertThat(cmd).contains("/log-level:info");
     }
