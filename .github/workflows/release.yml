@@ -15,32 +15,20 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    name: Build Linux Packages (.deb, .rpm, .tar.gz, .flatpak)
+  build-native-packages:
+    name: Build Native Linux Packages (.deb, .rpm, .tar.gz)
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Install packaging dependencies (rpm, dpkg-dev, fakeroot, Flatpak)
+      - name: Install packaging dependencies (rpm, dpkg-dev, fakeroot)
         run: |
           sudo apt-get update
-          sudo apt-get install -y fakeroot dpkg-dev rpm flatpak-builder
+          sudo apt-get install -y fakeroot dpkg-dev rpm
 
-      - name: Set up Flatpak runtime
-        run: |
-          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          echo "http.version=HTTP/1.1" | sudo tee -a /etc/flatpak/flatpak.conf 2>/dev/null || true
-          for i in 1 2 3 4 5; do
-            echo "Flatpak install attempt $i..."
-            sudo flatpak install -y --noninteractive flathub \
-              org.freedesktop.Platform//26.08 \
-              org.freedesktop.Sdk//26.08 \
-              org.freedesktop.Sdk.Extension.openjdk25//26.08 && break || sleep 15
-          done
       - name: Set up Oracle JDK 25
         uses: actions/setup-java@v6
         with:
@@ -65,23 +53,20 @@ jobs:
       - name: Run verification suite
         run: ./gradlew clean check -PappVersion=${{ env.APP_VERSION }}
 
-      - name: Build all distribution packages (Debian, RPM, and Portable Tarball)
+      - name: Build native distribution packages
         run: ./gradlew packageDeb packageRpm packagePortableTar -PappVersion=${{ env.APP_VERSION }}
-      - name: Build and bundle Flatpak
-        run: ./gradlew flatpakBuild flatpakBundle -PappVersion=${{ env.APP_VERSION }}
 
-      - name: List generated packages
+      - name: List native packages & checksums
         run: |
           ls -lh build/distributions/
-          sha256sum build/distributions/*.deb build/distributions/*.rpm build/distributions/*.tar.gz build/distributions/*.flatpak > build/distributions/checksums-sha256.txt
-          cat build/distributions/checksums-sha256.txt
+          sha256sum build/distributions/*.deb build/distributions/*.rpm build/distributions/*.tar.gz > build/distributions/checksums-native-sha256.txt
 
       - name: Generate Changelog & Release Notes
         run: |
           chmod +x scripts/generate-changelog.py
           python3 scripts/generate-changelog.py "v${{ env.APP_VERSION }}"
 
-      - name: Create GitHub Release and Upload Assets
+      - name: Create GitHub Release and Upload Native Assets
         uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
@@ -90,9 +75,66 @@ jobs:
             build/distributions/*.deb
             build/distributions/*.rpm
             build/distributions/*.tar.gz
-            build/distributions/*.flatpak
-            build/distributions/checksums-sha256.txt
+            build/distributions/checksums-native-sha256.txt
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-flatpak:
+    name: Build Flatpak Bundle (.flatpak)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Flatpak build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder ostree
+
+      - name: Configure Flatpak and disable HTTP/2 for Flathub
+        run: |
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          sudo ostree --repo=/var/lib/flatpak/repo config set 'remote "flathub"' http2 false
+          for i in 1 2 3 4 5; do
+            echo "Installing runtimes (attempt $i)..."
+            sudo flatpak install -y --noninteractive flathub \
+              org.freedesktop.Platform//26.08 \
+              org.freedesktop.Sdk//26.08 \
+              org.freedesktop.Sdk.Extension.openjdk25//26.08 && break || sleep 20
+          done
+
+      - name: Set up Oracle JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'oracle'
+          cache: 'gradle'
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew jw365
+
+      - name: Determine release version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VER="${{ github.event.inputs.version }}"
+          else
+            TAG_VER="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG_VER#v}"
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build and bundle Flatpak
+        run: ./gradlew flatpakBuild flatpakBundle -PappVersion=${{ env.APP_VERSION }}
+
+      - name: Upload Flatpak to GitHub Release
+        uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          files: |
+            build/distributions/*.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
