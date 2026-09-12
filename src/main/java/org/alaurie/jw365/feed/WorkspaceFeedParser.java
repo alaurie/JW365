@@ -151,7 +151,7 @@ public final class WorkspaceFeedParser {
                 uri = baseUri.resolve(uri);
             }
             return (policy == null || policy.test(uri)) ? uri : null;
-        } catch (IllegalArgumentException ignored) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

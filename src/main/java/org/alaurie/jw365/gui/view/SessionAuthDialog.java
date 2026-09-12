@@ -169,7 +169,7 @@ public final class SessionAuthDialog extends Stage {
                     }
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception _) { }
         return java.util.Optional.empty();
     }
 

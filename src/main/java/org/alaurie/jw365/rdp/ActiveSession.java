@@ -79,19 +79,19 @@ public final class ActiveSession {
 
         try {
             process.descendants().forEach(ProcessHandle::destroy);
-        } catch (Exception ignored) { }
+        } catch (Exception _) { }
         process.destroy();
         try {
             if (!process.waitFor(3, TimeUnit.SECONDS)) {
                 try {
                     process.descendants().forEach(ProcessHandle::destroyForcibly);
-                } catch (Exception ignored) { }
+                } catch (Exception _) { }
                 process.destroyForcibly();
             }
         } catch (InterruptedException e) {
             try {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);
-            } catch (Exception ignored) { }
+            } catch (Exception _) { }
             process.destroyForcibly();
             Thread.currentThread().interrupt();
         }

@@ -76,7 +76,7 @@ public final class Jw365App extends Application {
                 if (is != null) {
                     stage.getIcons().add(new Image(is));
                 }
-            } catch (Exception ignored) {
+            } catch (Exception _) {
             }
         }
 

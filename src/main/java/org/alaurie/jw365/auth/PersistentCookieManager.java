@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -124,19 +125,19 @@ public final class PersistentCookieManager extends CookieManager {
             Path parent = storageFile.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
-                try { Files.setPosixFilePermissions(parent, PosixFilePermissions.fromString("rwx------")); } catch (Exception ignored) {}
+                try { Files.setPosixFilePermissions(parent, PosixFilePermissions.fromString("rwx------")); } catch (Exception _) {}
             }
             Path temp = storageFile.resolveSibling(storageFile.getFileName() + ".tmp." + System.nanoTime());
             try {
                 byte[] encrypted = MachineBoundCrypto.encrypt(MAPPER.writeValueAsBytes(list));
                 Files.write(temp, encrypted);
-                try { Files.setPosixFilePermissions(temp, PosixFilePermissions.fromString("rw-------")); } catch (Exception ignored) {}
+                try { Files.setPosixFilePermissions(temp, PosixFilePermissions.fromString("rw-------")); } catch (Exception _) {}
                 try {
                     Files.move(temp, storageFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 } catch (AtomicMoveNotSupportedException e) {
                     Files.move(temp, storageFile, StandardCopyOption.REPLACE_EXISTING);
                 }
-                try { Files.setPosixFilePermissions(storageFile, PosixFilePermissions.fromString("rw-------")); } catch (Exception ignored) {}
+                try { Files.setPosixFilePermissions(storageFile, PosixFilePermissions.fromString("rw-------")); } catch (Exception _) {}
             } finally { Files.deleteIfExists(temp); }
         } catch (Exception e) {
             System.err.println("Warning: Could not persist cookies: " + e.getMessage());
@@ -152,8 +153,8 @@ public final class PersistentCookieManager extends CookieManager {
             if (hasSetCookie && autoPersistPending.compareAndSet(false, true)) {
                 Thread.ofVirtual().name("cookie-auto-persist").start(() -> {
                     try {
-                        Thread.sleep(300);
-                    } catch (InterruptedException ignored) {
+                        Thread.sleep(Duration.ofMillis(300));
+                    } catch (InterruptedException _) {
                         Thread.currentThread().interrupt();
                     } finally {
                         autoPersistPending.set(false);

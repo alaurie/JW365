@@ -92,14 +92,14 @@ public final class MachineBoundCrypto {
     private static String readMachineId() {
         for (String candidate : new String[]{"/etc/machine-id", "/var/lib/dbus/machine-id"}) {
             try {
-                Path p = Paths.get(candidate);
+                Path p = Path.of(candidate);
                 if (Files.isReadable(p)) {
                     String id = Files.readString(p, StandardCharsets.UTF_8).trim();
                     if (!id.isBlank()) {
                         return id;
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception _) {
             }
         }
         return "jw365-fallback-" + System.getProperty("user.home");

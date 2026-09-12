@@ -35,13 +35,15 @@ import org.alaurie.jw365.rdp.SessionStatus;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.time.Instant;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -103,53 +105,56 @@ public final class AppState {
         WorkspaceFeedClient feedClient,
         RdpProcessSupervisor rdpSupervisor
     ) {
-        this.oauthClient = oauthClient != null ? oauthClient : new OAuthClient();
-        this.tokenStore = tokenStore != null ? tokenStore : new TokenStore();
-        this.configManager = configManager != null ? configManager : new ConfigManager();
-        this.workspaceCache = workspaceCache != null ? workspaceCache : new WorkspaceCache();
-        this.feedClient = feedClient != null ? feedClient : new WorkspaceFeedClient();
-        this.rdpSupervisor = rdpSupervisor != null ? rdpSupervisor : new RdpProcessSupervisor();
+        this.oauthClient = Objects.requireNonNullElseGet(oauthClient, OAuthClient::new);
+        this.tokenStore = Objects.requireNonNullElseGet(tokenStore, TokenStore::new);
+        this.configManager = Objects.requireNonNullElseGet(configManager, ConfigManager::new);
+        this.workspaceCache = Objects.requireNonNullElseGet(workspaceCache, WorkspaceCache::new);
+        this.feedClient = Objects.requireNonNullElseGet(feedClient, WorkspaceFeedClient::new);
+        this.rdpSupervisor = Objects.requireNonNullElseGet(rdpSupervisor, RdpProcessSupervisor::new);
         this.rdpSupervisor.addGlobalListener(event -> {
-            if (event instanceof SessionEvent.StatusChanged sc) {
-                runOnFxThread(() -> {
+            switch (event) {
+                case SessionEvent.StatusChanged sc -> runOnFxThread(() -> {
                     if (closed.get() || !authenticated.get()) return;
                     sessionStatuses.put(sc.sessionId(), sc.newStatus());
-                    if (sc.newStatus() == SessionStatus.CONNECTED) {
-                        closeAuthDialog(sc.sessionId());
-                        statusMessage.set("Connected to Cloud PC");
-                    } else if (sc.newStatus() == SessionStatus.DISCONNECTED) {
-                        closeAuthDialog(sc.sessionId());
-                        statusMessage.set("Session disconnected");
-                    } else if (sc.newStatus() == SessionStatus.FAILED) {
-                        closeAuthDialog(sc.sessionId());
-                        statusMessage.set(sc.message() != null ? sc.message() : "Connection failed");
-                    } else if (sc.newStatus() == SessionStatus.CONNECTING || sc.newStatus() == SessionStatus.STARTING) {
-                        statusMessage.set(sc.message() != null ? sc.message() : "Connecting to Cloud PC...");
-                    } else if (sc.newStatus() == SessionStatus.RECONNECTING) {
-                        statusMessage.set(sc.message() != null ? sc.message() : "Reconnecting to Cloud PC...");
-                    } else if (sc.newStatus() == SessionStatus.DISCONNECTING) {
-                        statusMessage.set("Disconnecting from Cloud PC...");
+                    switch (sc.newStatus()) {
+                        case CONNECTED -> {
+                            closeAuthDialog(sc.sessionId());
+                            statusMessage.set("Connected to Cloud PC");
+                        }
+                        case DISCONNECTED -> {
+                            closeAuthDialog(sc.sessionId());
+                            statusMessage.set("Session disconnected");
+                        }
+                        case FAILED -> {
+                            closeAuthDialog(sc.sessionId());
+                            statusMessage.set(Objects.requireNonNullElse(sc.message(), "Connection failed"));
+                        }
+                        case CONNECTING, STARTING ->
+                            statusMessage.set(Objects.requireNonNullElse(sc.message(), "Connecting to Cloud PC..."));
+                        case RECONNECTING ->
+                            statusMessage.set(Objects.requireNonNullElse(sc.message(), "Reconnecting to Cloud PC..."));
+                        case DISCONNECTING ->
+                            statusMessage.set("Disconnecting from Cloud PC...");
                     }
                 });
-            } else if (event instanceof SessionEvent.Exited ex) {
-                runOnFxThread(() -> {
+                case SessionEvent.Exited ex -> runOnFxThread(() -> {
                     if (closed.get() || !authenticated.get()) return;
                     closeAuthDialog(ex.sessionId());
                     SessionStatus current = sessionStatuses.get(ex.sessionId());
                     if (current != SessionStatus.FAILED) {
                         if (ex.exitCode() != 0 && ex.exitCode() != 143 && ex.exitCode() != 130 && ex.exitCode() != 129) {
                             sessionStatuses.put(ex.sessionId(), SessionStatus.FAILED);
-                            statusMessage.set(ex.message() != null ? ex.message() : "Session exited with error code " + ex.exitCode());
+                            statusMessage.set(Objects.requireNonNullElse(ex.message(), "Session exited with error code " + ex.exitCode()));
                         } else {
                             sessionStatuses.put(ex.sessionId(), SessionStatus.DISCONNECTED);
                             statusMessage.set("Session ended");
                         }
                     }
                 });
-            } else if (event instanceof SessionEvent.AuthRequired ar) {
-                runOnFxThread(() -> {
+                case SessionEvent.AuthRequired ar -> runOnFxThread(() -> {
                     if (!closed.get() && authenticated.get()) handleSessionAuth(ar);
                 });
+                case SessionEvent.Started _, SessionEvent.OutputLine _ -> { }
             }
         });
     }
@@ -262,33 +267,36 @@ public final class AppState {
         setLoadingIfCurrent(generation, true, "Authenticating with Microsoft Entra ID...");
         Thread.ofVirtual().start(() -> {
             AuthResult result = oauthClient.exchangeAuthorizationCode(configManager.get().defaultTenant(), authorizationCode, codeVerifier, redirectUri);
-            if (result instanceof AuthResult.Success(var tokens, var claims)) {
-                synchronized (authOperationLock) {
-                    if (generation != operationGeneration.get()) return;
-                    try {
-                        tokenStore.save(tokens);
-                    } catch (Exception e) {
+            switch (result) {
+                case AuthResult.Success(var tokens, var claims) -> {
+                    synchronized (authOperationLock) {
                         if (generation != operationGeneration.get()) return;
+                        try {
+                            tokenStore.save(tokens);
+                        } catch (Exception e) {
+                            if (generation != operationGeneration.get()) return;
+                            runIfCurrent(generation, () -> {
+                                setLoading(false, "Authentication failed: " + e.getMessage());
+                                if (onError != null) onError.accept(e.getMessage());
+                            });
+                            return;
+                        }
                         runIfCurrent(generation, () -> {
-                            setLoading(false, "Authentication failed: " + e.getMessage());
-                            if (onError != null) onError.accept(e.getMessage());
+                            currentUser.set(claims);
+                            authenticated.set(true);
+                            setLoading(false, "Signed in as " + claims.displayIdentity());
+                            if (onSuccess != null) onSuccess.run();
+                            refreshWorkspacesAsync(false);
                         });
-                        return;
                     }
+                }
+                case AuthResult.Failure failure -> {
+                    if (generation != operationGeneration.get()) return;
                     runIfCurrent(generation, () -> {
-                        currentUser.set(claims);
-                        authenticated.set(true);
-                        setLoading(false, "Signed in as " + claims.displayIdentity());
-                        if (onSuccess != null) onSuccess.run();
-                        refreshWorkspacesAsync(false);
+                        setLoading(false, "Authentication failed: " + failure.errorMessage());
+                        if (onError != null) onError.accept(failure.errorMessage());
                     });
                 }
-            } else if (result instanceof AuthResult.Failure failure) {
-                if (generation != operationGeneration.get()) return;
-                runIfCurrent(generation, () -> {
-                    setLoading(false, "Authentication failed: " + failure.errorMessage());
-                    if (onError != null) onError.accept(failure.errorMessage());
-                });
             }
         });
     }
@@ -365,23 +373,26 @@ public final class AppState {
                 ClientConfig config = configManager.get();
                 if (forceTokenRefresh || tokens.isExpiringSoon()) {
                     AuthResult refreshResult = oauthClient.refreshTokenWithMsal(config.defaultTenant());
-                    if (refreshResult instanceof AuthResult.Success(var newTokens, var claims)) {
-                        synchronized (authOperationLock) {
-                            if (generation != operationGeneration.get()) return;
-                            tokens = mergeTokenResponses(tokens, newTokens);
-                            tokenStore.save(tokens);
+                    switch (refreshResult) {
+                        case AuthResult.Success(var newTokens, var claims) -> {
+                            synchronized (authOperationLock) {
+                                if (generation != operationGeneration.get()) return;
+                                tokens = mergeTokenResponses(tokens, newTokens);
+                                tokenStore.save(tokens);
+                            }
+                            runIfCurrent(generation, () -> currentUser.set(claims));
                         }
-                        runIfCurrent(generation, () -> currentUser.set(claims));
-                    } else if (refreshResult instanceof AuthResult.Failure f) {
-                        System.err.println("Warning: Token refresh failed: " + f.errorMessage());
-                        if (generation != operationGeneration.get()) return;
-                        long invalidationGeneration;
-                        synchronized (authOperationLock) {
+                        case AuthResult.Failure f -> {
+                            System.err.println("Warning: Token refresh failed: " + f.errorMessage());
                             if (generation != operationGeneration.get()) return;
-                            invalidationGeneration = operationGeneration.incrementAndGet();
+                            long invalidationGeneration;
+                            synchronized (authOperationLock) {
+                                if (generation != operationGeneration.get()) return;
+                                invalidationGeneration = operationGeneration.incrementAndGet();
+                            }
+                            expireAuthentication("Session expired, please sign in again", invalidationGeneration);
+                            return;
                         }
-                        expireAuthentication("Session expired, please sign in again", invalidationGeneration);
-                        return;
                     }
                 }
 
@@ -534,7 +545,7 @@ public final class AppState {
         long generation = operationGeneration.get();
         disconnectResource(resource);
         Thread.ofVirtual().name("jw365-restart-" + resource.sanitizedFileName()).start(() -> {
-            try { Thread.sleep(600); }
+            try { Thread.sleep(Duration.ofMillis(600)); }
             catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
             if (isCurrentGeneration(generation) && !closed.get()) connectResource(resource, DisplayMode.DEFAULT, onError);
         });
@@ -604,7 +615,7 @@ public final class AppState {
                 for (Consumer<Image> listener : listeners) {
                     try {
                         listener.accept(image);
-                    } catch (Exception ignored) { }
+                    } catch (Exception _) { }
                 }
             });
         }
@@ -726,7 +737,7 @@ public final class AppState {
             } else {
                 Platform.runLater(action);
             }
-        } catch (IllegalStateException ignored) {
+        } catch (IllegalStateException _) {
             // JavaFX toolkit is shutting down; discard late UI work.
         }
     }

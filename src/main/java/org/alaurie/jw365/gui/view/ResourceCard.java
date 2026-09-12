@@ -35,7 +35,7 @@ public final class ResourceCard extends VBox {
         javafx.scene.image.Image img = null;
         try (var is = ResourceCard.class.getResourceAsStream("/org/alaurie/jw365/gui/icons/icon_48.png")) {
             if (is != null) img = new javafx.scene.image.Image(is);
-        } catch (Exception ignored) { }
+        } catch (Exception _) { }
         DEFAULT_ICON = img;
     }
     private final javafx.collections.MapChangeListener<String, SessionStatus> statusListener;

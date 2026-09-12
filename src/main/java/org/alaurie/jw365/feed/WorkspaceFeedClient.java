@@ -244,18 +244,11 @@ public final class WorkspaceFeedClient {
     }
 
     private static byte[] readLimited(InputStream input, int maxBytes) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(maxBytes, 8192));
-        byte[] buffer = new byte[8192];
-        int total = 0;
-        int read;
-        while ((read = input.read(buffer)) != -1) {
-            if (read > maxBytes - total) {
-                throw new IOException("HTTP response exceeds " + maxBytes + " byte limit");
-            }
-            output.write(buffer, 0, read);
-            total += read;
+        byte[] bytes = input.readNBytes(maxBytes + 1);
+        if (bytes.length > maxBytes) {
+            throw new IOException("HTTP response exceeds " + maxBytes + " byte limit");
         }
-        return output.toByteArray();
+        return bytes;
     }
 
     private void requireAllowedEndpoint(URI uri) {

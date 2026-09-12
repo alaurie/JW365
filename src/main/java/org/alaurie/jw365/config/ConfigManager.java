@@ -89,7 +89,7 @@ public final class ConfigManager {
             if (Files.exists(tempFile)) {
                 try {
                     Files.delete(tempFile);
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                 }
             }
         }

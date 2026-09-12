@@ -127,7 +127,7 @@ public final class TokenStore {
                 try {
                     Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-------");
                     Files.setPosixFilePermissions(tempFile, perms);
-                } catch (UnsupportedOperationException ignored) {
+                } catch (UnsupportedOperationException _) {
                 }
                 try {
                     Files.move(tempFile, encryptedFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

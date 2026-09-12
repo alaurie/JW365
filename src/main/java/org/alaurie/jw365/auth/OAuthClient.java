@@ -86,7 +86,7 @@ public final class OAuthClient {
             if (Files.exists(signedIdentityFile)) {
                 try {
                     expectedIdentity = Files.readString(signedIdentityFile, StandardCharsets.UTF_8).trim();
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                 }
             }
 
@@ -129,7 +129,7 @@ public final class OAuthClient {
             System.err.println("Warning: Could not clear Microsoft authentication cache: " + e.getMessage());
         } finally {
             tokenCacheAspect.clear();
-            try { Files.deleteIfExists(signedIdentityFile); } catch (IOException ignored) { }
+            try { Files.deleteIfExists(signedIdentityFile); } catch (IOException _) { }
         }
     }
 
@@ -138,7 +138,7 @@ public final class OAuthClient {
             if (result.account() != null && result.account().username() != null) {
                 Files.writeString(signedIdentityFile, result.account().username(), StandardCharsets.UTF_8);
             }
-        } catch (IOException ignored) { }
+        } catch (IOException _) { }
         long expiresIn = Math.max(0, (result.expiresOnDate().getTime() - System.currentTimeMillis()) / 1000);
         TokenResponse tokens = new TokenResponse(result.accessToken(), null, result.idToken(), "Bearer", expiresIn, scope, System.currentTimeMillis() / 1000);
         return new AuthResult.Success(tokens, JwtClaimsParser.parseIdToken(result.idToken()));
@@ -146,7 +146,7 @@ public final class OAuthClient {
     private PublicClientApplication createMsalApplication(String applicationId, String tenant, FileTokenCacheAspect cacheAspect) {
         try {
             return PublicClientApplication.builder(applicationId)
-                .authority(String.format(LOGIN_BASE, normalizeTenant(tenant)))
+                .authority(LOGIN_BASE.formatted(normalizeTenant(tenant)))
                 .setTokenCacheAccessAspect(cacheAspect)
                 .build();
         } catch (Exception e) {
@@ -175,7 +175,7 @@ public final class OAuthClient {
                 if (Files.exists(file) && Files.size(file) > 0) {
                     context.tokenCache().deserialize(new String(MachineBoundCrypto.decrypt(Files.readAllBytes(file)), StandardCharsets.UTF_8));
                 }
-            } catch (Exception ignored) {
+            } catch (Exception _) {
             }
         }
 
@@ -191,24 +191,24 @@ public final class OAuthClient {
                     Files.write(tempFile, encrypted);
                     try {
                         Files.setPosixFilePermissions(tempFile, PosixFilePermissions.fromString("rw-------"));
-                    } catch (UnsupportedOperationException ignored) {
+                    } catch (UnsupportedOperationException _) {
                     }
                     try {
                         Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                    } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                    } catch (java.nio.file.AtomicMoveNotSupportedException _) {
                         Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING);
                     }
                 } finally {
                     Files.deleteIfExists(tempFile);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception _) {
             }
         }
 
         private synchronized void clear() {
             try {
                 Files.deleteIfExists(file);
-            } catch (Exception ignored) {
+            } catch (Exception _) {
             }
         }
     }

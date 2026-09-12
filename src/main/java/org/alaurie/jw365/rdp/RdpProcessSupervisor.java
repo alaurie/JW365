@@ -185,7 +185,7 @@ public final class RdpProcessSupervisor {
         Objects.requireNonNull(resource, "resource must not be null");
         Objects.requireNonNull(config, "config must not be null");
         String sessionId = resource.identityKey();
-        Object sessionLock = sessionLocks.computeIfAbsent(sessionId, ignored -> new Object());
+        Object sessionLock = sessionLocks.computeIfAbsent(sessionId, _ -> new Object());
         Path logFile;
         Process process;
         ActiveSession session;
@@ -215,12 +215,12 @@ public final class RdpProcessSupervisor {
         Path logDir = logFile.getParent();
         if (logDir != null) {
             Files.createDirectories(logDir);
-            try { Files.setPosixFilePermissions(logDir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); } catch (Exception ignored) { }
+            try { Files.setPosixFilePermissions(logDir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); } catch (Exception _) { }
         }
         if (!Files.exists(logFile)) {
             Files.createFile(logFile);
         }
-        try { Files.setPosixFilePermissions(logFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); } catch (Exception ignored) { }
+        try { Files.setPosixFilePermissions(logFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); } catch (Exception _) { }
         Map<String, String> env = pb.environment();
         String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
         String display = System.getenv("DISPLAY");
@@ -273,7 +273,7 @@ public final class RdpProcessSupervisor {
 
         // Start Virtual Thread to monitor output and lifecycle
         Thread.ofVirtual().name("rdp-watcher-" + resource.sanitizedFileName()).start(() -> {
-            Object logLock = LOG_LOCKS.computeIfAbsent(logFile.toAbsolutePath(), ignored -> new Object());
+            Object logLock = LOG_LOCKS.computeIfAbsent(logFile.toAbsolutePath(), _ -> new Object());
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
                  BufferedWriter logWriter = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 
@@ -420,7 +420,7 @@ public final class RdpProcessSupervisor {
      */
     public void stopSession(String resourceId) {
         if (resourceId == null) return;
-        Object lock = sessionLocks.computeIfAbsent(resourceId, ignored -> new Object());
+        Object lock = sessionLocks.computeIfAbsent(resourceId, _ -> new Object());
         synchronized (lock) {
             ActiveSession session = activeSessions.remove(resourceId);
             if (session != null) {
@@ -528,7 +528,7 @@ public final class RdpProcessSupervisor {
                     """;
                 Files.writeString(sdlJson, content, StandardCharsets.UTF_8);
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
         }
     }
 }

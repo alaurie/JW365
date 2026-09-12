@@ -41,7 +41,7 @@ class XdgLogPruningTest {
                     .forEach(p -> {
                         try {
                             Files.deleteIfExists(p);
-                        } catch (IOException ignored) {
+                        } catch (IOException _) {
                         }
                     });
             }
@@ -78,7 +78,7 @@ class XdgLogPruningTest {
                     .forEach(p -> {
                         try {
                             Files.deleteIfExists(p);
-                        } catch (IOException ignored) {
+                        } catch (IOException _) {
                         }
                     });
             }

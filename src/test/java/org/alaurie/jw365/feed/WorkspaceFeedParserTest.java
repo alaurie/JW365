@@ -176,7 +176,7 @@ class WorkspaceFeedParserTest {
         assertThat(ws.resources()).hasSize(3);
 
         // Prefers Icon64 over Icon32 and IconRaw
-        assertThat(ws.resources().get(0).iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/app64.png"));
+        assertThat(ws.resources().getFirst().iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/app64.png"));
         // Parses text content of icon tag
         assertThat(ws.resources().get(1).iconUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/text32.png"));
         // Parses IconUrl attribute directly on Resource element

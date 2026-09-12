@@ -125,7 +125,7 @@ class PersistentCookieManagerTest {
 
         long deadline = System.currentTimeMillis() + 2000;
         while ((!Files.exists(cookieFile) || Files.size(cookieFile) == 0) && System.currentTimeMillis() < deadline) {
-            Thread.sleep(50);
+            Thread.sleep(java.time.Duration.ofMillis(50));
         }
         assertThat(Files.exists(cookieFile)).isTrue();
         assertThat(Files.size(cookieFile)).isGreaterThan(0);

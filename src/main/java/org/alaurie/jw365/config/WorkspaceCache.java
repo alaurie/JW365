@@ -65,7 +65,7 @@ public final class WorkspaceCache {
         if (parent != null && !Files.exists(parent)) {
             try {
                 Files.createDirectories(parent);
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         }
 
@@ -83,7 +83,7 @@ public final class WorkspaceCache {
             if (Files.exists(tempFile)) {
                 try {
                     Files.delete(tempFile);
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                 }
             }
         }
@@ -96,7 +96,7 @@ public final class WorkspaceCache {
         if (Files.exists(cacheFile)) {
             try {
                 Files.delete(cacheFile);
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         }
     }
@@ -145,7 +145,7 @@ public final class WorkspaceCache {
         } finally {
             try {
                 Files.deleteIfExists(temp);
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         }
     }
@@ -161,7 +161,7 @@ public final class WorkspaceCache {
                 if (size > 0 && size <= 2 * 1024 * 1024) {
                     return Optional.of(Files.readAllBytes(target));
                 }
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         }
         return Optional.empty();

@@ -3,7 +3,6 @@ package org.alaurie.jw365.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  * Resolves standard XDG Base Directory specification paths on Linux.
@@ -21,8 +20,8 @@ public final class XdgPaths {
     public static Path configDir() {
         String xdgConfig = System.getenv("XDG_CONFIG_HOME");
         Path base = (xdgConfig != null && !xdgConfig.isBlank())
-            ? Paths.get(xdgConfig)
-            : Paths.get(System.getProperty("user.home"), ".config");
+            ? Path.of(xdgConfig)
+            : Path.of(System.getProperty("user.home"), ".config");
         Path dir = base.resolve(APP_NAME);
         ensureDir(dir);
         return dir;
@@ -34,8 +33,8 @@ public final class XdgPaths {
     public static Path dataDir() {
         String xdgData = System.getenv("XDG_DATA_HOME");
         Path base = (xdgData != null && !xdgData.isBlank())
-            ? Paths.get(xdgData)
-            : Paths.get(System.getProperty("user.home"), ".local", "share");
+            ? Path.of(xdgData)
+            : Path.of(System.getProperty("user.home"), ".local", "share");
         Path dir = base.resolve(APP_NAME);
         ensureDir(dir);
         return dir;
@@ -47,8 +46,8 @@ public final class XdgPaths {
     public static Path cacheDir() {
         String xdgCache = System.getenv("XDG_CACHE_HOME");
         Path base = (xdgCache != null && !xdgCache.isBlank())
-            ? Paths.get(xdgCache)
-            : Paths.get(System.getProperty("user.home"), ".cache");
+            ? Path.of(xdgCache)
+            : Path.of(System.getProperty("user.home"), ".cache");
         Path dir = base.resolve(APP_NAME);
         ensureDir(dir);
         return dir;
@@ -88,7 +87,7 @@ public final class XdgPaths {
         ensureDir(dir);
         try {
             Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
-        } catch (Exception ignored) { }
+        } catch (Exception _) { }
         return dir;
     }
 
@@ -105,7 +104,7 @@ public final class XdgPaths {
         ensureDir(dir);
         try {
             try { Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); }
-            catch (UnsupportedOperationException ignored) { }
+            catch (UnsupportedOperationException _) { }
             try (var stream = Files.list(dir)) {
                 java.util.List<Path> logFiles = stream.filter(p -> p.getFileName().toString().startsWith("session_")
                         && p.getFileName().toString().endsWith(".log"))
@@ -121,11 +120,11 @@ public final class XdgPaths {
                     else {
                         retainedBytes += size;
                         try { Files.setPosixFilePermissions(log, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); }
-                        catch (UnsupportedOperationException ignored) { }
+                        catch (UnsupportedOperationException _) { }
                     }
                 }
             }
-        } catch (IOException ignored) { }
+        } catch (IOException _) { }
     }
 
     /**

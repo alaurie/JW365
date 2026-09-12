@@ -4,7 +4,6 @@ import org.alaurie.jw365.util.ExecutableLocator;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -68,11 +67,11 @@ public final class FreeRdpLocator {
             return checkFlatpak();
         }
         try {
-            Path p = Paths.get(customPath);
+            Path p = Path.of(customPath);
             if (Files.isExecutable(p)) {
                 return Optional.of(inspectBinary(p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException _) {
         }
         return Optional.empty();
     }
@@ -124,7 +123,7 @@ public final class FreeRdpLocator {
                 }
                 return Optional.of(new FreeRdpInfo(null, FreeRdpFlavor.FLATPAK, version, true, "com.freerdp.FreeRDP"));
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
         }
         return Optional.empty();
     }
@@ -151,7 +150,7 @@ public final class FreeRdpLocator {
             } else {
                 process.destroyForcibly();
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
         }
         return null;
     }

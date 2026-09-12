@@ -23,7 +23,7 @@ public final class AppVersion {
                     return ver.trim();
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception _) {
         }
         Package pkg = AppVersion.class.getPackage();
         if (pkg != null && pkg.getImplementationVersion() != null && !pkg.getImplementationVersion().isBlank()) {
