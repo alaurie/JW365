@@ -65,6 +65,7 @@ class XdgAndConfigTest {
         assertThat(loaded.fullscreen()).isTrue();
         assertThat(loaded.microphone()).isFalse();
         assertThat(loaded.multiMonitor()).isTrue();
+        assertThat(loaded.preventSessionLock()).isTrue();
         assertThat(loaded.autoRefreshMinutes()).isEqualTo(30);
         assertThat(loaded.extraArgs()).containsExactly("/bpp:24");
     }
@@ -82,6 +83,7 @@ class XdgAndConfigTest {
 
         manager.save(loaded);
         assertThat(Files.readString(configFile)).doesNotContain("preferredBrowser");
+        assertThat(loaded.preventSessionLock()).isTrue();
     }
     @Test
     @DisplayName("WorkspaceCache persists and loads workspaces and cached icons")

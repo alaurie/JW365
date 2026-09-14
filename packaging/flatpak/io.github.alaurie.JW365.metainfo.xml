@@ -26,6 +26,7 @@
     <binary>jw365</binary>
   </provides>
   <releases>
+    <release version="0.2.5" date="2026-09-14" />
     <release version="0.2.4" date="2026-09-11" />
     <release version="0.2.2" date="2026-09-10" />
   </releases>

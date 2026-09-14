@@ -9,6 +9,7 @@ Native desktop client for Linux to connect to Microsoft Windows 365 Cloud PCs an
 - **Embedded Entra ID Authentication**: Direct Microsoft work/school account sign-in via embedded WebView with OAuth 2.0 PKCE.
 - **Silent Session Re-auth**: Injects session identity into FreeRDP `/sec:aad` token requests with encrypted, machine-bound cookie persistence.
 - **Optimized FreeRDP 3 Engine**: H.264 video decoding (`/gfx:AVC420,progressive`), RemoteFX (`+rfx`), software GDI compositing, and VSync enabled by default to prevent tearing and flicker.
+- **Prevent Idle Session Lock**: Injects periodic fake mouse motion (`/prevent-session-lock:120`) to keep remote Cloud PC sessions alive, avoiding screen lock and 20-second reconnection freezes.
 - **Dynamic Resolution & Multi-Monitor**: Automatically adapts remote resolution to Linux window size; supports multi-monitor spanning and fullscreen modes.
 - **Audio & Peripheral Redirection**: PulseAudio/PipeWire 48kHz audio output and microphone input, clipboard synchronization, smartcard redirection.
 - **Self-Contained Packages**: Bundled Java 25 runtime image via `jlink`. No local JRE installation required. Available as Flatpak, `.deb`, `.rpm`, and portable `.tar.gz`.
@@ -73,10 +74,13 @@ sudo pacman -S freerdp
 ```
 
 You can also use Flathub's FreeRDP:
+
 ```bash
 flatpak install --user flathub com.freerdp.FreeRDP
 ```
+
 In **Settings > FreeRDP Client Engine**, choose between system, Flatpak, or custom binaries.
+
 ### Shortcuts (SDL FreeRDP)
 
 FreeRDP uses `Right Ctrl` as the local client modifier key:
@@ -88,6 +92,7 @@ FreeRDP uses `Right Ctrl` as the local client modifier key:
 - **Right Ctrl + R**: Toggle resizable window
 
 *(The modifier was remapped from Right Shift to Right Control so typing capital letters like G and D does not trigger local shortcuts).*
+
 ## Architecture
 
 - **Runtime**: Java 25 (`jlink` minimal image, ~90 MB).

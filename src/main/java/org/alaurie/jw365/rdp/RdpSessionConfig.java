@@ -24,6 +24,7 @@ public record RdpSessionConfig(
     boolean autoReconnect,
     boolean usbRedirection,
     boolean smartcard,
+    boolean preventSessionLock,
     List<String> extraArgs
 ) {
 
@@ -44,7 +45,7 @@ public record RdpSessionConfig(
         boolean ignoreCert,
         List<String> extraArgs
     ) {
-        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, true, true, extraArgs);
+        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, true, true, true, extraArgs);
     }
 
     public static RdpSessionConfig defaults(Path rdpFile, String username) {
@@ -64,6 +65,7 @@ public record RdpSessionConfig(
             true,
             false,
             false,
+            true,
             Collections.emptyList()
         );
     }

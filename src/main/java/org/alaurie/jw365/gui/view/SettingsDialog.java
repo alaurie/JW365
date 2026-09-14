@@ -59,6 +59,7 @@ public final class SettingsDialog extends Stage {
     private final CheckBox gfxProgressiveCheck;
     private final CheckBox asyncUpdateCheck;
     private final CheckBox autoReconnectCheck;
+    private final CheckBox preventSessionLockCheck;
 
     private final CheckBox autoConnectCheck;
 
@@ -171,6 +172,9 @@ public final class SettingsDialog extends Stage {
 
         autoReconnectCheck = new CheckBox("Automatic Reconnection on Network Interruption (+auto-reconnect)");
         autoReconnectCheck.setSelected(currentConfig.autoReconnect());
+
+        preventSessionLockCheck = new CheckBox("Prevent Idle Session Lock & Timeouts (/prevent-session-lock)");
+        preventSessionLockCheck.setSelected(currentConfig.preventSessionLock());
         usbCheck = new CheckBox("Redirect USB devices (/usb:auto)");
         usbCheck.setSelected(currentConfig.usbRedirection());
         smartcardCheck = new CheckBox("Redirect smartcard (/smartcard)");
@@ -218,7 +222,7 @@ public final class SettingsDialog extends Stage {
             rdpSection, detectedLabel, sourceBox, customRdpBox,
             new Separator(),
             displaySection, displayGrid,
-            fullscreenCheck, multiMonCheck, multiMonHint, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, usbCheck, smartcardCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
+            fullscreenCheck, multiMonCheck, multiMonHint, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, preventSessionLockCheck, usbCheck, smartcardCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
             new Separator(),
             advancedSection, autoConnectCheck, advGrid
         );
@@ -316,6 +320,7 @@ public final class SettingsDialog extends Stage {
             autoConnectCheck.isSelected(),
             usbCheck.isSelected(),
             smartcardCheck.isSelected(),
+            preventSessionLockCheck.isSelected(),
             autoRefresh,
             extraArgs
         );

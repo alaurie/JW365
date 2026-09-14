@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.5] - 2026-09-14
+
+### Added
+
+- **Prevent Idle Session Lock & Gateway Timeouts**: Added `/prevent-session-lock:120` by default and a configurable setting under Settings to keep remote Cloud PC sessions active, preventing idle screen lockouts, Azure gateway drops, and the resulting ~20-second GNOME "Quit or Wait" reconnection hang.
+
 ## [0.2.4] - 2026-09-11
 
 ### Fixed
+
 - Remapped default FreeRDP SDL shortcut modifier to `Right Ctrl` (`KMOD_RCTRL`) to avoid keyboard typing collisions with `Right Shift`.
 - Auto-seed `freerdp/sdl-freerdp.json` configuration on session launch across all package platforms.
 - Resolved connected session status marker detection for FreeRDP 3.31+.
@@ -19,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.3] - 2026-09-11
 
 ### Fixed
+
 - FreeRDP session authentication hang: handled AAD login prompt without requiring `state` query parameter and enabled silent SSO with auto-injected `login_hint`.
 - Missing Cloud PC tile icon: added XML element content parsing, Base64 support, and SVG desktop fallback icon.
 - Graphic rendering: resolved screen flicker and tearing using `/gdi:sw`, `SDL_RENDER_VSYNC=1`, `SDL_VIDEO_DOUBLE_BUFFER=1`, and modern AVC420 video pipeline.
@@ -29,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.2] - 2026-09-10
 
 ### Changed
+
 - Authentication now uses only the embedded JavaFX WebView; external browser choices and their unused detection code were removed. Legacy `preferredBrowser` settings are ignored safely.
 
 ---
@@ -36,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.7] - 2026-09-07
 
 ### Added
+
 - **Silent-First Session Authorization**: FreeRDP session authentication handshakes now resolve silently in the background off-screen using active session cookies, eliminating window popups during connection.
 - **Graceful Fallback Prompt**: If user interaction (e.g. MFA, password change, consent) is required, an interactive dialog seamlessly appears after a 1.2s threshold.
 
@@ -44,11 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.6] - 2026-09-07
 
 ### Added
+
 - **Hardware-Accelerated GDI (`/gdi:hw`)**: Enabled OpenGL 2D compositing offload by default.
 - **32-Bit True Color (`/bpp:32`)**: Enabled 32-bit color rendering by default.
 - **Optimized FreeRDP Performance Defaults**: Enabled `/network:auto`, `+async-update`, `+async-channels`, `+auto-reconnect`, `/auto-reconnect-max-retries:10`, `/gfx:progressive`, `+clipboard`, and `+dynamic-resolution` by default.
 
 ### Removed
+
 - **Shared Folder Redirection**: Removed `/drive:Share...` option and configuration parameters.
 
 ---
@@ -56,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.5] - 2026-09-07
 
 ### Fixed
+
 - **Clean Disconnect Status**: Terminating an active session via the "Disconnect" button or closing the FreeRDP window now marks the session as `Idle` / `Connect` instead of reporting `Failed` / `Retry`.
 - **Exit Signal Handling**: Normalized Linux process exit signals (`143` SIGTERM, `130` SIGINT, `129` SIGHUP) as clean disconnects.
 
@@ -64,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.4] - 2026-09-07
 
 ### Fixed
+
 - **Clean FreeRDP Version Display**: Parsed version strings with regex so FreeRDP reports cleanly as `(v3.30.0)` instead of repeating `(This is FreeRDP version 3.30.0 (3.30.0))`.
 - **Automatic Feed Discovery on Sign-In**: Eliminated the race condition where `refreshWorkspacesAsync()` evaluated before `authenticated.set(true)` completed, removing the need to manually click "Refresh".
 
@@ -72,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.3] - 2026-09-07
 
 ### Added
+
 - **Card Context Menu**: Right-click menu on Cloud PC tiles with options to Connect (Default, Fullscreen, Windowed, Multi-Monitor), Restart Session, View Session Log, and Open .RDP File.
 - **Restart Session Action**: Cleanly disconnects and reconnects an active session with one click.
 - **Startup Auto-Connect Option**: Preference to automatically connect to the primary Cloud PC on launch.
@@ -81,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.2] - 2026-09-07
 
 ### Fixed
+
 - **FreeRDP SDL Hotkey Interception**: Generates `sdl-freerdp.json` with dedicated `F12` disconnect, `F11` minimize, and `F10` fullscreen shortcuts so normal `Shift + D` input remains safe.
 
 ---
@@ -88,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-09-07
 
 ### Security
+
 - **Machine-Bound AES-256-GCM Encryption**: Tokens cached at rest are now encrypted using AES-256-GCM keyed to `/etc/machine-id` and user login identity via 100,000 rounds of PBKDF2-HMAC-SHA256 (`0600` permissions).
 - **Plaintext Shredding**: Legacy unencrypted `token-cache.json` files are automatically migrated and deleted.
 
@@ -96,6 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-09-07
 
 ### Initial Release
+
 - Initial release of JW365 for Linux (Wayland & X11).
 - Microsoft Entra ID (Azure AD) OAuth 2.0 PKCE authentication with persistent session cookies.
 - FreeRDP 3.x process supervisor with native PTY allocation and live logging.

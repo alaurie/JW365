@@ -504,7 +504,7 @@ public final class AppState {
                 RdpSessionConfig sessionConfig = new RdpSessionConfig(rdpFilePath, username, fullscreen,
                     config.scalePercent(), config.sound(), config.microphone(), multiMon, config.ignoreCert(), config.clipboard(),
                     config.dynamicResolution(), config.gfxProgressive(), config.asyncUpdate(), config.autoReconnect(),
-                    config.usbRedirection(), config.smartcard(), config.extraArgs());
+                    config.usbRedirection(), config.smartcard(), config.preventSessionLock(), config.extraArgs());
                 synchronized (authOperationLock) {
                     if (!isCurrentGeneration(generation) || closed.get()) return;
                     runIfCurrent(generation, () -> statusMessage.set("Starting FreeRDP session..."));

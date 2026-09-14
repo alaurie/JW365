@@ -141,6 +141,11 @@ public final class RdpProcessSupervisor {
             cmd.add("/auto-reconnect-max-retries:10");
         }
 
+        // Keep remote session active and prevent idle lock / gateway disconnects
+        if (config.preventSessionLock() && !hasArg(config.extraArgs(), "/prevent-session-lock")) {
+            cmd.add("/prevent-session-lock:120");
+        }
+
         // H.264 / AVC420 and Progressive graphics pipeline with RemoteFX
         if (config.gfxProgressive()) {
             cmd.add("/gfx:AVC420,progressive");
@@ -343,6 +348,11 @@ public final class RdpProcessSupervisor {
                 activeSessions.remove(sessionId, session);
             }
         });
+    }
+
+    private static boolean hasArg(List<String> extraArgs, String prefix) {
+        if (extraArgs == null) return false;
+        return extraArgs.stream().anyMatch(a -> a != null && (a.equals(prefix) || a.startsWith(prefix + ":")));
     }
 
     private static void destroyAndAwait(Process process) {

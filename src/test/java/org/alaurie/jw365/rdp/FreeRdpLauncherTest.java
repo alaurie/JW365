@@ -68,6 +68,7 @@ class FreeRdpLauncherTest {
         assertThat(cmd).doesNotContain("+async-update");
         assertThat(cmd).contains("+async-channels");
         assertThat(cmd).contains("+auto-reconnect");
+        assertThat(cmd).contains("/prevent-session-lock:120");
         assertThat(cmd).contains("/gfx:AVC420,progressive");
         assertThat(cmd).contains("+rfx");
         assertThat(cmd).contains("/gdi:sw");
@@ -93,5 +94,30 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("@@");
         assertThat(cmd).contains("/sec:aad");
         assertThat(cmd).contains("/u:user@tenant.onmicrosoft.com");
+        assertThat(cmd).contains("/prevent-session-lock:120");
+    }
+
+    @Test
+    @DisplayName("buildCommandLine omits /prevent-session-lock when disabled or overridden in extraArgs")
+    void testPreventSessionLockOptions(@TempDir Path tempDir) {
+        Path rdpFile = tempDir.resolve("session.rdp");
+        FreeRdpInfo freeRdp = new FreeRdpInfo(Path.of("/usr/bin/sdl-freerdp"), FreeRdpFlavor.SDL_FREERDP, "FreeRDP 3.30.0", false, null);
+
+        // Disabled
+        RdpSessionConfig disabled = new RdpSessionConfig(
+            rdpFile, "user@tenant.com", false, 0, true, false, false, false,
+            true, true, true, true, true, false, false, false, List.of()
+        );
+        List<String> disabledCmd = RdpProcessSupervisor.buildCommandLine(freeRdp, disabled);
+        assertThat(disabledCmd).noneMatch(arg -> arg.startsWith("/prevent-session-lock"));
+
+        // Overridden with custom interval in extraArgs
+        RdpSessionConfig customExtra = new RdpSessionConfig(
+            rdpFile, "user@tenant.com", false, 0, true, false, false, false,
+            true, true, true, true, true, false, false, true, List.of("/prevent-session-lock:60")
+        );
+        List<String> customCmd = RdpProcessSupervisor.buildCommandLine(freeRdp, customExtra);
+        assertThat(customCmd).contains("/prevent-session-lock:60");
+        assertThat(customCmd).doesNotContain("/prevent-session-lock:120");
     }
 }
