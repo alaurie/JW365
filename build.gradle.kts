@@ -3,9 +3,10 @@ plugins {
     id("org.openjfx.javafxplugin")
 }
 
-val rawVersion: String = (project.findProperty("appVersion") as? String)
-    ?: System.getenv("APP_VERSION")
-    ?: "0.2.5"
+val rawVersion: String =
+    (project.findProperty("appVersion") as? String)
+        ?: System.getenv("APP_VERSION")
+        ?: "0.2.5"
 
 val cleanVersion: String = rawVersion.removePrefix("v").trim()
 
@@ -17,8 +18,9 @@ repositories {
     mavenCentral()
 }
 
-val targetJavaVersion = (project.findProperty("javaVersion") as? String)?.toIntOrNull()
-    ?: 25
+val targetJavaVersion =
+    (project.findProperty("javaVersion") as? String)?.toIntOrNull()
+        ?: 25
 
 java {
     toolchain {
@@ -30,16 +32,17 @@ javafx {
     modules = listOf("javafx.controls", "javafx.graphics", "javafx.web")
 }
 // JVM tuning flags — single source of truth for dev run, jpackage, and JavaExec tasks
-val jvmFlags = listOf(
-    "--enable-native-access=ALL-UNNAMED",
-    "-Xms24m",
-    "-Xmx192m",
-    "-XX:ReservedCodeCacheSize=64m",
-    "-XX:CICompilerCount=2",
-    "-XX:+UseSerialGC",
-    "-XX:MinHeapFreeRatio=10",
-    "-XX:MaxHeapFreeRatio=20"
-)
+val jvmFlags =
+    listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "-Xms24m",
+        "-Xmx192m",
+        "-XX:ReservedCodeCacheSize=64m",
+        "-XX:CICompilerCount=2",
+        "-XX:+UseSerialGC",
+        "-XX:MinHeapFreeRatio=10",
+        "-XX:MaxHeapFreeRatio=20",
+    )
 
 application {
     mainClass.set("org.alaurie.jw365.gui.Jw365Main")
@@ -83,7 +86,11 @@ tasks.withType<JavaExec>().configureEach {
 // Packaging: jlink minimal runtime + jpackage .deb, .rpm & portable tarball
 // --------------------------------------------------------------------------
 
-val javaHome: String = javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
+val javaHome: String =
+    javaToolchains
+        .launcherFor(java.toolchain)
+        .get()
+        .metadata.installationPath.asFile.absolutePath
 val jpackageJvmOptions = jvmFlags.flatMap { listOf("--java-options", it) }
 val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
 val resourceDir = file("packaging")
@@ -117,7 +124,7 @@ tasks.register<Exec>("flatpakBuild") {
                 "flatpak-repo*/**",
                 "repo/**",
                 "**/*.iml",
-                "Project_Default.xml"
+                "Project_Default.xml",
             )
         }
     }
@@ -128,25 +135,27 @@ tasks.register<Exec>("flatpakBuild") {
         "--disable-rofiles-fuse",
         "--repo=${flatpakRepoDir.get().asFile.absolutePath}",
         flatpakBuildDir.get().asFile.absolutePath,
-        sourceDir.resolve(flatpakManifest.name).absolutePath
+        sourceDir.resolve(flatpakManifest.name).absolutePath,
     )
     doLast {
         val appRoot = flatpakBuildDir.get().asFile.resolve("files")
-        val required = mutableListOf(
-            appRoot.resolve("runtime/bin/java"),
-            appRoot.resolve("runtime/lib/modules"),
-            appRoot.resolve("lib/jw365-$cleanVersion.jar")
-        )
+        val required =
+            mutableListOf(
+                appRoot.resolve("runtime/bin/java"),
+                appRoot.resolve("runtime/lib/modules"),
+                appRoot.resolve("lib/jw365-$cleanVersion.jar"),
+            )
         if (appRoot.resolve("lib").listFiles()?.none {
                 it.isFile && it.name.startsWith("javafx-web-") && it.name.endsWith(".jar")
-            } != false) {
+            } != false
+        ) {
             required += appRoot.resolve("lib/javafx-web-*.jar")
         }
         val missing = required.filterNot { it.isFile }
         if (missing.isNotEmpty()) {
             throw GradleException(
                 "Flatpak staging is missing required artifacts: " +
-                    missing.joinToString(", ") { it.relativeTo(appRoot).path }
+                    missing.joinToString(", ") { it.relativeTo(appRoot).path },
             )
         }
     }
@@ -157,40 +166,54 @@ tasks.register("validateFlatpakArtifacts") {
     description = "Validates the Java runtime and application libraries for Flatpak"
     dependsOn("createRuntimeImage", "installDist")
     doLast {
-        val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
-        val appLibDir = layout.buildDirectory.dir("install/jw365/lib").get().asFile
-        val required = mutableListOf(
-            runtimeDir.resolve("bin/java"),
-            runtimeDir.resolve("lib/modules"),
-            appLibDir.resolve("jw365-$cleanVersion.jar")
-        )
+        val runtimeDir =
+            layout.buildDirectory
+                .dir("runtime")
+                .get()
+                .asFile
+        val appLibDir =
+            layout.buildDirectory
+                .dir("install/jw365/lib")
+                .get()
+                .asFile
+        val required =
+            mutableListOf(
+                runtimeDir.resolve("bin/java"),
+                runtimeDir.resolve("lib/modules"),
+                appLibDir.resolve("jw365-$cleanVersion.jar"),
+            )
         if (appLibDir.listFiles()?.none {
                 it.isFile && it.name.startsWith("javafx-web-") && it.name.endsWith(".jar")
-            } != false) {
+            } != false
+        ) {
             required += appLibDir.resolve("javafx-web-*.jar")
         }
         val missing = required.filterNot { it.isFile }
         if (missing.isNotEmpty()) {
             throw GradleException(
                 "Flatpak build artifacts are missing: " +
-                    missing.joinToString(", ") { it.relativeTo(projectDir).path }
+                    missing.joinToString(", ") { it.relativeTo(projectDir).path },
             )
         }
     }
 }
 
-
 tasks.register<Exec>("flatpakBundle") {
     group = "distribution"
     description = "Creates the distributable Flatpak bundle"
     dependsOn("flatpakBuild")
-    doFirst { flatpakBundleFile.get().asFile.parentFile.mkdirs() }
+    doFirst {
+        flatpakBundleFile
+            .get()
+            .asFile.parentFile
+            .mkdirs()
+    }
     commandLine(
         "flatpak",
         "build-bundle",
         flatpakRepoDir.get().asFile.absolutePath,
         flatpakBundleFile.get().asFile.absolutePath,
-        "io.github.alaurie.JW365"
+        "io.github.alaurie.JW365",
     )
 }
 
@@ -198,7 +221,11 @@ tasks.register<Exec>("createRuntimeImage") {
     group = "distribution"
     description = "Creates the minimized Java runtime image used by application packages"
     dependsOn("jar")
-    val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
+    val runtimeDir =
+        layout.buildDirectory
+            .dir("runtime")
+            .get()
+            .asFile
     outputs.dir(runtimeDir)
 
     doFirst {
@@ -209,12 +236,14 @@ tasks.register<Exec>("createRuntimeImage") {
 
     commandLine(
         "$javaHome/bin/jlink",
-        "--add-modules", "java.base,java.desktop,java.net.http,java.sql,jdk.httpserver,jdk.unsupported,jdk.crypto.ec,jdk.jsobject,jdk.xml.dom",
+        "--add-modules",
+        "java.base,java.desktop,java.net.http,java.sql,jdk.httpserver,jdk.unsupported,jdk.crypto.ec,jdk.jsobject,jdk.xml.dom",
         "--strip-debug",
         "--no-man-pages",
         "--no-header-files",
         "--compress=zip-6",
-        "--output", runtimeDir.absolutePath
+        "--output",
+        runtimeDir.absolutePath,
     )
 }
 
@@ -222,42 +251,78 @@ tasks.register<Exec>("packageDeb") {
     group = "distribution"
     description = "Builds the native Debian package"
     dependsOn("installDist", "createRuntimeImage")
-    val distDir = layout.buildDirectory.dir("distributions").get().asFile
-    val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
+    val distDir =
+        layout.buildDirectory
+            .dir("distributions")
+            .get()
+            .asFile
+    val runtimeDir =
+        layout.buildDirectory
+            .dir("runtime")
+            .get()
+            .asFile
 
     doFirst { distDir.mkdirs() }
 
-    commandLine(buildList {
-        addAll(listOf(
-            "$javaHome/bin/jpackage",
-            "--type", "deb",
-            "--dest", distDir.absolutePath,
-            "--name", "jw365",
-            "--app-version", cleanVersion,
-            "--vendor", "Alex Laurie",
-            "--description", "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
-            "--icon", iconFile.absolutePath,
-            "--resource-dir", resourceDir.absolutePath,
-            "--runtime-image", runtimeDir.absolutePath,
-            "--input", inputDir.get().asFile.absolutePath,
-            "--main-jar", "jw365-$cleanVersion.jar",
-            "--main-class", "org.alaurie.jw365.gui.Jw365Main",
-            "--linux-package-name", "jw365",
-            "--linux-app-category", "Network",
-            "--linux-shortcut",
-            "--linux-menu-group", "Network;",
-            "--linux-package-deps", "freerdp3-sdl | freerdp3-x11 | freerdp3-wayland"
-        ))
-        addAll(jpackageJvmOptions)
-    })
+    commandLine(
+        buildList {
+            addAll(
+                listOf(
+                    "$javaHome/bin/jpackage",
+                    "--type",
+                    "deb",
+                    "--dest",
+                    distDir.absolutePath,
+                    "--name",
+                    "jw365",
+                    "--app-version",
+                    cleanVersion,
+                    "--vendor",
+                    "Alex Laurie",
+                    "--description",
+                    "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
+                    "--icon",
+                    iconFile.absolutePath,
+                    "--resource-dir",
+                    resourceDir.absolutePath,
+                    "--runtime-image",
+                    runtimeDir.absolutePath,
+                    "--input",
+                    inputDir.get().asFile.absolutePath,
+                    "--main-jar",
+                    "jw365-$cleanVersion.jar",
+                    "--main-class",
+                    "org.alaurie.jw365.gui.Jw365Main",
+                    "--linux-package-name",
+                    "jw365",
+                    "--linux-app-category",
+                    "Network",
+                    "--linux-shortcut",
+                    "--linux-menu-group",
+                    "Network;",
+                    "--linux-package-deps",
+                    "freerdp3-sdl | freerdp3-x11 | freerdp3-wayland",
+                ),
+            )
+            addAll(jpackageJvmOptions)
+        },
+    )
 }
 
 tasks.register<Exec>("packageAppImage") {
     group = "distribution"
     description = "Builds the Linux application image"
     dependsOn("installDist", "createRuntimeImage")
-    val distDir = layout.buildDirectory.dir("distributions").get().asFile
-    val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
+    val distDir =
+        layout.buildDirectory
+            .dir("distributions")
+            .get()
+            .asFile
+    val runtimeDir =
+        layout.buildDirectory
+            .dir("runtime")
+            .get()
+            .asFile
 
     doFirst {
         val appImageDir = file("${distDir.absolutePath}/jw365")
@@ -265,30 +330,49 @@ tasks.register<Exec>("packageAppImage") {
         distDir.mkdirs()
     }
 
-    commandLine(buildList {
-        addAll(listOf(
-            "$javaHome/bin/jpackage",
-            "--type", "app-image",
-            "--dest", distDir.absolutePath,
-            "--name", "jw365",
-            "--app-version", cleanVersion,
-            "--vendor", "Alex Laurie",
-            "--icon", iconFile.absolutePath,
-            "--resource-dir", resourceDir.absolutePath,
-            "--runtime-image", runtimeDir.absolutePath,
-            "--input", inputDir.get().asFile.absolutePath,
-            "--main-jar", "jw365-$cleanVersion.jar",
-            "--main-class", "org.alaurie.jw365.gui.Jw365Main"
-        ))
-        addAll(jpackageJvmOptions)
-    })
+    commandLine(
+        buildList {
+            addAll(
+                listOf(
+                    "$javaHome/bin/jpackage",
+                    "--type",
+                    "app-image",
+                    "--dest",
+                    distDir.absolutePath,
+                    "--name",
+                    "jw365",
+                    "--app-version",
+                    cleanVersion,
+                    "--vendor",
+                    "Alex Laurie",
+                    "--icon",
+                    iconFile.absolutePath,
+                    "--resource-dir",
+                    resourceDir.absolutePath,
+                    "--runtime-image",
+                    runtimeDir.absolutePath,
+                    "--input",
+                    inputDir.get().asFile.absolutePath,
+                    "--main-jar",
+                    "jw365-$cleanVersion.jar",
+                    "--main-class",
+                    "org.alaurie.jw365.gui.Jw365Main",
+                ),
+            )
+            addAll(jpackageJvmOptions)
+        },
+    )
 }
 
 tasks.register<Exec>("packagePortableTar") {
     group = "distribution"
     description = "Builds the portable Linux tarball"
     dependsOn("packageAppImage")
-    val distDir = layout.buildDirectory.dir("distributions").get().asFile
+    val distDir =
+        layout.buildDirectory
+            .dir("distributions")
+            .get()
+            .asFile
     val tarFile = File(distDir, "jw365-$cleanVersion-linux-x64.tar.gz")
     val appDir = File(distDir, "jw365")
 
@@ -320,42 +404,72 @@ tasks.register<Exec>("packageRpm") {
     group = "distribution"
     description = "Builds the native RPM package"
     dependsOn("installDist", "createRuntimeImage")
-    val distDir = layout.buildDirectory.dir("distributions").get().asFile
-    val runtimeDir = layout.buildDirectory.dir("runtime").get().asFile
+    val distDir =
+        layout.buildDirectory
+            .dir("distributions")
+            .get()
+            .asFile
+    val runtimeDir =
+        layout.buildDirectory
+            .dir("runtime")
+            .get()
+            .asFile
 
     doFirst {
         val hasRpmBuild = File("/usr/bin/rpmbuild").exists() || File("/bin/rpmbuild").exists()
-        if (!hasRpmBuild) throw GradleException(
-            "Cannot build RPM package: 'rpmbuild' is not installed.\n" +
-            "To install on Debian/Ubuntu: sudo apt install rpm\n" +
-            "To install on Fedora/RHEL: sudo dnf install rpm-build"
-        )
+        if (!hasRpmBuild) {
+            throw GradleException(
+                "Cannot build RPM package: 'rpmbuild' is not installed.\n" +
+                    "To install on Debian/Ubuntu: sudo apt install rpm\n" +
+                    "To install on Fedora/RHEL: sudo dnf install rpm-build",
+            )
+        }
         distDir.mkdirs()
     }
 
-    commandLine(buildList {
-        addAll(listOf(
-            "$javaHome/bin/jpackage",
-            "--type", "rpm",
-            "--dest", distDir.absolutePath,
-            "--name", "jw365",
-            "--app-version", cleanVersion,
-            "--vendor", "Alex Laurie",
-            "--description", "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
-            "--icon", iconFile.absolutePath,
-            "--resource-dir", resourceDir.absolutePath,
-            "--runtime-image", runtimeDir.absolutePath,
-            "--input", inputDir.get().asFile.absolutePath,
-            "--main-jar", "jw365-$cleanVersion.jar",
-            "--main-class", "org.alaurie.jw365.gui.Jw365Main",
-            "--linux-package-name", "jw365",
-            "--linux-app-category", "Network",
-            "--linux-shortcut",
-            "--linux-menu-group", "Network;",
-            "--linux-package-deps", "freerdp"
-        ))
-        addAll(jpackageJvmOptions)
-    })
+    commandLine(
+        buildList {
+            addAll(
+                listOf(
+                    "$javaHome/bin/jpackage",
+                    "--type",
+                    "rpm",
+                    "--dest",
+                    distDir.absolutePath,
+                    "--name",
+                    "jw365",
+                    "--app-version",
+                    cleanVersion,
+                    "--vendor",
+                    "Alex Laurie",
+                    "--description",
+                    "Modern Linux Client for Windows 365 and Azure Virtual Desktop",
+                    "--icon",
+                    iconFile.absolutePath,
+                    "--resource-dir",
+                    resourceDir.absolutePath,
+                    "--runtime-image",
+                    runtimeDir.absolutePath,
+                    "--input",
+                    inputDir.get().asFile.absolutePath,
+                    "--main-jar",
+                    "jw365-$cleanVersion.jar",
+                    "--main-class",
+                    "org.alaurie.jw365.gui.Jw365Main",
+                    "--linux-package-name",
+                    "jw365",
+                    "--linux-app-category",
+                    "Network",
+                    "--linux-shortcut",
+                    "--linux-menu-group",
+                    "Network;",
+                    "--linux-package-deps",
+                    "freerdp",
+                ),
+            )
+            addAll(jpackageJvmOptions)
+        },
+    )
 }
 
 tasks.register("rpm") {
