@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.time.Duration;
 import java.time.Instant;
 
@@ -14,21 +13,19 @@ import java.time.Instant;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TokenResponse(
-    @JsonProperty("access_token") String accessToken,
-    @JsonProperty("refresh_token") String refreshToken,
-    @JsonProperty("id_token") String idToken,
-    @JsonProperty("token_type") String tokenType,
-    @JsonProperty("expires_in") long expiresIn,
-    @JsonProperty("scope") String scope,
-    @JsonProperty("obtained_epoch_sec") long obtainedEpochSec
-) {
+        @JsonProperty("access_token") String accessToken,
+        @JsonProperty("refresh_token") String refreshToken,
+        @JsonProperty("id_token") String idToken,
+        @JsonProperty("token_type") String tokenType,
+        @JsonProperty("expires_in") long expiresIn,
+        @JsonProperty("scope") String scope,
+        @JsonProperty("obtained_epoch_sec") long obtainedEpochSec) {
 
     public TokenResponse {
         if (obtainedEpochSec <= 0) {
             obtainedEpochSec = Instant.now().getEpochSecond();
         }
     }
-
 
     @JsonIgnore
     public Instant expiresAt() {

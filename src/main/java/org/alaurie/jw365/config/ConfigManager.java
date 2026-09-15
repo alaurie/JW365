@@ -1,24 +1,22 @@
 package org.alaurie.jw365.config;
 
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.SerializationFeature;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Manages reading and writing application configuration to disk.
  */
 public final class ConfigManager {
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder()
-        .enable(SerializationFeature.INDENT_OUTPUT)
-        .build();
+    private static final ObjectMapper MAPPER =
+            JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
     private final Path configFile;
     private final AtomicReference<ClientConfig> cachedConfig = new AtomicReference<>();
@@ -30,7 +28,6 @@ public final class ConfigManager {
     public ConfigManager(Path configFile) {
         this.configFile = Objects.requireNonNull(configFile, "configFile must not be null");
     }
-
 
     /**
      * Loads the current configuration from disk, creating default if not found.
@@ -47,7 +44,8 @@ public final class ConfigManager {
             cachedConfig.set(config);
             return config;
         } catch (Exception e) {
-            System.err.println("Warning: Failed to parse config file " + configFile + ": " + e.getMessage() + ". Using defaults.");
+            System.err.println(
+                    "Warning: Failed to parse config file " + configFile + ": " + e.getMessage() + ". Using defaults.");
             ClientConfig def = ClientConfig.defaultConfig();
             cachedConfig.set(def);
             return def;

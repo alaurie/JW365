@@ -6,7 +6,7 @@ plugins {
 val rawVersion: String =
     (project.findProperty("appVersion") as? String)
         ?: System.getenv("APP_VERSION")
-        ?: "0.2.5"
+        ?: "0.0.0"
 
 val cleanVersion: String = rawVersion.removePrefix("v").trim()
 
@@ -42,6 +42,7 @@ val jvmFlags =
         "-XX:+UseSerialGC",
         "-XX:MinHeapFreeRatio=10",
         "-XX:MaxHeapFreeRatio=20",
+        "-XX:-UsePerfData",
     )
 
 application {
@@ -53,7 +54,7 @@ dependencies {
     implementation("tools.jackson.core:jackson-databind:3.2.2")
     implementation("com.microsoft.azure:msal4j:1.26.0")
 
-    testImplementation(platform("org.junit:junit-bom:5.12.2"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.27.7")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -491,4 +492,11 @@ tasks.register("packageAll") {
     if (File("/usr/bin/rpmbuild").exists() || File("/bin/rpmbuild").exists()) {
         dependsOn("rpm")
     }
+}
+
+fun isNonStable(version: String): Boolean {
+    val stableKeyword = listOf("RELEASE", "FINAL", "GA").any { version.uppercase().contains(it) }
+    val regex = "^[0-9,.v-]+(-r)?$".toRegex()
+    val isStable = stableKeyword || regex.matches(version)
+    return !isStable
 }

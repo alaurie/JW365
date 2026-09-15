@@ -12,19 +12,15 @@ import java.nio.file.Path;
  * @param flatpakAppId   app ID if flatpak (e.g. "com.freerdp.FreeRDP")
  */
 public record FreeRdpInfo(
-    Path binaryPath,
-    FreeRdpFlavor flavor,
-    String versionString,
-    boolean isFlatpak,
-    String flatpakAppId
-) {
+        Path binaryPath, FreeRdpFlavor flavor, String versionString, boolean isFlatpak, String flatpakAppId) {
 
     public String displayName() {
         if (isFlatpak) {
             return "Flatpak (" + flatpakAppId + ")";
         }
         if (binaryPath != null) {
-            return binaryPath.getFileName().toString() + (versionString != null ? " (" + versionString.trim() + ")" : "");
+            return binaryPath.getFileName().toString()
+                    + (versionString != null ? " (" + versionString.trim() + ")" : "");
         }
         return flavor.getDescription();
     }

@@ -11,8 +11,7 @@ public final class XdgPaths {
 
     private static final String APP_NAME = "jw365";
 
-    private XdgPaths() {
-    }
+    private XdgPaths() {}
 
     /**
      * Resolves {@code $XDG_CONFIG_HOME/jw365} (default: {@code ~/.config/jw365}).
@@ -20,8 +19,8 @@ public final class XdgPaths {
     public static Path configDir() {
         String xdgConfig = System.getenv("XDG_CONFIG_HOME");
         Path base = (xdgConfig != null && !xdgConfig.isBlank())
-            ? Path.of(xdgConfig)
-            : Path.of(System.getProperty("user.home"), ".config");
+                ? Path.of(xdgConfig)
+                : Path.of(System.getProperty("user.home"), ".config");
         Path dir = base.resolve(APP_NAME);
         ensureDir(dir);
         return dir;
@@ -33,8 +32,8 @@ public final class XdgPaths {
     public static Path dataDir() {
         String xdgData = System.getenv("XDG_DATA_HOME");
         Path base = (xdgData != null && !xdgData.isBlank())
-            ? Path.of(xdgData)
-            : Path.of(System.getProperty("user.home"), ".local", "share");
+                ? Path.of(xdgData)
+                : Path.of(System.getProperty("user.home"), ".local", "share");
         Path dir = base.resolve(APP_NAME);
         ensureDir(dir);
         return dir;
@@ -46,8 +45,8 @@ public final class XdgPaths {
     public static Path cacheDir() {
         String xdgCache = System.getenv("XDG_CACHE_HOME");
         Path base = (xdgCache != null && !xdgCache.isBlank())
-            ? Path.of(xdgCache)
-            : Path.of(System.getProperty("user.home"), ".cache");
+                ? Path.of(xdgCache)
+                : Path.of(System.getProperty("user.home"), ".cache");
         Path dir = base.resolve(APP_NAME);
         ensureDir(dir);
         return dir;
@@ -87,7 +86,8 @@ public final class XdgPaths {
         ensureDir(dir);
         try {
             Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
-        } catch (Exception _) { }
+        } catch (Exception _) {
+        }
         return dir;
     }
 
@@ -103,15 +103,23 @@ public final class XdgPaths {
         if (dir == null || maxFilesToKeep < 0) return;
         ensureDir(dir);
         try {
-            try { Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); }
-            catch (UnsupportedOperationException _) { }
+            try {
+                Files.setPosixFilePermissions(
+                        dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            } catch (UnsupportedOperationException _) {
+            }
             try (var stream = Files.list(dir)) {
-                java.util.List<Path> logFiles = stream.filter(p -> p.getFileName().toString().startsWith("session_")
-                        && p.getFileName().toString().endsWith(".log"))
-                    .sorted((a, b) -> {
-                        try { return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a)); }
-                        catch (IOException e) { return 0; }
-                    }).toList();
+                java.util.List<Path> logFiles = stream.filter(
+                                p -> p.getFileName().toString().startsWith("session_")
+                                        && p.getFileName().toString().endsWith(".log"))
+                        .sorted((a, b) -> {
+                            try {
+                                return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
+                            } catch (IOException e) {
+                                return 0;
+                            }
+                        })
+                        .toList();
                 long retainedBytes = 0;
                 for (int i = 0; i < logFiles.size(); i++) {
                     Path log = logFiles.get(i);
@@ -119,12 +127,16 @@ public final class XdgPaths {
                     if (i >= maxFilesToKeep || retainedBytes + size > 32L * 1024 * 1024) Files.deleteIfExists(log);
                     else {
                         retainedBytes += size;
-                        try { Files.setPosixFilePermissions(log, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); }
-                        catch (UnsupportedOperationException _) { }
+                        try {
+                            Files.setPosixFilePermissions(
+                                    log, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+                        } catch (UnsupportedOperationException _) {
+                        }
                     }
                 }
             }
-        } catch (IOException _) { }
+        } catch (IOException _) {
+        }
     }
 
     /**

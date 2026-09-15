@@ -9,32 +9,6 @@ import java.util.Objects;
  * Launch configuration parameters for an RDP session.
  */
 public record RdpSessionConfig(
-    Path rdpFile,
-    String username,
-    boolean fullscreen,
-    int scalePercent,
-    boolean sound,
-    boolean microphone,
-    boolean multiMonitor,
-    boolean ignoreCert,
-    boolean clipboard,
-    boolean dynamicResolution,
-    boolean gfxProgressive,
-    boolean asyncUpdate,
-    boolean autoReconnect,
-    boolean usbRedirection,
-    boolean smartcard,
-    boolean preventSessionLock,
-    List<String> extraArgs
-) {
-
-    public RdpSessionConfig {
-        Objects.requireNonNull(rdpFile, "rdpFile must not be null");
-        extraArgs = extraArgs != null ? List.copyOf(extraArgs) : Collections.emptyList();
-    }
-
-
-    public RdpSessionConfig(
         Path rdpFile,
         String username,
         boolean fullscreen,
@@ -43,30 +17,90 @@ public record RdpSessionConfig(
         boolean microphone,
         boolean multiMonitor,
         boolean ignoreCert,
-        List<String> extraArgs
-    ) {
-        this(rdpFile, username, fullscreen, scalePercent, sound, microphone, multiMonitor, ignoreCert, true, true, true, true, true, true, true, true, extraArgs);
+        boolean clipboard,
+        boolean dynamicResolution,
+        boolean gfxProgressive,
+        boolean asyncUpdate,
+        boolean autoReconnect,
+        boolean usbRedirection,
+        boolean smartcard,
+        boolean preventSessionLock,
+        List<String> extraArgs) {
+
+    public RdpSessionConfig {
+        Objects.requireNonNull(rdpFile, "rdpFile must not be null");
+        extraArgs = extraArgs != null ? List.copyOf(extraArgs) : Collections.emptyList();
+    }
+
+    public RdpSessionConfig(
+            Path rdpFile,
+            String username,
+            boolean fullscreen,
+            int scalePercent,
+            boolean sound,
+            boolean microphone,
+            boolean multiMonitor,
+            boolean ignoreCert,
+            List<String> extraArgs) {
+        this(
+                rdpFile,
+                username,
+                fullscreen,
+                scalePercent,
+                sound,
+                microphone,
+                multiMonitor,
+                ignoreCert,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                extraArgs);
+    }
+
+    public RdpSessionConfig withRdpFile(Path newRdpFile) {
+        return new RdpSessionConfig(
+                newRdpFile,
+                username,
+                fullscreen,
+                scalePercent,
+                sound,
+                microphone,
+                multiMonitor,
+                ignoreCert,
+                clipboard,
+                dynamicResolution,
+                gfxProgressive,
+                asyncUpdate,
+                autoReconnect,
+                usbRedirection,
+                smartcard,
+                preventSessionLock,
+                extraArgs);
     }
 
     public static RdpSessionConfig defaults(Path rdpFile, String username) {
         return new RdpSessionConfig(
-            rdpFile,
-            username,
-            false,
-            0,
-            true,
-            true,
-            false,
-            false,
-            true,
-            true,
-            true,
-            true,
-            true,
-            false,
-            false,
-            true,
-            Collections.emptyList()
-        );
+                rdpFile,
+                username,
+                false,
+                0,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                true,
+                Collections.emptyList());
     }
 }

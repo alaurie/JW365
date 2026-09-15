@@ -3,7 +3,6 @@ package org.alaurie.jw365.feed;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.net.URI;
 import java.util.Objects;
 
@@ -12,16 +11,15 @@ import java.util.Objects;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record WorkspaceResource(
-    @JsonProperty("id") String id,
-    @JsonProperty("title") String title,
-    @JsonProperty("type") ResourceType type,
-    @JsonProperty("tenantName") String tenantName,
-    @JsonProperty("tenantId") String tenantId,
-    @JsonProperty("publisher") String publisher,
-    @JsonProperty("armPath") String armPath,
-    @JsonProperty("rdpUrl") URI rdpUrl,
-    @JsonProperty("iconUrl") URI iconUrl
-) {
+        @JsonProperty("id") String id,
+        @JsonProperty("title") String title,
+        @JsonProperty("type") ResourceType type,
+        @JsonProperty("tenantName") String tenantName,
+        @JsonProperty("tenantId") String tenantId,
+        @JsonProperty("publisher") String publisher,
+        @JsonProperty("armPath") String armPath,
+        @JsonProperty("rdpUrl") URI rdpUrl,
+        @JsonProperty("iconUrl") URI iconUrl) {
 
     public WorkspaceResource {
         Objects.requireNonNull(id, "id must not be null");

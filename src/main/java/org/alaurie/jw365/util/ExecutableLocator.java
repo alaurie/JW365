@@ -9,8 +9,7 @@ import java.util.Optional;
 /** Locates executable files on the current process PATH. */
 public final class ExecutableLocator {
 
-    private ExecutableLocator() {
-    }
+    private ExecutableLocator() {}
 
     public static Optional<Path> findOnPath(String executableName) {
         String pathEnv = System.getenv("PATH");

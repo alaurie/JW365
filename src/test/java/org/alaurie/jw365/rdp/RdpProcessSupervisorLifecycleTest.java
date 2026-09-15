@@ -1,11 +1,11 @@
 package org.alaurie.jw365.rdp;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 class RdpProcessSupervisorLifecycleTest {
 
@@ -16,12 +16,7 @@ class RdpProcessSupervisorLifecycleTest {
         // Spawn a lightweight long-running echo process
         Process process = new ProcessBuilder("cat").start();
 
-        ActiveSession session = new ActiveSession(
-            "test-res-1",
-            "Test Cloud PC",
-            process,
-            SessionStatus.STARTING
-        );
+        ActiveSession session = new ActiveSession("test-res-1", "Test Cloud PC", process, SessionStatus.STARTING);
 
         assertThat(session.sessionId()).isEqualTo("test-res-1");
         assertThat(session.resourceTitle()).isEqualTo("Test Cloud PC");
@@ -50,13 +45,10 @@ class RdpProcessSupervisorLifecycleTest {
         AtomicReference<String> passedUrl = new AtomicReference<>();
 
         SessionEvent.AuthRequired event = new SessionEvent.AuthRequired(
-            "session-abc",
-            "https://login.microsoftonline.com/authorize?foo=bar",
-            url -> {
-                passedUrl.set(url);
-                authHandled.set(true);
-            }
-        );
+                "session-abc", "https://login.microsoftonline.com/authorize?foo=bar", url -> {
+                    passedUrl.set(url);
+                    authHandled.set(true);
+                });
 
         assertThat(event.sessionId()).isEqualTo("session-abc");
 
@@ -70,11 +62,17 @@ class RdpProcessSupervisorLifecycleTest {
     @Test
     @DisplayName("Connected status requires a known positive marker")
     void connectedMarkerValidation() {
-        assertThat(RdpProcessSupervisor.isConnectedMarker("channelConnected: RDPDR")).isTrue();
-        assertThat(RdpProcessSupervisor.isConnectedMarker("[11:43:18:631] [701252:000ab344] [INFO][com.freerdp.core] - Successfully connected to 10.0.0.1:3389")).isTrue();
-        assertThat(RdpProcessSupervisor.isConnectedMarker("[INFO][com.freerdp.client.SDL] - postConnect: completed")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("channelConnected: RDPDR"))
+                .isTrue();
+        assertThat(
+                        RdpProcessSupervisor.isConnectedMarker(
+                                "[11:43:18:631] [701252:000ab344] [INFO][com.freerdp.core] - Successfully connected to 10.0.0.1:3389"))
+                .isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("[INFO][com.freerdp.client.SDL] - postConnect: completed"))
+                .isTrue();
         assertThat(RdpProcessSupervisor.isConnectedMarker("Activated")).isTrue();
-        assertThat(RdpProcessSupervisor.isConnectedMarker("connection established to hostile text")).isFalse();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("connection established to hostile text"))
+                .isFalse();
     }
 
     @Test

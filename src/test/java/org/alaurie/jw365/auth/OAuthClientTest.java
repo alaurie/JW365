@@ -1,36 +1,32 @@
 package org.alaurie.jw365.auth;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 class OAuthClientTest {
-
-
 
     @Test
     @DisplayName("TokenResponse expiration logic operates accurately")
     void testTokenResponseExpiration() {
         long now = Instant.now().getEpochSecond();
         TokenResponse validTokens = new TokenResponse(
-            "access_token_123",
-            "refresh_token_456",
-            "id_token_789",
-            "Bearer",
-            3600,
-            "https://www.wvd.microsoft.com/.default",
-            now
-        );
+                "access_token_123",
+                "refresh_token_456",
+                "id_token_789",
+                "Bearer",
+                3600,
+                "https://www.wvd.microsoft.com/.default",
+                now);
 
         assertThat(validTokens.isExpired()).isFalse();
         assertThat(validTokens.isExpiringSoon()).isFalse();
@@ -38,28 +34,26 @@ class OAuthClientTest {
         assertThat(validTokens.expiresAt()).isEqualTo(Instant.ofEpochSecond(now + 3600));
 
         TokenResponse expiringTokens = new TokenResponse(
-            "access_token_123",
-            "refresh_token_456",
-            "id_token_789",
-            "Bearer",
-            120, // 2 minutes left
-            "https://www.wvd.microsoft.com/.default",
-            now
-        );
+                "access_token_123",
+                "refresh_token_456",
+                "id_token_789",
+                "Bearer",
+                120, // 2 minutes left
+                "https://www.wvd.microsoft.com/.default",
+                now);
 
         assertThat(expiringTokens.isExpired()).isFalse();
         assertThat(expiringTokens.isExpiringSoon()).isTrue();
         assertThat(expiringTokens.isExpiringWithin(Duration.ofMinutes(5))).isTrue();
 
         TokenResponse expiredTokens = new TokenResponse(
-            "access_token_123",
-            "refresh_token_456",
-            "id_token_789",
-            "Bearer",
-            -10, // already expired
-            "https://www.wvd.microsoft.com/.default",
-            now
-        );
+                "access_token_123",
+                "refresh_token_456",
+                "id_token_789",
+                "Bearer",
+                -10, // already expired
+                "https://www.wvd.microsoft.com/.default",
+                now);
 
         assertThat(expiredTokens.isExpired()).isTrue();
     }
@@ -81,7 +75,8 @@ class OAuthClientTest {
             }
             """;
 
-        String base64Payload = Base64.getUrlEncoder().withoutPadding().encodeToString(jsonPayload.getBytes(StandardCharsets.UTF_8));
+        String base64Payload =
+                Base64.getUrlEncoder().withoutPadding().encodeToString(jsonPayload.getBytes(StandardCharsets.UTF_8));
         String syntheticJwt = "eyJhbGciOiJSUzI1NiJ9." + base64Payload + ".signature123";
 
         UserClaims claims = JwtClaimsParser.parseIdToken(syntheticJwt);
@@ -101,20 +96,15 @@ class OAuthClientTest {
     @Test
     @DisplayName("Embedded authorization URLs request query responses for WebView interception")
     void embeddedAuthorizationUrlUsesQueryResponseMode() {
-        PkceChallenge challenge = new PkceChallenge(
-            "verifier",
-            PkceChallenge.computeS256("verifier"),
-            "state-value"
-        );
+        PkceChallenge challenge = new PkceChallenge("verifier", PkceChallenge.computeS256("verifier"), "state-value");
 
-        URI authorizeUri = new OAuthClient().buildAuthorizeUrl(
-            OAuthClient.DEFAULT_TENANT,
-            challenge,
-            OAuthClient.REDIRECT_URI,
-            null
-        );
+        URI authorizeUri = new OAuthClient()
+                .buildAuthorizeUrl(OAuthClient.DEFAULT_TENANT, challenge, OAuthClient.REDIRECT_URI, null);
 
-        assertThat(authorizeUri.getRawQuery().split("&")).as(authorizeUri.toString()).filteredOn(query -> query.startsWith("response_mode=")).containsExactly("response_mode=query");
+        assertThat(authorizeUri.getRawQuery().split("&"))
+                .as(authorizeUri.toString())
+                .filteredOn(query -> query.startsWith("response_mode="))
+                .containsExactly("response_mode=query");
         assertThat(authorizeUri.getRawQuery()).contains("state=state-value");
     }
 
@@ -124,15 +114,9 @@ class OAuthClientTest {
         Path cacheFile = tempDir.resolve("msal-cache.enc");
         Files.write(cacheFile, MachineBoundCrypto.encrypt("{}".getBytes(StandardCharsets.UTF_8)));
 
-        OAuthClient client = new OAuthClient(
-            OAuthClient.DEFAULT_CLIENT_ID,
-            OAuthClient.DEFAULT_SCOPE,
-            null,
-            cacheFile
-        );
+        OAuthClient client = new OAuthClient(OAuthClient.DEFAULT_CLIENT_ID, OAuthClient.DEFAULT_SCOPE, null, cacheFile);
         client.clearCacheAndAccounts();
 
         assertThat(cacheFile).doesNotExist();
     }
-
 }

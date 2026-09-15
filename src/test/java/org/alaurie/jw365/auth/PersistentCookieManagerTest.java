@@ -1,8 +1,6 @@
 package org.alaurie.jw365.auth;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.CookieStore;
 import java.net.HttpCookie;
@@ -10,8 +8,9 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class PersistentCookieManagerTest {
 
@@ -119,9 +118,7 @@ class PersistentCookieManagerTest {
         PersistentCookieManager manager = new PersistentCookieManager(cookieFile);
 
         URI uri = URI.create("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
-        manager.put(uri, java.util.Map.of(
-            "Set-Cookie", List.of("ESTSAUTH=auto_val_999; path=/; secure; HttpOnly")
-        ));
+        manager.put(uri, java.util.Map.of("Set-Cookie", List.of("ESTSAUTH=auto_val_999; path=/; secure; HttpOnly")));
 
         long deadline = System.currentTimeMillis() + 2000;
         while ((!Files.exists(cookieFile) || Files.size(cookieFile) == 0) && System.currentTimeMillis() < deadline) {

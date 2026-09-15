@@ -1,5 +1,9 @@
 package org.alaurie.jw365.gui;
 
+import java.io.InputStream;
+import java.net.CookieHandler;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -10,11 +14,6 @@ import org.alaurie.jw365.auth.PersistentCookieManager;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.gui.view.MainView;
 import org.alaurie.jw365.gui.view.SignInView;
-
-import java.io.InputStream;
-import java.net.CookieHandler;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Main JavaFX Application entrypoint for the JW365 Windows 365 & AVD Linux Client.
@@ -58,11 +57,13 @@ public final class Jw365App extends Application {
         mainView = new MainView(state);
 
         // Bind root view to authentication state
-        state.authenticatedProperty().addListener((obs, oldVal, isAuth) -> Platform.runLater(() -> updateActiveView(isAuth)));
+        state.authenticatedProperty()
+                .addListener((obs, oldVal, isAuth) -> Platform.runLater(() -> updateActiveView(isAuth)));
         updateActiveView(state.authenticatedProperty().get());
 
         Scene scene = new Scene(rootContainer, 1050, 720);
-        String cssPath = Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css")).toExternalForm();
+        String cssPath = Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css"))
+                .toExternalForm();
         scene.getStylesheets().add(cssPath);
 
         stage.setTitle("JW365 - Windows 365 & AVD Client");
@@ -71,8 +72,9 @@ public final class Jw365App extends Application {
         stage.setScene(scene);
 
         // Load multiple icon resolutions so Wayland / X11 window managers select the crispest match
-        for (int size : new int[]{16, 32, 48, 64, 128, 256}) {
-            try (InputStream is = getClass().getResourceAsStream("/org/alaurie/jw365/gui/icons/icon_" + size + ".png")) {
+        for (int size : new int[] {16, 32, 48, 64, 128, 256}) {
+            try (InputStream is =
+                    getClass().getResourceAsStream("/org/alaurie/jw365/gui/icons/icon_" + size + ".png")) {
                 if (is != null) {
                     stage.getIcons().add(new Image(is));
                 }
@@ -88,6 +90,7 @@ public final class Jw365App extends Application {
 
         stage.show();
     }
+
     @Override
     public void stop() {
         cleanup();

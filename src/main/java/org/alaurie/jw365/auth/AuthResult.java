@@ -1,6 +1,5 @@
 package org.alaurie.jw365.auth;
 
-
 /**
  * Sealed result type representing the outcome of an authentication attempt.
  */
@@ -9,8 +8,7 @@ public sealed interface AuthResult {
     /**
      * Authentication succeeded with valid tokens and extracted user claims.
      */
-    record Success(TokenResponse tokens, UserClaims claims) implements AuthResult {
-    }
+    record Success(TokenResponse tokens, UserClaims claims) implements AuthResult {}
 
     /**
      * Authentication failed with an error message.

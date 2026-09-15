@@ -2,12 +2,12 @@ package org.alaurie.jw365.gui.view;
 
 import javafx.application.Platform;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -16,9 +16,9 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
-import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.rdp.SessionStatus;
 
 /**
@@ -31,14 +31,18 @@ public final class ResourceCard extends VBox {
     private final Label statusBadge;
     private final Button actionButton;
     private static final javafx.scene.image.Image DEFAULT_ICON;
+
     static {
         javafx.scene.image.Image img = null;
         try (var is = ResourceCard.class.getResourceAsStream("/org/alaurie/jw365/gui/icons/icon_48.png")) {
             if (is != null) img = new javafx.scene.image.Image(is);
-        } catch (Exception _) { }
+        } catch (Exception _) {
+        }
         DEFAULT_ICON = img;
     }
+
     private final javafx.collections.MapChangeListener<String, SessionStatus> statusListener;
+
     public ResourceCard(WorkspaceResource resource, AppState state) {
         this.resource = resource;
         this.state = state;
@@ -134,33 +138,32 @@ public final class ResourceCard extends VBox {
         }
     }
 
-
     private void handleActionClick() {
         SessionStatus current = state.getSessionStatuses().get(resource.identityKey());
         if (current != null && current.isActive()) {
             state.disconnectResource(resource);
         } else {
-            state.connectResource(resource, error -> Platform.runLater(() -> {
-                javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                    javafx.scene.control.Alert.AlertType.ERROR,
-                    error,
-                    javafx.scene.control.ButtonType.OK
-                );
-                alert.setHeaderText("Connection Failed");
-                alert.setTitle("JW365");
-                alert.showAndWait();
-            }));
+            state.connectResource(
+                    resource,
+                    error -> Platform.runLater(() -> {
+                        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                                javafx.scene.control.Alert.AlertType.ERROR, error, javafx.scene.control.ButtonType.OK);
+                        alert.setHeaderText("Connection Failed");
+                        alert.setTitle("JW365");
+                        alert.showAndWait();
+                    }));
         }
     }
 
     private void updateStatus(SessionStatus status) {
         Platform.runLater(() -> {
-            statusBadge.getStyleClass().removeAll(
-                "badge-status-idle",
-                "badge-status-connecting",
-                "badge-status-connected",
-                "badge-status-failed"
-            );
+            statusBadge
+                    .getStyleClass()
+                    .removeAll(
+                            "badge-status-idle",
+                            "badge-status-connecting",
+                            "badge-status-connected",
+                            "badge-status-failed");
 
             if (status == null || status == SessionStatus.IDLE || status == SessionStatus.DISCONNECTED) {
                 statusBadge.setText("Idle");
@@ -171,10 +174,16 @@ public final class ResourceCard extends VBox {
                 if (!actionButton.getStyleClass().contains("btn-primary")) {
                     actionButton.getStyleClass().add("btn-primary");
                 }
-            } else if (status == SessionStatus.STARTING || status == SessionStatus.CONNECTING || status == SessionStatus.RECONNECTING || status == SessionStatus.DISCONNECTING) {
+            } else if (status == SessionStatus.STARTING
+                    || status == SessionStatus.CONNECTING
+                    || status == SessionStatus.RECONNECTING
+                    || status == SessionStatus.DISCONNECTING) {
                 statusBadge.setText(status.getLabel());
                 statusBadge.getStyleClass().add("badge-status-connecting");
-                actionButton.setText(status == SessionStatus.DISCONNECTING ? "Disconnecting..." : status == SessionStatus.RECONNECTING ? "Reconnecting..." : "Connecting...");
+                actionButton.setText(
+                        status == SessionStatus.DISCONNECTING
+                                ? "Disconnecting..."
+                                : status == SessionStatus.RECONNECTING ? "Reconnecting..." : "Connecting...");
                 actionButton.setDisable(status == SessionStatus.DISCONNECTING);
             } else if (status == SessionStatus.CONNECTED) {
                 statusBadge.setText("Connected");
@@ -205,13 +214,16 @@ public final class ResourceCard extends VBox {
         connectDefault.setOnAction(e -> handleActionClick());
 
         MenuItem connectFullscreen = new MenuItem("Connect (Fullscreen)");
-        connectFullscreen.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.FULLSCREEN, this::showError));
+        connectFullscreen.setOnAction(
+                e -> state.connectResource(resource, AppState.DisplayMode.FULLSCREEN, this::showError));
 
         MenuItem connectWindowed = new MenuItem("Connect (Windowed)");
-        connectWindowed.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.WINDOWED, this::showError));
+        connectWindowed.setOnAction(
+                e -> state.connectResource(resource, AppState.DisplayMode.WINDOWED, this::showError));
 
         MenuItem connectMultiMon = new MenuItem("Connect (Multi-Monitor)");
-        connectMultiMon.setOnAction(e -> state.connectResource(resource, AppState.DisplayMode.MULTIMON, this::showError));
+        connectMultiMon.setOnAction(
+                e -> state.connectResource(resource, AppState.DisplayMode.MULTIMON, this::showError));
 
         MenuItem restartItem = new MenuItem("Restart Session");
         MenuItem retryItem = new MenuItem("Retry Connection");
@@ -240,33 +252,32 @@ public final class ResourceCard extends VBox {
         MenuItem diagnosticsItem = new MenuItem("Copy Diagnostics");
         diagnosticsItem.setOnAction(e -> copyDiagnostics());
 
-        menu.getItems().addAll(
-            connectDefault,
-            connectFullscreen,
-            connectWindowed,
-            connectMultiMon,
-            new javafx.scene.control.SeparatorMenuItem(),
-            retryItem,
-            disconnectItem,
-            new javafx.scene.control.SeparatorMenuItem(),
-            controlsItem,
-            diagnosticsItem,
-            new javafx.scene.control.SeparatorMenuItem(),
-            viewLogItem,
-            openRdpItem,
-            new javafx.scene.control.SeparatorMenuItem(),
-            copyIdItem
-        );
+        menu.getItems()
+                .addAll(
+                        connectDefault,
+                        connectFullscreen,
+                        connectWindowed,
+                        connectMultiMon,
+                        new javafx.scene.control.SeparatorMenuItem(),
+                        retryItem,
+                        disconnectItem,
+                        new javafx.scene.control.SeparatorMenuItem(),
+                        controlsItem,
+                        diagnosticsItem,
+                        new javafx.scene.control.SeparatorMenuItem(),
+                        viewLogItem,
+                        openRdpItem,
+                        new javafx.scene.control.SeparatorMenuItem(),
+                        copyIdItem);
 
         setOnContextMenuRequested(e -> menu.show(this, e.getScreenX(), e.getScreenY()));
     }
 
     private void showSessionControls() {
         Alert alert = new Alert(
-            Alert.AlertType.INFORMATION,
-            "F12  Disconnect\nF11  Minimize\nF10  Toggle fullscreen\nCtrl + Alt + Enter  Toggle FreeRDP fullscreen",
-            ButtonType.OK
-        );
+                Alert.AlertType.INFORMATION,
+                "F12  Disconnect\nF11  Minimize\nF10  Toggle fullscreen\nCtrl + Alt + Enter  Toggle FreeRDP fullscreen",
+                ButtonType.OK);
         alert.setHeaderText("Fullscreen Session Controls");
         alert.setTitle("JW365");
         alert.showAndWait();
@@ -276,21 +287,19 @@ public final class ResourceCard extends VBox {
         SessionStatus status = state.getSessionStatuses().get(resource.identityKey());
         var engine = state.detectedFreeRdpProperty().get();
         String diagnostics = "JW365 " + AppVersion.VERSION + "\n"
-            + "Resource: " + resource.title() + " (" + resource.id() + ")\n"
-            + "Status: " + (status != null ? status.getLabel() : "Idle") + "\n"
-            + "RDP engine: " + (engine != null ? engine.displayName() : "Not detected") + "\n"
-            + "Session controls: Right Ctrl+F12 disconnect; Right Ctrl+F10 fullscreen toggle";
+                + "Resource: " + resource.title() + " (" + resource.id() + ")\n"
+                + "Status: " + (status != null ? status.getLabel() : "Idle") + "\n"
+                + "RDP engine: " + (engine != null ? engine.displayName() : "Not detected") + "\n"
+                + "Session controls: Right Ctrl+F12 disconnect; Right Ctrl+F10 fullscreen toggle";
         ClipboardContent content = new ClipboardContent();
         content.putString(diagnostics);
         Clipboard.getSystemClipboard().setContent(content);
     }
+
     private void showError(String error) {
         Platform.runLater(() -> {
             javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                javafx.scene.control.Alert.AlertType.ERROR,
-                error,
-                javafx.scene.control.ButtonType.OK
-            );
+                    javafx.scene.control.Alert.AlertType.ERROR, error, javafx.scene.control.ButtonType.OK);
             alert.setHeaderText("Connection Error");
             alert.setTitle("JW365");
             alert.showAndWait();
@@ -301,15 +310,17 @@ public final class ResourceCard extends VBox {
         try {
             java.nio.file.Path logDir = org.alaurie.jw365.config.XdgPaths.logsDir();
             try (var stream = java.nio.file.Files.list(logDir)) {
-                java.util.Optional<java.nio.file.Path> latest = stream
-                    .filter(p -> p.getFileName().toString().contains(resource.sanitizedFileName()) && p.getFileName().toString().endsWith(".log"))
-                    .max(java.util.Comparator.comparingLong(p -> {
-                        try {
-                            return java.nio.file.Files.getLastModifiedTime(p).toMillis();
-                        } catch (Exception e) {
-                            return 0L;
-                        }
-                    }));
+                java.util.Optional<java.nio.file.Path> latest = stream.filter(
+                                p -> p.getFileName().toString().contains(resource.sanitizedFileName())
+                                        && p.getFileName().toString().endsWith(".log"))
+                        .max(java.util.Comparator.comparingLong(p -> {
+                            try {
+                                return java.nio.file.Files.getLastModifiedTime(p)
+                                        .toMillis();
+                            } catch (Exception e) {
+                                return 0L;
+                            }
+                        }));
 
                 if (latest.isPresent() && java.awt.Desktop.isDesktopSupported()) {
                     java.awt.Desktop.getDesktop().open(latest.get().toFile());
@@ -324,7 +335,8 @@ public final class ResourceCard extends VBox {
 
     private void openRdpFile() {
         try {
-            java.nio.file.Path rdpFile = org.alaurie.jw365.config.XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
+            java.nio.file.Path rdpFile =
+                    org.alaurie.jw365.config.XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
             if (java.nio.file.Files.exists(rdpFile) && java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop.getDesktop().open(rdpFile.toFile());
             } else {

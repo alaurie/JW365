@@ -1,5 +1,9 @@
 package org.alaurie.jw365.gui.view;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -21,10 +25,6 @@ import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.Locale;
 
 /**
  * Main application view showing the workspace grid, search bar, header, and status bar.
@@ -39,6 +39,7 @@ public final class MainView extends BorderPane {
     private final Label rdpEngineLabel;
     private final Label lastSyncedLabel;
     private final java.util.Map<String, ResourceCard> cardCache = new java.util.HashMap<>();
+
     public MainView(AppState state) {
         this.state = state;
 
@@ -91,18 +92,19 @@ public final class MainView extends BorderPane {
         signOutBtn.getStyleClass().add("btn-icon");
         signOutBtn.setOnAction(e -> handleSignOut());
 
-        headerBar.getChildren().addAll(
-            brandTitle,
-            brandBadge,
-            searchField,
-            refreshBtn,
-            helpBtn,
-            refreshIndicator,
-            spacer,
-            userPill,
-            settingsBtn,
-            signOutBtn
-        );
+        headerBar
+                .getChildren()
+                .addAll(
+                        brandTitle,
+                        brandBadge,
+                        searchField,
+                        refreshBtn,
+                        helpBtn,
+                        refreshIndicator,
+                        spacer,
+                        userPill,
+                        settingsBtn,
+                        signOutBtn);
         setTop(headerBar);
 
         // 2. Center Workspace Grid
@@ -131,14 +133,16 @@ public final class MainView extends BorderPane {
 
         Runnable updateSessionProgress = () -> {
             boolean hasActiveProgress = state.getSessionStatuses().values().stream()
-                .anyMatch(s -> s == org.alaurie.jw365.rdp.SessionStatus.STARTING
+                    .anyMatch(s -> s == org.alaurie.jw365.rdp.SessionStatus.STARTING
                             || s == org.alaurie.jw365.rdp.SessionStatus.CONNECTING
                             || s == org.alaurie.jw365.rdp.SessionStatus.RECONNECTING
                             || s == org.alaurie.jw365.rdp.SessionStatus.DISCONNECTING);
             sessionProgressIndicator.setVisible(hasActiveProgress);
             sessionProgressIndicator.setManaged(hasActiveProgress);
         };
-        state.getSessionStatuses().addListener((javafx.collections.MapChangeListener<String, org.alaurie.jw365.rdp.SessionStatus>) change -> updateSessionProgress.run());
+        state.getSessionStatuses()
+                .addListener((javafx.collections.MapChangeListener<String, org.alaurie.jw365.rdp.SessionStatus>)
+                        change -> updateSessionProgress.run());
         updateSessionProgress.run();
 
         Label statusMessageLabel = new Label();
@@ -152,7 +156,11 @@ public final class MainView extends BorderPane {
                     if (!statusMessageLabel.getStyleClass().contains("status-bar-text-error")) {
                         statusMessageLabel.getStyleClass().add("status-bar-text-error");
                     }
-                } else if (lower.contains("connecting") || lower.contains("authenticating") || lower.contains("starting") || lower.contains("downloading") || lower.contains("reconnecting")) {
+                } else if (lower.contains("connecting")
+                        || lower.contains("authenticating")
+                        || lower.contains("starting")
+                        || lower.contains("downloading")
+                        || lower.contains("reconnecting")) {
                     statusMessageLabel.getStyleClass().remove("status-bar-text-error");
                     if (!statusMessageLabel.getStyleClass().contains("status-bar-text-active")) {
                         statusMessageLabel.getStyleClass().add("status-bar-text-active");
@@ -179,21 +187,23 @@ public final class MainView extends BorderPane {
         Label appVersionLabel = new Label("v" + AppVersion.VERSION);
         appVersionLabel.getStyleClass().add("status-bar-text");
 
-        statusBar.getChildren().addAll(
-            appVersionLabel,
-            resourceCountLabel,
-            statusMessageBox,
-            footerSpacer,
-            rdpEngineLabel,
-            lastSyncedLabel
-        );
+        statusBar
+                .getChildren()
+                .addAll(
+                        appVersionLabel,
+                        resourceCountLabel,
+                        statusMessageBox,
+                        footerSpacer,
+                        rdpEngineLabel,
+                        lastSyncedLabel);
         setBottom(statusBar);
 
         // Wire State Listeners
         state.currentUserProperty().addListener((obs, oldVal, newVal) -> updateUserInfo(newVal));
         updateUserInfo(state.currentUserProperty().get());
 
-        state.getWorkspaces().addListener((javafx.collections.ListChangeListener<Workspace>) c -> updateWorkspaceGrid());
+        state.getWorkspaces()
+                .addListener((javafx.collections.ListChangeListener<Workspace>) c -> updateWorkspaceGrid());
         updateWorkspaceGrid();
 
         state.detectedFreeRdpProperty().addListener((obs, oldVal, newVal) -> updateFreeRdpLabel(newVal));
@@ -241,7 +251,8 @@ public final class MainView extends BorderPane {
         Platform.runLater(() -> {
             workspaceContainer.getChildren().clear();
 
-            String query = searchField.getText() != null ? searchField.getText().trim().toLowerCase(Locale.ROOT) : "";
+            String query =
+                    searchField.getText() != null ? searchField.getText().trim().toLowerCase(Locale.ROOT) : "";
             List<Workspace> allWorkspaces = state.getWorkspaces();
 
             // Collect active resource IDs to clean up orphaned cards
@@ -263,11 +274,13 @@ public final class MainView extends BorderPane {
 
             for (Workspace ws : allWorkspaces) {
                 List<WorkspaceResource> filtered = ws.resources().stream()
-                    .filter(res -> query.isEmpty() ||
-                                   res.title().toLowerCase(Locale.ROOT).contains(query) ||
-                                   res.displaySubtitle().toLowerCase(Locale.ROOT).contains(query) ||
-                                   res.id().toLowerCase(Locale.ROOT).contains(query))
-                    .toList();
+                        .filter(res -> query.isEmpty()
+                                || res.title().toLowerCase(Locale.ROOT).contains(query)
+                                || res.displaySubtitle()
+                                        .toLowerCase(Locale.ROOT)
+                                        .contains(query)
+                                || res.id().toLowerCase(Locale.ROOT).contains(query))
+                        .toList();
 
                 if (!filtered.isEmpty()) {
                     matchedResources += filtered.size();
@@ -283,7 +296,8 @@ public final class MainView extends BorderPane {
                     flowPane.setPrefWrapLength(800);
 
                     for (WorkspaceResource res : filtered) {
-                        ResourceCard card = cardCache.computeIfAbsent(res.identityKey(), id -> new ResourceCard(res, state));
+                        ResourceCard card =
+                                cardCache.computeIfAbsent(res.identityKey(), id -> new ResourceCard(res, state));
                         flowPane.getChildren().add(card);
                     }
 
@@ -299,9 +313,13 @@ public final class MainView extends BorderPane {
                 emptyBox.setAlignment(Pos.CENTER);
                 emptyBox.setPadding(new Insets(60, 20, 60, 20));
 
-                Label emptyTitle = new Label(query.isEmpty() ? "No Cloud PCs or Apps Found" : "No matches for \"" + query + "\"");
+                Label emptyTitle =
+                        new Label(query.isEmpty() ? "No Cloud PCs or Apps Found" : "No matches for \"" + query + "\"");
                 emptyTitle.getStyleClass().add("signin-title");
-                Label emptySubtitle = new Label(query.isEmpty() ? "Click Refresh to check for available Windows 365 or AVD resources." : "Try adjusting your search terms.");
+                Label emptySubtitle = new Label(
+                        query.isEmpty()
+                                ? "Click Refresh to check for available Windows 365 or AVD resources."
+                                : "Try adjusting your search terms.");
                 emptySubtitle.getStyleClass().add("signin-subtitle");
 
                 Button emptyRefreshBtn = new Button("Refresh Workspaces");
@@ -319,11 +337,10 @@ public final class MainView extends BorderPane {
 
     private void handleSignOut() {
         Alert alert = new Alert(
-            Alert.AlertType.CONFIRMATION,
-            "Are you sure you want to sign out of Windows 365 / AVD?",
-            ButtonType.YES,
-            ButtonType.NO
-        );
+                Alert.AlertType.CONFIRMATION,
+                "Are you sure you want to sign out of Windows 365 / AVD?",
+                ButtonType.YES,
+                ButtonType.NO);
         alert.setTitle("Sign Out");
         alert.setHeaderText("Sign Out Confirmation");
         alert.showAndWait().ifPresent(btn -> {
@@ -332,24 +349,24 @@ public final class MainView extends BorderPane {
             }
         });
     }
+
     private void showHelp() {
         FreeRdpInfo engine = state.detectedFreeRdpProperty().get();
         String engineText = engine != null ? engine.displayName() : "Not detected";
         ButtonType aboutButton = new ButtonType("About");
         Alert alert = new Alert(
-            Alert.AlertType.INFORMATION,
-            "RDP session shortcuts:\n\n"
-                + "F12  Disconnect session\n"
-                + "F11  Minimize session\n"
-                + "F10  Toggle fullscreen\n"
-                + "Ctrl + Alt + Enter  Toggle FreeRDP fullscreen when supported\n\n"
-                + "Teams optimization:\n"
-                + "Teams media optimization is not available through generic Linux FreeRDP. "
-                + "Use Teams locally for meetings.\n\n"
-                + "FreeRDP engine: " + engineText,
-            aboutButton,
-            ButtonType.OK
-        );
+                Alert.AlertType.INFORMATION,
+                "RDP session shortcuts:\n\n"
+                        + "F12  Disconnect session\n"
+                        + "F11  Minimize session\n"
+                        + "F10  Toggle fullscreen\n"
+                        + "Ctrl + Alt + Enter  Toggle FreeRDP fullscreen when supported\n\n"
+                        + "Teams optimization:\n"
+                        + "Teams media optimization is not available through generic Linux FreeRDP. "
+                        + "Use Teams locally for meetings.\n\n"
+                        + "FreeRDP engine: " + engineText,
+                aboutButton,
+                ButtonType.OK);
         alert.setTitle("JW365 Help");
         alert.setHeaderText("Shortcuts and connection help");
         if (alert.showAndWait().orElse(ButtonType.OK) == aboutButton) {
@@ -360,14 +377,13 @@ public final class MainView extends BorderPane {
     private void showAbout() {
         ButtonType githubButton = new ButtonType("Open GitHub");
         Alert alert = new Alert(
-            Alert.AlertType.INFORMATION,
-            "JW365\n"
-                + "Windows 365 and Azure Virtual Desktop client for Linux\n\n"
-                + "Version " + AppVersion.VERSION + "\n"
-                + "https://github.com/alaurie/JW365",
-            githubButton,
-            ButtonType.OK
-        );
+                Alert.AlertType.INFORMATION,
+                "JW365\n"
+                        + "Windows 365 and Azure Virtual Desktop client for Linux\n\n"
+                        + "Version " + AppVersion.VERSION + "\n"
+                        + "https://github.com/alaurie/JW365",
+                githubButton,
+                ButtonType.OK);
         alert.setTitle("About JW365");
         alert.setHeaderText("JW365");
         if (alert.showAndWait().orElse(ButtonType.OK) == githubButton) {

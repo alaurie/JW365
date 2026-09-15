@@ -9,11 +9,11 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.gui.state.AppState;
+
 /**
  * Landing view presented when no active user session is authenticated.
  */
 public final class SignInView extends StackPane {
-
 
     public SignInView(AppState state) {
 
@@ -77,13 +77,7 @@ public final class SignInView extends StackPane {
         versionLabel.getStyleClass().add("status-bar-text");
         versionLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: -color-text-muted;");
 
-        card.getChildren().addAll(
-            headerBox,
-            signInBtn,
-            settingsBtn,
-            statusBox,
-            versionLabel
-        );
+        card.getChildren().addAll(headerBox, signInBtn, settingsBtn, statusBox, versionLabel);
         getChildren().add(card);
     }
 }

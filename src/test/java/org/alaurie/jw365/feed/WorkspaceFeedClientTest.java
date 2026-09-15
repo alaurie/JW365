@@ -1,13 +1,10 @@
 package org.alaurie.jw365.feed;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -19,9 +16,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class WorkspaceFeedClientTest {
 
@@ -70,26 +69,29 @@ class WorkspaceFeedClientTest {
         // 1. Discovery endpoint
         server.createContext("/api/arm/feeddiscovery", exchange -> {
             validateHeaders(exchange);
-            byte[] body = ("\uFEFF" + MOCK_DISCOVERY_XML.replace("PORT", String.valueOf(port))).getBytes(StandardCharsets.UTF_8);
+            byte[] body = ("\uFEFF" + MOCK_DISCOVERY_XML.replace("PORT", String.valueOf(port)))
+                    .getBytes(StandardCharsets.UTF_8);
             sendResponse(exchange, 200, "application/x-msts-radc-discovery+xml; charset=utf-8", body);
         });
 
         // 2. Feed endpoint
         server.createContext("/api/feed/tenant-123", exchange -> {
             validateHeaders(exchange);
-            byte[] body = ("\uFEFF" + MOCK_WORKSPACE_XML.replace("PORT", String.valueOf(port))).getBytes(StandardCharsets.UTF_8);
+            byte[] body = ("\uFEFF" + MOCK_WORKSPACE_XML.replace("PORT", String.valueOf(port)))
+                    .getBytes(StandardCharsets.UTF_8);
             sendResponse(exchange, 200, "application/x-msts-radc+xml; charset=utf-8", body);
         });
 
         // 3. RDP file download endpoint
         server.createContext("/api/rdp/cloudpc1.rdp", exchange -> {
-            byte[] rdpContent = "full address:s:cloudpc.wvd.microsoft.com\ngatewayhostname:s:gateway.wvd.microsoft.com".getBytes(StandardCharsets.UTF_8);
+            byte[] rdpContent = "full address:s:cloudpc.wvd.microsoft.com\ngatewayhostname:s:gateway.wvd.microsoft.com"
+                    .getBytes(StandardCharsets.UTF_8);
             sendResponse(exchange, 200, "application/x-rdp", rdpContent);
         });
 
         // 4. Icon endpoint
         server.createContext("/api/icons/cloudpc1.png", exchange -> {
-            byte[] pngBytes = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47};
+            byte[] pngBytes = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47};
             sendResponse(exchange, 200, "image/png", pngBytes);
         });
         server.createContext("/api/redirect", exchange -> {
@@ -100,11 +102,17 @@ class WorkspaceFeedClientTest {
             if (exchange.getRequestHeaders().getFirst("Authorization") != null) {
                 redirectAuthHeaderReceived.set(true);
             }
-            sendResponse(exchange, 200, "image/png", new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
+            sendResponse(exchange, 200, "image/png", new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47});
         });
 
         // 5. Error endpoint
-        server.createContext("/api/error/unauthorized", exchange -> sendResponse(exchange, 401, "application/json", "{\"error\": \"Unauthorized\"}".getBytes(StandardCharsets.UTF_8)));
+        server.createContext(
+                "/api/error/unauthorized",
+                exchange -> sendResponse(
+                        exchange,
+                        401,
+                        "application/json",
+                        "{\"error\": \"Unauthorized\"}".getBytes(StandardCharsets.UTF_8)));
 
         server.start();
     }
@@ -128,10 +136,12 @@ class WorkspaceFeedClientTest {
         }
     }
 
-    private static void sendResponse(HttpExchange exchange, int status, String contentType, byte[] body) throws IOException {
+    private static void sendResponse(HttpExchange exchange, int status, String contentType, byte[] body)
+            throws IOException {
         exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(status, body.length);
-        try (exchange; OutputStream os = exchange.getResponseBody()) {
+        try (exchange;
+                OutputStream os = exchange.getResponseBody()) {
             os.write(body);
         }
     }
@@ -140,7 +150,8 @@ class WorkspaceFeedClientTest {
     @DisplayName("WorkspaceFeedClient does not send bearer credentials to localhost")
     void testDiscoverTenantFeeds() throws Exception {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(
+                discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         List<TenantFeed> feeds = client.discoverTenantFeeds("test_token_xyz");
 
@@ -158,10 +169,15 @@ class WorkspaceFeedClientTest {
     @DisplayName("WorkspaceFeedClient fetches workspace resources and handles concurrent virtual thread fan-out")
     void testFetchAllWorkspaces() {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(
+                discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
-        TenantFeed tenant = new TenantFeed("tenant-123", "Contoso Workspace", URI.create("http://localhost:" + port + "/api/feed/tenant-123"));
-        TenantFeed failedTenant = new TenantFeed("tenant-failed", "Failed Workspace", URI.create("http://localhost:" + port + "/api/error/unauthorized"));
+        TenantFeed tenant = new TenantFeed(
+                "tenant-123", "Contoso Workspace", URI.create("http://localhost:" + port + "/api/feed/tenant-123"));
+        TenantFeed failedTenant = new TenantFeed(
+                "tenant-failed",
+                "Failed Workspace",
+                URI.create("http://localhost:" + port + "/api/error/unauthorized"));
 
         List<Workspace> workspaces = client.fetchAllWorkspaces("test_token_xyz", List.of(tenant, failedTenant));
 
@@ -180,7 +196,8 @@ class WorkspaceFeedClientTest {
     @DisplayName("WorkspaceFeedClient downloads RDP files and icons atomically")
     void testDownloads(@TempDir Path tempDir) throws Exception {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(
+                discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         Path targetRdp = tempDir.resolve("test-download.rdp");
         URI rdpUri = URI.create("http://localhost:" + port + "/api/rdp/cloudpc1.rdp");
@@ -194,30 +211,34 @@ class WorkspaceFeedClientTest {
 
         URI iconUri = URI.create("http://localhost:" + port + "/api/icons/cloudpc1.png");
         byte[] iconBytes = client.downloadIconBytes("test_token_xyz", iconUri);
-        assertThat(iconBytes).isNotNull().startsWith(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47});
+        assertThat(iconBytes).isNotNull().startsWith(new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47});
     }
+
     @Test
     @DisplayName("WorkspaceFeedClient rejects hostile icon hosts and strips bearer on cross-origin redirects")
     void rejectsHostileIconAndRedirect() {
         URI discoveryUri = URI.create("http://localhost:" + port + "/api/arm/feeddiscovery");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(
+                discoveryUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
-        assertThat(client.downloadIconBytes("test_token_xyz", URI.create("https://attacker.example/icon.png"))).isNull();
-        byte[] redirected = client.downloadIconBytes("test_token_xyz", URI.create("http://localhost:" + port + "/api/redirect"));
+        assertThat(client.downloadIconBytes("test_token_xyz", URI.create("https://attacker.example/icon.png")))
+                .isNull();
+        byte[] redirected =
+                client.downloadIconBytes("test_token_xyz", URI.create("http://localhost:" + port + "/api/redirect"));
 
         assertThat(redirected).isNotNull();
         assertThat(redirectAuthHeaderReceived).isFalse();
     }
 
-
     @Test
     @DisplayName("WorkspaceFeedClient throws IOException on HTTP error response")
     void testHttpError() {
         URI errorUri = URI.create("http://localhost:" + port + "/api/error/unauthorized");
-        WorkspaceFeedClient client = new WorkspaceFeedClient(errorUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
+        WorkspaceFeedClient client = new WorkspaceFeedClient(
+                errorUri, HttpClient.newHttpClient(), WorkspaceFeedClient.localTestEndpointPolicy());
 
         assertThatThrownBy(() -> client.discoverTenantFeeds("invalid_token"))
-            .isInstanceOf(IOException.class)
-            .hasMessageContaining("401");
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("401");
     }
 }

@@ -1,8 +1,5 @@
 package org.alaurie.jw365.rdp;
 
-import org.alaurie.jw365.config.XdgPaths;
-import org.alaurie.jw365.feed.WorkspaceResource;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -18,10 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.alaurie.jw365.config.XdgPaths;
+import org.alaurie.jw365.feed.WorkspaceResource;
 
 /**
  * Supervises the lifecycle, execution, and output logging of FreeRDP processes.
@@ -30,14 +29,12 @@ public final class RdpProcessSupervisor {
     private static final long MAX_SESSION_LOG_BYTES = 2L * 1024 * 1024;
     private static final String REDACTED = "[REDACTED]";
 
-
     private final Map<String, ActiveSession> activeSessions = new ConcurrentHashMap<>();
     private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
     private static final Map<Path, Object> LOG_LOCKS = new ConcurrentHashMap<>();
     private final List<SessionListener> globalListeners = new CopyOnWriteArrayList<>();
 
-    public RdpProcessSupervisor() {
-    }
+    public RdpProcessSupervisor() {}
 
     public void addGlobalListener(SessionListener listener) {
         if (listener != null) {
@@ -52,12 +49,57 @@ public final class RdpProcessSupervisor {
     }
 
     /**
+     * Prepares and optimizes an RDP profile file based on user session preferences.
+     * Prevents runaway smartcard polling loops (SCARD_E_NO_SERVICE) and unwanted peripheral forwarding.
+     */
+    public static Path prepareRdpProfile(Path sourceRdpFile, RdpSessionConfig config) throws IOException {
+        Objects.requireNonNull(sourceRdpFile, "sourceRdpFile must not be null");
+        Objects.requireNonNull(config, "config must not be null");
+        if (!Files.exists(sourceRdpFile)) {
+            return sourceRdpFile;
+        }
+
+        String content = Files.readString(sourceRdpFile, StandardCharsets.UTF_8);
+        List<String> lines = content.lines().toList();
+        List<String> modifiedLines = new ArrayList<>(lines.size());
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            int colonIdx = trimmed.indexOf(':');
+            if (colonIdx > 0) {
+                String key = trimmed.substring(0, colonIdx).toLowerCase(java.util.Locale.ROOT);
+                if (key.equals("redirectsmartcards") && !config.smartcard()) {
+                    modifiedLines.add("redirectsmartcards:i:0");
+                    continue;
+                } else if (key.equals("usbdevicestoredirect") && !config.usbRedirection()) {
+                    modifiedLines.add("usbdevicestoredirect:s:");
+                    continue;
+                } else if (key.equals("devicestoredirect") && !config.usbRedirection()) {
+                    modifiedLines.add("devicestoredirect:s:");
+                    continue;
+                } else if (key.equals("redirectclipboard") && !config.clipboard()) {
+                    modifiedLines.add("redirectclipboard:i:0");
+                    continue;
+                }
+            }
+            modifiedLines.add(trimmed);
+        }
+
+        Path parent = sourceRdpFile.getParent();
+        Path preparedFile =
+                parent != null ? parent.resolve(sourceRdpFile.getFileName().toString() + ".active.rdp") : sourceRdpFile;
+        String output = String.join("\r\n", modifiedLines) + "\r\n";
+        Files.writeString(preparedFile, output, StandardCharsets.UTF_8);
+        return preparedFile;
+    }
+
+    /**
      * Builds the command line argument list for launching FreeRDP with AVD / AAD parameters.
      */
-    public static List<String> buildCommandLine(
-        FreeRdpInfo freeRdp,
-        RdpSessionConfig config
-    ) {
+    public static List<String> buildCommandLine(FreeRdpInfo freeRdp, RdpSessionConfig config) {
         List<String> cmd = new ArrayList<>();
 
         if (freeRdp.isFlatpak()) {
@@ -181,11 +223,8 @@ public final class RdpProcessSupervisor {
      * @param listener optional session-specific event listener
      */
     public void launch(
-        FreeRdpInfo freeRdp,
-        WorkspaceResource resource,
-        RdpSessionConfig config,
-        SessionListener listener
-    ) throws IOException {
+            FreeRdpInfo freeRdp, WorkspaceResource resource, RdpSessionConfig config, SessionListener listener)
+            throws IOException {
         Objects.requireNonNull(freeRdp, "freeRdp must not be null");
         Objects.requireNonNull(resource, "resource must not be null");
         Objects.requireNonNull(config, "config must not be null");
@@ -199,77 +238,85 @@ public final class RdpProcessSupervisor {
             if (existing != null) existing.stop();
             stopSession(sessionId);
 
-        List<String> rawCommand = buildCommandLine(freeRdp, config);
-        if (config.multiMonitor() && !freeRdp.isFlatpak()) {
-            detectMonitorSelection(freeRdp).ifPresent(selection -> rawCommand.add("/monitors:" + selection));
-        }
-        ensureSdlConfig();
-        List<String> processCommand;
-        if (Files.isExecutable(Path.of("/usr/bin/script"))) {
-            String joined = rawCommand.stream()
-                .map(arg -> "'" + arg.replace("'", "'\\''") + "'")
-                .collect(java.util.stream.Collectors.joining(" "));
-            processCommand = List.of("/usr/bin/script", "-q", "-c", joined, "/dev/null");
-        } else {
-            processCommand = rawCommand;
-        }
-
-        logFile = XdgPaths.logsDir().resolve("session_" + resource.sanitizedFileName() + "_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID() + ".log");
-        ProcessBuilder pb = new ProcessBuilder(processCommand);
-        pb.redirectErrorStream(true);
-        Path logDir = logFile.getParent();
-        if (logDir != null) {
-            Files.createDirectories(logDir);
-            try { Files.setPosixFilePermissions(logDir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")); } catch (Exception _) { }
-        }
-        if (!Files.exists(logFile)) {
-            Files.createFile(logFile);
-        }
-        try { Files.setPosixFilePermissions(logFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")); } catch (Exception _) { }
-        Map<String, String> env = pb.environment();
-        String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
-        String display = System.getenv("DISPLAY");
-        if (display != null && !display.isBlank()) {
-            env.put("DISPLAY", display);
-        }
-        if (waylandDisplay != null && !waylandDisplay.isBlank()) {
-            env.put("WAYLAND_DISPLAY", waylandDisplay);
-            boolean isFlatpakEnv = freeRdp.isFlatpak() || System.getenv("FLATPAK_ID") != null;
-            if (display != null && !display.isBlank()) {
-                // In Flatpak or when XWayland is available, SDL3 client on X11 avoids the Wayland buffer-swap
-                // tearing and double-buffering flickering anomalies.
-                env.put("SDL_VIDEODRIVER", isFlatpakEnv ? "x11" : "wayland,x11");
-            } else {
-                env.put("SDL_VIDEODRIVER", "wayland,x11");
+            Path activeRdpFile = prepareRdpProfile(config.rdpFile(), config);
+            RdpSessionConfig activeConfig = config.withRdpFile(activeRdpFile);
+            List<String> rawCommand = buildCommandLine(freeRdp, activeConfig);
+            if (config.multiMonitor() && !freeRdp.isFlatpak()) {
+                detectMonitorSelection(freeRdp).ifPresent(selection -> rawCommand.add("/monitors:" + selection));
             }
-        }
-        String xdgRuntime = System.getenv("XDG_RUNTIME_DIR");
-        if (xdgRuntime != null && !xdgRuntime.isBlank()) {
-            env.put("XDG_RUNTIME_DIR", xdgRuntime);
-        }
-        // Synchronize SDL presentation with vertical refresh rate and force immediate double buffering
-        // to eliminate tearing, buffer swapping flickering, and presentation lag.
-        env.put("SDL_RENDER_VSYNC", "1");
-        env.put("SDL_VIDEO_DOUBLE_BUFFER", "1");
+            ensureSdlConfig();
+            List<String> processCommand;
+            if (Files.isExecutable(Path.of("/usr/bin/script"))) {
+                String joined = rawCommand.stream()
+                        .map(arg -> "'" + arg.replace("'", "'\\''") + "'")
+                        .collect(java.util.stream.Collectors.joining(" "));
+                processCommand = List.of("/usr/bin/script", "-q", "-c", joined, "/dev/null");
+            } else {
+                processCommand = rawCommand;
+            }
 
+            logFile = XdgPaths.logsDir()
+                    .resolve("session_" + resource.sanitizedFileName() + "_" + System.currentTimeMillis() + "_"
+                            + java.util.UUID.randomUUID() + ".log");
+            ProcessBuilder pb = new ProcessBuilder(processCommand);
+            pb.redirectErrorStream(true);
+            Path logDir = logFile.getParent();
+            if (logDir != null) {
+                Files.createDirectories(logDir);
+                try {
+                    Files.setPosixFilePermissions(
+                            logDir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+                } catch (Exception _) {
+                }
+            }
+            if (!Files.exists(logFile)) {
+                Files.createFile(logFile);
+            }
+            try {
+                Files.setPosixFilePermissions(
+                        logFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            } catch (Exception _) {
+            }
+            Map<String, String> env = pb.environment();
+            String waylandDisplay = System.getenv("WAYLAND_DISPLAY");
+            String display = System.getenv("DISPLAY");
+            if (display != null && !display.isBlank()) {
+                env.put("DISPLAY", display);
+            }
+            if (waylandDisplay != null && !waylandDisplay.isBlank()) {
+                env.put("WAYLAND_DISPLAY", waylandDisplay);
+                boolean isFlatpakEnv = freeRdp.isFlatpak() || System.getenv("FLATPAK_ID") != null;
+                if (display != null && !display.isBlank()) {
+                    // In Flatpak or when XWayland is available, SDL3 client on X11 avoids the Wayland buffer-swap
+                    // tearing and double-buffering flickering anomalies.
+                    env.put("SDL_VIDEODRIVER", isFlatpakEnv ? "x11" : "wayland,x11");
+                } else {
+                    env.put("SDL_VIDEODRIVER", "wayland,x11");
+                }
+            }
+            String xdgRuntime = System.getenv("XDG_RUNTIME_DIR");
+            if (xdgRuntime != null && !xdgRuntime.isBlank()) {
+                env.put("XDG_RUNTIME_DIR", xdgRuntime);
+            }
+            // Synchronize SDL presentation with vertical refresh rate and force immediate double buffering
+            // to eliminate tearing, buffer swapping flickering, and presentation lag.
+            env.put("SDL_RENDER_VSYNC", "1");
+            env.put("SDL_VIDEO_DOUBLE_BUFFER", "1");
 
-        // PipeWire / PulseAudio direct native socket path
-        String pulseServer = System.getenv("PULSE_SERVER");
-        if (pulseServer != null && !pulseServer.isBlank()) {
-            env.put("PULSE_SERVER", pulseServer);
-        } else if (xdgRuntime != null && !xdgRuntime.isBlank() && Files.exists(Path.of(xdgRuntime, "pulse", "native"))) {
-            env.put("PULSE_SERVER", "unix:" + xdgRuntime + "/pulse/native");
-        }
-        process = pb.start();
+            // PipeWire / PulseAudio direct native socket path
+            String pulseServer = System.getenv("PULSE_SERVER");
+            if (pulseServer != null && !pulseServer.isBlank()) {
+                env.put("PULSE_SERVER", pulseServer);
+            } else if (xdgRuntime != null
+                    && !xdgRuntime.isBlank()
+                    && Files.exists(Path.of(xdgRuntime, "pulse", "native"))) {
+                env.put("PULSE_SERVER", "unix:" + xdgRuntime + "/pulse/native");
+            }
+            process = pb.start();
 
-        session = new ActiveSession(
-            sessionId,
-            resource.title(),
-            process,
-            SessionStatus.STARTING
-        );
+            session = new ActiveSession(sessionId, resource.title(), process, SessionStatus.STARTING);
 
-        activeSessions.put(sessionId, session);
+            activeSessions.put(sessionId, session);
         }
 
         // Notify started
@@ -279,8 +326,10 @@ public final class RdpProcessSupervisor {
         // Start Virtual Thread to monitor output and lifecycle
         Thread.ofVirtual().name("rdp-watcher-" + resource.sanitizedFileName()).start(() -> {
             Object logLock = LOG_LOCKS.computeIfAbsent(logFile.toAbsolutePath(), _ -> new Object());
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
-                 BufferedWriter logWriter = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+                    BufferedWriter logWriter = Files.newBufferedWriter(
+                            logFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 
                 long[] logBytes;
                 synchronized (logLock) {
@@ -296,8 +345,10 @@ public final class RdpProcessSupervisor {
                     emitEvent(listener, new SessionEvent.OutputLine(sessionId, line, false));
 
                     if (line.contains("Browse to: ")) {
-                        String rawAuth = line.substring(line.indexOf("Browse to: ") + "Browse to: ".length()).trim();
-                        String authUrl = rawAuth.replaceAll("\u001B\\[[;?0-9]*[a-zA-Z]", "").trim();
+                        String rawAuth = line.substring(line.indexOf("Browse to: ") + "Browse to: ".length())
+                                .trim();
+                        String authUrl = rawAuth.replaceAll("\u001B\\[[;?0-9]*[a-zA-Z]", "")
+                                .trim();
                         int spaceIdx = authUrl.indexOf(' ');
                         if (spaceIdx > 0) {
                             authUrl = authUrl.substring(0, spaceIdx).trim();
@@ -320,14 +371,29 @@ public final class RdpProcessSupervisor {
                 }
                 int exitCode = process.waitFor();
                 writeLogLine(logWriter, logBytes, "", logLock);
-                writeLogLine(logWriter, logBytes, "=== Process exited with code " + exitCode + " at " + Instant.now() + " ===", logLock);
+                writeLogLine(
+                        logWriter,
+                        logBytes,
+                        "=== Process exited with code " + exitCode + " at " + Instant.now() + " ===",
+                        logLock);
 
-                if (session.isUserInitiatedStop() || exitCode == 0 || exitCode == 143 || exitCode == 130 || exitCode == 129) {
+                if (session.isUserInitiatedStop()
+                        || exitCode == 0
+                        || exitCode == 143
+                        || exitCode == 130
+                        || exitCode == 129) {
                     updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
                 } else {
                     updateStatus(session, listener, SessionStatus.FAILED, "Session exited with error code " + exitCode);
                 }
-                emitEvent(listener, new SessionEvent.Exited(sessionId, exitCode, session.isUserInitiatedStop() ? "Session disconnected" : "Session exited with error code " + exitCode));
+                emitEvent(
+                        listener,
+                        new SessionEvent.Exited(
+                                sessionId,
+                                exitCode,
+                                session.isUserInitiatedStop()
+                                        ? "Session disconnected"
+                                        : "Session exited with error code " + exitCode));
             } catch (InterruptedException e) {
                 destroyAndAwait(process);
                 Thread.currentThread().interrupt();
@@ -339,8 +405,11 @@ public final class RdpProcessSupervisor {
                     updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
                     emitEvent(listener, new SessionEvent.Exited(sessionId, 0, "Session disconnected"));
                 } else {
-                    updateStatus(session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
-                    emitEvent(listener, new SessionEvent.Exited(sessionId, -1, "Session monitoring error: " + e.getMessage()));
+                    updateStatus(
+                            session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
+                    emitEvent(
+                            listener,
+                            new SessionEvent.Exited(sessionId, -1, "Session monitoring error: " + e.getMessage()));
                 }
             } finally {
                 LOG_LOCKS.remove(logFile.toAbsolutePath(), logLock);
@@ -365,7 +434,9 @@ public final class RdpProcessSupervisor {
             Thread.currentThread().interrupt();
         }
     }
-    private static void writeLogLine(BufferedWriter writer, long[] bytes, String line, Object logLock) throws IOException {
+
+    private static void writeLogLine(BufferedWriter writer, long[] bytes, String line, Object logLock)
+            throws IOException {
         synchronized (logLock) {
             if (bytes[0] >= MAX_SESSION_LOG_BYTES) {
                 return;
@@ -380,32 +451,38 @@ public final class RdpProcessSupervisor {
             bytes[0] += encoded.length;
         }
     }
+
     static boolean isConnectedMarker(String line) {
         if (line == null || line.isBlank()) {
             return false;
         }
         String lower = line.toLowerCase(java.util.Locale.ROOT);
         return lower.contains("logon info v2")
-            || lower.contains("logon info")
-            || lower.contains("channelconnected")
-            || lower.contains("tsg_state_connected")
-            || lower.contains("displaycontrolcapspdu")
-            || lower.contains("sdl_event_window_shown")
-            || lower.contains("successfully connected")
-            || lower.contains("postconnect")
-            || lower.contains("rdp_client_connect_demand_active")
-            || lower.contains("logoninfov1")
-            || lower.contains("logoninfov2")
-            || lower.contains("demand_active")
-            || lower.contains("connection_state_active")
-            || lower.contains("handleshow")
-            || lower.contains("activated");
+                || lower.contains("logon info")
+                || lower.contains("channelconnected")
+                || lower.contains("tsg_state_connected")
+                || lower.contains("displaycontrolcapspdu")
+                || lower.contains("sdl_event_window_shown")
+                || lower.contains("successfully connected")
+                || lower.contains("postconnect")
+                || lower.contains("rdp_client_connect_demand_active")
+                || lower.contains("logoninfov1")
+                || lower.contains("logoninfov2")
+                || lower.contains("demand_active")
+                || lower.contains("connection_state_active")
+                || lower.contains("handleshow")
+                || lower.contains("activated");
     }
 
     static String redactLogLine(String line) {
-        String redacted = line.replaceAll("(?i)(Authorization\\s*(?:[:=]\\s*|\\s+)Bearer\\s+)[^\\s,]+", "$1" + REDACTED);
-        redacted = redacted.replaceAll("(?i)(password|passwd|token|secret|authorization|bearer)([=:]\\s*|\\s+)(?!Bearer\\s+\\[REDACTED\\])[^\\s]+", "$1$2" + REDACTED);
-        return redacted.replaceAll("(?i)([?&](?:code|token|access_token|refresh_token|id_token|secret|password)=)[^&\\s]+", "$1" + REDACTED);
+        String redacted =
+                line.replaceAll("(?i)(Authorization\\s*(?:[:=]\\s*|\\s+)Bearer\\s+)[^\\s,]+", "$1" + REDACTED);
+        redacted = redacted.replaceAll(
+                "(?i)(password|passwd|token|secret|authorization|bearer)([=:]\\s*|\\s+)(?!Bearer\\s+\\[REDACTED])[^\\s]+",
+                "$1$2" + REDACTED);
+        return redacted.replaceAll(
+                "(?i)([?&](?:code|token|access_token|refresh_token|id_token|secret|password)=)[^&\\s]+",
+                "$1" + REDACTED);
     }
 
     /**
@@ -445,7 +522,8 @@ public final class RdpProcessSupervisor {
         for (String id : List.copyOf(activeSessions.keySet())) stopSession(id);
     }
 
-    private void updateStatus(ActiveSession session, SessionListener listener, SessionStatus newStatus, String message) {
+    private void updateStatus(
+            ActiveSession session, SessionListener listener, SessionStatus newStatus, String message) {
         SessionStatus old = session.status();
         if (old == newStatus) {
             return;
@@ -471,16 +549,15 @@ public final class RdpProcessSupervisor {
         }
     }
 
-
     private static Optional<String> detectMonitorSelection(FreeRdpInfo freeRdp) {
         String executable = freeRdp.binaryPath() != null
-            ? freeRdp.binaryPath().toString()
-            : freeRdp.flavor().getExecutableName();
+                ? freeRdp.binaryPath().toString()
+                : freeRdp.flavor().getExecutableName();
         Process process = null;
         try {
             process = new ProcessBuilder(executable, "/list:monitor")
-                .redirectErrorStream(true)
-                .start();
+                    .redirectErrorStream(true)
+                    .start();
             if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 process.waitFor(1, java.util.concurrent.TimeUnit.SECONDS);
@@ -509,34 +586,47 @@ public final class RdpProcessSupervisor {
             }
             return ids.isEmpty() ? Optional.empty() : Optional.of(String.join(",", ids));
         } catch (InterruptedException e) {
-            if (process != null) process.destroyForcibly();
+            process.destroyForcibly();
             Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (Exception e) {
-            if (process != null && process.isAlive()) process.destroyForcibly();
+            if (process.isAlive()) process.destroyForcibly();
             return Optional.empty();
         }
     }
 
     private static void ensureSdlConfig() {
         try {
+            List<Path> baseDirs = new ArrayList<>();
             String configHome = System.getenv("XDG_CONFIG_HOME");
-            Path base = (configHome != null && !configHome.isBlank())
-                ? Path.of(configHome)
-                : Path.of(System.getProperty("user.home"), ".config");
-            Path freerdpDir = base.resolve("freerdp");
-            Files.createDirectories(freerdpDir);
-            Path sdlJson = freerdpDir.resolve("sdl-freerdp.json");
-            if (!Files.exists(sdlJson)) {
-                String content = """
-                    {
-                      "SDL_KeyModMask": ["KMOD_RCTRL"],
-                      "SDL_Disconnect": ["SDL_SCANCODE_F12"],
-                      "SDL_Minimize": ["SDL_SCANCODE_F11"],
-                      "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
+            if (configHome != null && !configHome.isBlank()) {
+                baseDirs.add(Path.of(configHome));
+            }
+            Path userHome = Path.of(System.getProperty("user.home"));
+            baseDirs.add(userHome.resolve(".config"));
+            baseDirs.add(userHome.resolve(".var/app/com.freerdp.FreeRDP/config"));
+
+            String content = """
+                {
+                  "SDL_KeyModMask": ["KMOD_RCTRL"],
+                  "SDL_Disconnect": ["SDL_SCANCODE_F12"],
+                  "SDL_Minimize": ["SDL_SCANCODE_F11"],
+                  "SDL_Fullscreen": ["SDL_SCANCODE_F10"]
+                }
+                """;
+
+            for (Path base : baseDirs) {
+                try {
+                    Path freerdpDir = base.resolve("freerdp");
+                    if (Files.isDirectory(base) || base.toString().contains(".config")) {
+                        Files.createDirectories(freerdpDir);
+                        Path sdlJson = freerdpDir.resolve("sdl-freerdp.json");
+                        if (!Files.exists(sdlJson)) {
+                            Files.writeString(sdlJson, content, StandardCharsets.UTF_8);
+                        }
                     }
-                    """;
-                Files.writeString(sdlJson, content, StandardCharsets.UTF_8);
+                } catch (Exception _) {
+                }
             }
         } catch (Exception _) {
         }

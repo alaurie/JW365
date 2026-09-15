@@ -13,19 +13,14 @@ import java.util.Optional;
  * <p>The embedded sign-in flow deliberately requests {@code response_mode=query};
  * form-post responses are not exposed as a navigated URL by JavaFX WebView.</p>
  */
-public record OAuthCallback(
-    String code,
-    String state,
-    String error,
-    String errorDescription
-) {
+public record OAuthCallback(String code, String state, String error, String errorDescription) {
     public static boolean isRedirect(String callbackUrl, URI expected) {
         try {
             URI candidate = URI.create(callbackUrl);
             return expected.getScheme().equalsIgnoreCase(candidate.getScheme())
-                && expected.getHost().equalsIgnoreCase(candidate.getHost())
-                && expected.getPort() == candidate.getPort()
-                && expected.getPath().equals(candidate.getPath());
+                    && expected.getHost().equalsIgnoreCase(candidate.getHost())
+                    && expected.getPort() == candidate.getPort()
+                    && expected.getPath().equals(candidate.getPath());
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -67,11 +62,7 @@ public record OAuthCallback(
                 return Optional.empty();
             }
             return Optional.of(new OAuthCallback(
-                values.get("code"),
-                values.get("state"),
-                values.get("error"),
-                values.get("error_description")
-            ));
+                    values.get("code"), values.get("state"), values.get("error"), values.get("error_description")));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

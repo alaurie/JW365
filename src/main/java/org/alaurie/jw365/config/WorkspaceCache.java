@@ -1,12 +1,5 @@
 package org.alaurie.jw365.config;
 
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.SerializationFeature;
-import org.alaurie.jw365.feed.Workspace;
-import org.alaurie.jw365.feed.WorkspaceResource;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,15 +7,20 @@ import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.alaurie.jw365.feed.Workspace;
+import org.alaurie.jw365.feed.WorkspaceResource;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Caches discovered workspace lists and resource icons on local storage for instant application startup.
  */
 public final class WorkspaceCache {
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder()
-        .enable(SerializationFeature.INDENT_OUTPUT)
-        .build();
+    private static final ObjectMapper MAPPER =
+            JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
     private final Path cacheFile;
     private final Path iconsDirectory;

@@ -24,6 +24,10 @@ public enum SessionStatus {
     }
 
     public boolean isActive() {
-        return this == STARTING || this == CONNECTING || this == RECONNECTING || this == CONNECTED || this == DISCONNECTING;
+        return this == STARTING
+                || this == CONNECTING
+                || this == RECONNECTING
+                || this == CONNECTED
+                || this == DISCONNECTING;
     }
 }

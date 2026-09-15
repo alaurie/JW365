@@ -76,7 +76,7 @@ modules:
       - unzip -q gradle-dist/gradle-9.7.1-bin.zip -d gradle-dist-extracted
       - |
         set -eu
-        VERSION="${APP_VERSION:-$(sed -n 's/^version=//p' src/main/resources/org/alaurie/jw365/version.properties)}"
+        VERSION="${APP_VERSION:-$(sed -n 's/^appVersion=//p' gradle.properties)}"
         GRADLE_USER_HOME=gradle-home gradle-dist-extracted/gradle-9.7.1/bin/gradle --offline --no-daemon createRuntimeImage installDist validateFlatpakArtifacts -PappVersion="$VERSION"
         test -x build/runtime/bin/java
         test -f build/runtime/lib/modules

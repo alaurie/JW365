@@ -1,13 +1,20 @@
 package org.alaurie.jw365.gui.view;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
@@ -21,19 +28,12 @@ import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import org.alaurie.jw365.config.XdgPaths;
-import org.alaurie.jw365.rdp.FreeRdpSource;
 import org.alaurie.jw365.config.AppVersion;
 import org.alaurie.jw365.config.ClientConfig;
+import org.alaurie.jw365.config.XdgPaths;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Objects;
+import org.alaurie.jw365.rdp.FreeRdpSource;
 
 /**
  * Settings configuration dialog for FreeRDP parameters, display scaling,
@@ -102,25 +102,29 @@ public final class SettingsDialog extends Stage {
         authHint.getStyleClass().add("status-bar-text");
         authHint.setWrapText(true);
 
-
         // 2. FreeRDP Binary Section
         Label rdpSection = new Label("FreeRDP Client Engine");
         rdpSection.getStyleClass().add("brand-title");
 
         FreeRdpInfo detected = state.detectedFreeRdpProperty().get();
-        Label detectedLabel = new Label("Detected: " + (detected != null ? detected.displayName() : "None found (please install FreeRDP)"));
+        Label detectedLabel = new Label(
+                "Detected: " + (detected != null ? detected.displayName() : "None found (please install FreeRDP)"));
         detectedLabel.getStyleClass().add("status-bar-text");
         Label sourceLabel = new Label("Source:");
         sourceLabel.getStyleClass().add("form-label");
         freerdpSourceChoice = new ChoiceBox<>();
         boolean flatpakRuntime = XdgPaths.isFlatpak();
-        freerdpSourceChoice.setValue(flatpakRuntime ? "Bundled FreeRDP" : sourceCodeToLabel(currentConfig.freerdpSource().name()));
+        freerdpSourceChoice.setValue(
+                flatpakRuntime
+                        ? "Bundled FreeRDP"
+                        : sourceCodeToLabel(currentConfig.freerdpSource().name()));
         freerdpSourceChoice.setDisable(flatpakRuntime);
         HBox sourceBox = new HBox(12, sourceLabel, freerdpSourceChoice);
         sourceBox.setAlignment(Pos.CENTER_LEFT);
 
         HBox customRdpBox = new HBox(8);
-        customRdpPathField = new TextField(currentConfig.preferredFreeRdpPath() != null ? currentConfig.preferredFreeRdpPath() : "");
+        customRdpPathField =
+                new TextField(currentConfig.preferredFreeRdpPath() != null ? currentConfig.preferredFreeRdpPath() : "");
         customRdpPathField.setDisable(flatpakRuntime);
         HBox.setHgrow(customRdpPathField, Priority.ALWAYS);
 
@@ -164,7 +168,8 @@ public final class SettingsDialog extends Stage {
         dynamicResCheck = new CheckBox("Dynamic Desktop Resizing (+dynamic-resolution)");
         dynamicResCheck.setSelected(currentConfig.dynamicResolution());
 
-        gfxProgressiveCheck = new CheckBox("H.264 / AVC420 & Progressive Graphics Acceleration (/gfx:AVC420,progressive)");
+        gfxProgressiveCheck =
+                new CheckBox("H.264 / AVC420 & Progressive Graphics Acceleration (/gfx:AVC420,progressive)");
         gfxProgressiveCheck.setSelected(currentConfig.gfxProgressive());
 
         asyncUpdateCheck = new CheckBox("Asynchronous Channel Processing (+async-channels)");
@@ -217,15 +222,37 @@ public final class SettingsDialog extends Stage {
 
         advGrid.addRow(1, extraArgsLabel, extraArgsField);
 
-        contentBox.getChildren().addAll(
-            tenantSection, tenantGrid, authHint,
-            rdpSection, detectedLabel, sourceBox, customRdpBox,
-            new Separator(),
-            displaySection, displayGrid,
-            fullscreenCheck, multiMonCheck, multiMonHint, dynamicResCheck, gfxProgressiveCheck, asyncUpdateCheck, autoReconnectCheck, preventSessionLockCheck, usbCheck, smartcardCheck, clipboardCheck, soundCheck, micCheck, ignoreCertCheck,
-            new Separator(),
-            advancedSection, autoConnectCheck, advGrid
-        );
+        contentBox
+                .getChildren()
+                .addAll(
+                        tenantSection,
+                        tenantGrid,
+                        authHint,
+                        rdpSection,
+                        detectedLabel,
+                        sourceBox,
+                        customRdpBox,
+                        new Separator(),
+                        displaySection,
+                        displayGrid,
+                        fullscreenCheck,
+                        multiMonCheck,
+                        multiMonHint,
+                        dynamicResCheck,
+                        gfxProgressiveCheck,
+                        asyncUpdateCheck,
+                        autoReconnectCheck,
+                        preventSessionLockCheck,
+                        usbCheck,
+                        smartcardCheck,
+                        clipboardCheck,
+                        soundCheck,
+                        micCheck,
+                        ignoreCertCheck,
+                        new Separator(),
+                        advancedSection,
+                        autoConnectCheck,
+                        advGrid);
 
         ScrollPane scrollPane = new ScrollPane(contentBox);
         scrollPane.setFitToWidth(true);
@@ -253,15 +280,17 @@ public final class SettingsDialog extends Stage {
         root.setBottom(buttonBar);
 
         Scene scene = new Scene(root, 600, 700);
-        scene.getStylesheets().add(Objects.requireNonNull(
-            getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
-            "Missing stylesheet resource"
-        ).toExternalForm());
+        scene.getStylesheets()
+                .add(Objects.requireNonNull(
+                                getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
+                                "Missing stylesheet resource")
+                        .toExternalForm());
         setScene(scene);
     }
 
     private void handleSave() {
-        String tenant = tenantField.getText() == null ? "" : tenantField.getText().trim();
+        String tenant =
+                tenantField.getText() == null ? "" : tenantField.getText().trim();
         if (tenant.isBlank()) {
             showValidationError("Default tenant cannot be empty.");
             return;
@@ -283,8 +312,8 @@ public final class SettingsDialog extends Stage {
         String rawExtra = extraArgsField.getText();
         if (rawExtra != null && !rawExtra.isBlank()) {
             extraArgs.addAll(Arrays.stream(rawExtra.split("\\s+"))
-                .filter(s -> !s.isBlank())
-                .toList());
+                    .filter(s -> !s.isBlank())
+                    .toList());
         }
 
         String customPath = customRdpPathField.getText().trim();
@@ -303,27 +332,26 @@ public final class SettingsDialog extends Stage {
         }
 
         ClientConfig newConfig = new ClientConfig(
-            tenant,
-            FreeRdpSource.valueOf(sourceLabelToCode(freerdpSourceChoice.getValue())),
-            customPath,
-            scale,
-            fullscreenCheck.isSelected(),
-            soundCheck.isSelected(),
-            micCheck.isSelected(),
-            multiMonCheck.isSelected(),
-            ignoreCertCheck.isSelected(),
-            clipboardCheck.isSelected(),
-            dynamicResCheck.isSelected(),
-            gfxProgressiveCheck.isSelected(),
-            asyncUpdateCheck.isSelected(),
-            autoReconnectCheck.isSelected(),
-            autoConnectCheck.isSelected(),
-            usbCheck.isSelected(),
-            smartcardCheck.isSelected(),
-            preventSessionLockCheck.isSelected(),
-            autoRefresh,
-            extraArgs
-        );
+                tenant,
+                FreeRdpSource.valueOf(sourceLabelToCode(freerdpSourceChoice.getValue())),
+                customPath,
+                scale,
+                fullscreenCheck.isSelected(),
+                soundCheck.isSelected(),
+                micCheck.isSelected(),
+                multiMonCheck.isSelected(),
+                ignoreCertCheck.isSelected(),
+                clipboardCheck.isSelected(),
+                dynamicResCheck.isSelected(),
+                gfxProgressiveCheck.isSelected(),
+                asyncUpdateCheck.isSelected(),
+                autoReconnectCheck.isSelected(),
+                autoConnectCheck.isSelected(),
+                usbCheck.isSelected(),
+                smartcardCheck.isSelected(),
+                preventSessionLockCheck.isSelected(),
+                autoRefresh,
+                extraArgs);
 
         state.updateConfig(newConfig);
         close();
@@ -351,7 +379,6 @@ public final class SettingsDialog extends Stage {
         alert.setHeaderText("Check your settings");
         alert.showAndWait();
     }
-
 
     private static String scalePercentToString(int scale) {
         if (scale <= 0 || scale == 100) return "100%";

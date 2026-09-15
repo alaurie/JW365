@@ -1,13 +1,12 @@
 package org.alaurie.jw365.auth;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 class MachineBoundCryptoTest {
 
@@ -52,7 +51,6 @@ class MachineBoundCryptoTest {
         byte[] tampered = Arrays.copyOf(encrypted, encrypted.length);
         tampered[tampered.length - 1] ^= 0x01;
 
-        assertThatThrownBy(() -> MachineBoundCrypto.decrypt(tampered))
-            .isInstanceOf(Exception.class);
+        assertThatThrownBy(() -> MachineBoundCrypto.decrypt(tampered)).isInstanceOf(Exception.class);
     }
 }

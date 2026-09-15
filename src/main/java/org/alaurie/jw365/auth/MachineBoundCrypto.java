@@ -1,17 +1,16 @@
 package org.alaurie.jw365.auth;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.SecureRandom;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.SecureRandom;
 
 /**
  * Machine-bound AES-256-GCM authenticated encryption for persistent token caching.
@@ -26,8 +25,7 @@ public final class MachineBoundCrypto {
     private static final int KEY_LENGTH_BITS = 256;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private MachineBoundCrypto() {
-    }
+    private MachineBoundCrypto() {}
 
     /**
      * Encrypts plaintext bytes using AES-256-GCM with a random salt and IV.
@@ -90,7 +88,7 @@ public final class MachineBoundCrypto {
     }
 
     private static String readMachineId() {
-        for (String candidate : new String[]{"/etc/machine-id", "/var/lib/dbus/machine-id"}) {
+        for (String candidate : new String[] {"/etc/machine-id", "/var/lib/dbus/machine-id"}) {
             try {
                 Path p = Path.of(candidate);
                 if (Files.isReadable(p)) {

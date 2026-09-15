@@ -13,14 +13,10 @@ public final class ActiveSession {
     private final String resourceTitle;
     private final Process process;
     private final AtomicReference<SessionStatus> status;
-    private final java.util.concurrent.atomic.AtomicBoolean userInitiatedStop = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final java.util.concurrent.atomic.AtomicBoolean userInitiatedStop =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
-    public ActiveSession(
-        String sessionId,
-        String resourceTitle,
-        Process process,
-        SessionStatus initialStatus
-    ) {
+    public ActiveSession(String sessionId, String resourceTitle, Process process, SessionStatus initialStatus) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId must not be null");
         this.resourceTitle = Objects.requireNonNull(resourceTitle, "resourceTitle must not be null");
         this.process = Objects.requireNonNull(process, "process must not be null");
@@ -34,7 +30,6 @@ public final class ActiveSession {
     public String resourceTitle() {
         return resourceTitle;
     }
-
 
     public SessionStatus status() {
         return status.get();
@@ -63,7 +58,6 @@ public final class ActiveSession {
         }
     }
 
-
     public boolean isUserInitiatedStop() {
         return userInitiatedStop.get();
     }
@@ -79,19 +73,22 @@ public final class ActiveSession {
 
         try {
             process.descendants().forEach(ProcessHandle::destroy);
-        } catch (Exception _) { }
+        } catch (Exception _) {
+        }
         process.destroy();
         try {
             if (!process.waitFor(3, TimeUnit.SECONDS)) {
                 try {
                     process.descendants().forEach(ProcessHandle::destroyForcibly);
-                } catch (Exception _) { }
+                } catch (Exception _) {
+                }
                 process.destroyForcibly();
             }
         } catch (InterruptedException e) {
             try {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);
-            } catch (Exception _) { }
+            } catch (Exception _) {
+            }
             process.destroyForcibly();
             Thread.currentThread().interrupt();
         }

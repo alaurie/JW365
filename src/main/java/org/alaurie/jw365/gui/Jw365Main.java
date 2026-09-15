@@ -6,10 +6,9 @@ package org.alaurie.jw365.gui;
  */
 public final class Jw365Main {
 
-    private Jw365Main() {
-    }
+    private Jw365Main() {}
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         // Configure native window manager / Wayland app_id and X11 WM_CLASS
         System.setProperty("jdk.gtk.name", "jw365");
         System.setProperty("sun.awt.datatransfer.appName", "jw365");

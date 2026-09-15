@@ -1,13 +1,12 @@
 package org.alaurie.jw365.rdp;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class FreeRdpLauncherTest {
 
@@ -25,7 +24,8 @@ class FreeRdpLauncherTest {
     }
 
     @Test
-    @DisplayName("buildCommandLine composes correct FreeRDP parameters with gateway, AAD auth, audio, and display options")
+    @DisplayName(
+            "buildCommandLine composes correct FreeRDP parameters with gateway, AAD auth, audio, and display options")
     void testBuildCommandLine(@TempDir Path tempDir) {
         Path rdpFile = tempDir.resolve("test-session.rdp");
         Path binPath = Path.of("/usr/bin/sdl-freerdp");
@@ -33,16 +33,15 @@ class FreeRdpLauncherTest {
         FreeRdpInfo freeRdp = new FreeRdpInfo(binPath, FreeRdpFlavor.SDL_FREERDP, "FreeRDP 3.30.0", false, null);
 
         RdpSessionConfig config = new RdpSessionConfig(
-            rdpFile,
-            "alex@contoso.com",
-            true, // fullscreen
-            150,  // scale-desktop:150
-            true, // sound
-            true, // microphone
-            true, // multiMonitor
-            true, // ignoreCert
-            List.of("/bpp:32")
-        );
+                rdpFile,
+                "alex@contoso.com",
+                true, // fullscreen
+                150, // scale-desktop:150
+                true, // sound
+                true, // microphone
+                true, // multiMonitor
+                true, // ignoreCert
+                List.of("/bpp:32"));
 
         List<String> cmd = RdpProcessSupervisor.buildCommandLine(freeRdp, config);
 
@@ -76,12 +75,14 @@ class FreeRdpLauncherTest {
         assertThat(cmd).contains("/bpp:32");
         assertThat(cmd).contains("/log-level:info");
     }
+
     @Test
     @DisplayName("buildCommandLine handles Flatpak FreeRDP invocation")
     void testBuildCommandLineFlatpak(@TempDir Path tempDir) {
         Path rdpFile = tempDir.resolve("cloudpc.rdp");
 
-        FreeRdpInfo freeRdp = new FreeRdpInfo(null, FreeRdpFlavor.FLATPAK, "FreeRDP Flatpak", true, "com.freerdp.FreeRDP");
+        FreeRdpInfo freeRdp =
+                new FreeRdpInfo(null, FreeRdpFlavor.FLATPAK, "FreeRDP Flatpak", true, "com.freerdp.FreeRDP");
 
         RdpSessionConfig config = RdpSessionConfig.defaults(rdpFile, "user@tenant.onmicrosoft.com");
 
@@ -101,23 +102,93 @@ class FreeRdpLauncherTest {
     @DisplayName("buildCommandLine omits /prevent-session-lock when disabled or overridden in extraArgs")
     void testPreventSessionLockOptions(@TempDir Path tempDir) {
         Path rdpFile = tempDir.resolve("session.rdp");
-        FreeRdpInfo freeRdp = new FreeRdpInfo(Path.of("/usr/bin/sdl-freerdp"), FreeRdpFlavor.SDL_FREERDP, "FreeRDP 3.30.0", false, null);
+        FreeRdpInfo freeRdp = new FreeRdpInfo(
+                Path.of("/usr/bin/sdl-freerdp"), FreeRdpFlavor.SDL_FREERDP, "FreeRDP 3.30.0", false, null);
 
         // Disabled
         RdpSessionConfig disabled = new RdpSessionConfig(
-            rdpFile, "user@tenant.com", false, 0, true, false, false, false,
-            true, true, true, true, true, false, false, false, List.of()
-        );
+                rdpFile,
+                "user@tenant.com",
+                false,
+                0,
+                true,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                List.of());
         List<String> disabledCmd = RdpProcessSupervisor.buildCommandLine(freeRdp, disabled);
         assertThat(disabledCmd).noneMatch(arg -> arg.startsWith("/prevent-session-lock"));
 
         // Overridden with custom interval in extraArgs
         RdpSessionConfig customExtra = new RdpSessionConfig(
-            rdpFile, "user@tenant.com", false, 0, true, false, false, false,
-            true, true, true, true, true, false, false, true, List.of("/prevent-session-lock:60")
-        );
+                rdpFile,
+                "user@tenant.com",
+                false,
+                0,
+                true,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                true,
+                List.of("/prevent-session-lock:60"));
         List<String> customCmd = RdpProcessSupervisor.buildCommandLine(freeRdp, customExtra);
         assertThat(customCmd).contains("/prevent-session-lock:60");
         assertThat(customCmd).doesNotContain("/prevent-session-lock:120");
+    }
+
+    @Test
+    @DisplayName("prepareRdpProfile disables smartcard and usb redirection when config sets them false")
+    void testPrepareRdpProfile(@TempDir Path tempDir) throws Exception {
+        Path rdpFile = tempDir.resolve("original.rdp");
+        String rdpContent = """
+            full address:s:rdgateway.wvd.microsoft.com
+            redirectsmartcards:i:1
+            devicestoredirect:s:*
+            usbdevicestoredirect:s:*
+            redirectclipboard:i:1
+            """;
+        java.nio.file.Files.writeString(rdpFile, rdpContent);
+
+        RdpSessionConfig config = new RdpSessionConfig(
+                rdpFile,
+                "user@tenant.com",
+                false,
+                0,
+                true,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false, // usbRedirection false
+                false, // smartcard false
+                true,
+                List.of());
+
+        Path active = RdpProcessSupervisor.prepareRdpProfile(rdpFile, config);
+        assertThat(active).isNotEqualTo(rdpFile);
+        String activeContent = java.nio.file.Files.readString(active);
+        assertThat(activeContent).contains("redirectsmartcards:i:0");
+        assertThat(activeContent).contains("devicestoredirect:s:");
+        assertThat(activeContent).contains("usbdevicestoredirect:s:");
+        assertThat(activeContent).contains("redirectclipboard:i:1");
     }
 }

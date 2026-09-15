@@ -1,33 +1,25 @@
 package org.alaurie.jw365.rdp;
 
-import org.alaurie.jw365.util.ExecutableLocator;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import org.alaurie.jw365.util.ExecutableLocator;
 
 /**
  * Discovers and validates installed FreeRDP binaries on the host system.
  */
 public final class FreeRdpLocator {
 
-    private static final List<String> CANDIDATE_NAMES = List.of(
-        "sdl-freerdp3",
-        "sdl-freerdp",
-        "xfreerdp3",
-        "xfreerdp",
-        "wlfreerdp3",
-        "wlfreerdp"
-    );
+    private static final List<String> CANDIDATE_NAMES =
+            List.of("sdl-freerdp3", "sdl-freerdp", "xfreerdp3", "xfreerdp", "wlfreerdp3", "wlfreerdp");
 
-    private static final java.util.regex.Pattern VERSION_PATTERN =
-        java.util.regex.Pattern.compile("(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE);
+    private static final java.util.regex.Pattern VERSION_PATTERN = java.util.regex.Pattern.compile(
+            "(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE);
 
-    private FreeRdpLocator() {
-    }
-
+    private FreeRdpLocator() {}
 
     /**
      * Locates FreeRDP according to source preference: AUTO, SYSTEM, FLATPAK, or CUSTOM.
@@ -69,7 +61,8 @@ public final class FreeRdpLocator {
         try {
             Path p = Path.of(customPath);
             if (Files.isExecutable(p)) {
-                return Optional.of(inspectBinary(p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
+                return Optional.of(inspectBinary(
+                        p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
             }
         } catch (RuntimeException _) {
         }
@@ -94,8 +87,6 @@ public final class FreeRdpLocator {
         return Optional.empty();
     }
 
-
-
     private static FreeRdpInfo inspectBinary(Path path, FreeRdpFlavor flavor) {
         String version = extractVersion(List.of(path.toString(), "--version"));
         if (version == null) {
@@ -115,7 +106,9 @@ public final class FreeRdpLocator {
             boolean finished = p.waitFor(3, TimeUnit.SECONDS);
             if (finished && p.exitValue() == 0) {
                 String out;
-                try (var input = p.getInputStream()) { out = new String(input.readAllBytes(), StandardCharsets.UTF_8); }
+                try (var input = p.getInputStream()) {
+                    out = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+                }
                 String version = "v3.31.1";
                 var matcher = VERSION_PATTERN.matcher(out);
                 if (matcher.find()) {
@@ -134,9 +127,13 @@ public final class FreeRdpLocator {
             boolean finished = process.waitFor(2, TimeUnit.SECONDS);
             if (finished) {
                 String out;
-                try (var input = process.getInputStream()) { out = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim(); }
+                try (var input = process.getInputStream()) {
+                    out = new String(input.readAllBytes(), StandardCharsets.UTF_8).trim();
+                }
                 if (out.isBlank()) {
-                    try (var error = process.getErrorStream()) { out = new String(error.readAllBytes(), StandardCharsets.UTF_8).trim(); }
+                    try (var error = process.getErrorStream()) {
+                        out = new String(error.readAllBytes(), StandardCharsets.UTF_8).trim();
+                    }
                 }
                 for (String line : out.lines().toList()) {
                     var matcher = VERSION_PATTERN.matcher(line);

@@ -1,13 +1,12 @@
 package org.alaurie.jw365.auth;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Utility for extracting user claims from Entra ID JWT ID tokens without external crypto dependencies.
@@ -17,8 +16,7 @@ public final class JwtClaimsParser {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Base64.Decoder URL_DECODER = Base64.getUrlDecoder();
 
-    private JwtClaimsParser() {
-    }
+    private JwtClaimsParser() {}
 
     /**
      * Parses the payload section of a JWT string into a {@link UserClaims} instance.

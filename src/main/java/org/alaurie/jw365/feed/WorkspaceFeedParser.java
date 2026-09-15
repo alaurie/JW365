@@ -1,19 +1,17 @@
 package org.alaurie.jw365.feed;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 /** Secure XML parser for Windows 365 and AVD workspace feed documents. */
 public final class WorkspaceFeedParser {
@@ -68,14 +66,25 @@ public final class WorkspaceFeedParser {
                 for (int p = 0; p < publisherNodes.getLength(); p++) {
                     if (publisherNodes.item(p) instanceof Element pEl) {
                         String publisherName = getAttributeIgnoreCase(pEl, "Name", "name", "Title", "title");
-                        parseResourcesUnderElement(pEl, resources, tenantDisplayName, tenantId,
-                            publisherName == null || publisherName.isBlank() ? workspaceName : publisherName,
-                            endpointPolicy, tenantFeed != null ? tenantFeed.feedUrl() : null);
+                        parseResourcesUnderElement(
+                                pEl,
+                                resources,
+                                tenantDisplayName,
+                                tenantId,
+                                publisherName == null || publisherName.isBlank() ? workspaceName : publisherName,
+                                endpointPolicy,
+                                tenantFeed != null ? tenantFeed.feedUrl() : null);
                     }
                 }
             } else {
-                parseResourcesUnderElement(doc.getDocumentElement(), resources, tenantDisplayName, tenantId,
-                    workspaceName, endpointPolicy, tenantFeed != null ? tenantFeed.feedUrl() : null);
+                parseResourcesUnderElement(
+                        doc.getDocumentElement(),
+                        resources,
+                        tenantDisplayName,
+                        tenantId,
+                        workspaceName,
+                        endpointPolicy,
+                        tenantFeed != null ? tenantFeed.feedUrl() : null);
             }
             return new Workspace(workspaceName, tenantId, tenantDisplayName, resources);
         } catch (Exception e) {
@@ -83,8 +92,14 @@ public final class WorkspaceFeedParser {
         }
     }
 
-    private static void parseResourcesUnderElement(Element parent, List<WorkspaceResource> output, String tenantName,
-                                                   String tenantId, String publisherName, Predicate<URI> policy, URI baseUri) {
+    private static void parseResourcesUnderElement(
+            Element parent,
+            List<WorkspaceResource> output,
+            String tenantName,
+            String tenantId,
+            String publisherName,
+            Predicate<URI> policy,
+            URI baseUri) {
         NodeList resourceNodes = parent.getElementsByTagNameNS("*", "Resource");
         for (int r = 0; r < resourceNodes.getLength(); r++) {
             if (!(resourceNodes.item(r) instanceof Element resource)) continue;
@@ -94,29 +109,38 @@ public final class WorkspaceFeedParser {
             String armPath = getAttributeIgnoreCase(resource, "ArmPath", "armPath", "ARMPath");
             if (id == null || id.isBlank()) id = "resource-" + (output.size() + 1);
             if (title == null || title.isBlank()) title = id;
-            URI rdpUrl = findChildAttributeOrTextUri(resource, "ResourceFile", policy, baseUri, "URL", "Url", "url", "href");
+            URI rdpUrl =
+                    findChildAttributeOrTextUri(resource, "ResourceFile", policy, baseUri, "URL", "Url", "url", "href");
             URI iconUrl = findIconUri(resource, policy, baseUri);
-            output.add(new WorkspaceResource(id, title, ResourceType.fromString(typeStr), tenantName, tenantId,
-                publisherName, armPath, rdpUrl, iconUrl));
+            output.add(new WorkspaceResource(
+                    id,
+                    title,
+                    ResourceType.fromString(typeStr),
+                    tenantName,
+                    tenantId,
+                    publisherName,
+                    armPath,
+                    rdpUrl,
+                    iconUrl));
         }
     }
 
     private static URI findIconUri(Element resource, Predicate<URI> policy, URI baseUri) {
-        String[] iconTags = { "Icon64", "Icon48", "Icon32", "Icon128", "Icon256", "Icon16", "Icon", "IconRaw" };
-        String[] attrNames = { "FileURL", "FileUrl", "fileUrl", "URL", "Url", "url", "href", "Href", "src", "Src" };
+        String[] iconTags = {"Icon64", "Icon48", "Icon32", "Icon128", "Icon256", "Icon16", "Icon", "IconRaw"};
+        String[] attrNames = {"FileURL", "FileUrl", "fileUrl", "URL", "Url", "url", "href", "Href", "src", "Src"};
         for (String tag : iconTags) {
             URI uri = findChildAttributeOrTextUri(resource, tag, policy, baseUri, attrNames);
             if (uri != null) return uri;
         }
         String directAttr = getAttributeIgnoreCase(resource, "IconUrl", "IconURL", "iconUrl", "Icon", "icon");
         if (directAttr != null && !directAttr.isBlank()) {
-            URI uri = parseAllowedUri(directAttr.trim(), policy, baseUri);
-            if (uri != null) return uri;
+            return parseAllowedUri(directAttr.trim(), policy, baseUri);
         }
         return null;
     }
 
-    private static URI findChildAttributeOrTextUri(Element parent, String tagName, Predicate<URI> policy, URI baseUri, String... names) {
+    private static URI findChildAttributeOrTextUri(
+            Element parent, String tagName, Predicate<URI> policy, URI baseUri, String... names) {
         NodeList list = parent.getElementsByTagNameNS("*", tagName);
         for (int i = 0; i < list.getLength(); i++) {
             if (!(list.item(i) instanceof Element el)) continue;
@@ -155,9 +179,13 @@ public final class WorkspaceFeedParser {
             return null;
         }
     }
+
     private static boolean isProductionAllowedUri(URI uri) {
-        return uri != null && uri.getUserInfo() == null && "https".equalsIgnoreCase(uri.getScheme())
-            && uri.getHost() != null && (uri.getPort() == -1 || uri.getPort() == 443);
+        return uri != null
+                && uri.getUserInfo() == null
+                && "https".equalsIgnoreCase(uri.getScheme())
+                && uri.getHost() != null
+                && (uri.getPort() == -1 || uri.getPort() == 443);
     }
 
     private static Document parseSecurely(String xml) throws Exception {

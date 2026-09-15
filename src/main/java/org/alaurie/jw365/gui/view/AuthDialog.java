@@ -1,5 +1,8 @@
 package org.alaurie.jw365.gui.view;
 
+import java.net.CookieHandler;
+import java.net.URI;
+import java.util.Objects;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -15,24 +18,21 @@ import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.alaurie.jw365.auth.OAuthCallback;
 import org.alaurie.jw365.auth.OAuthClient;
+import org.alaurie.jw365.auth.PersistentCookieManager;
 import org.alaurie.jw365.auth.PkceChallenge;
 import org.alaurie.jw365.config.ClientConfig;
-import org.alaurie.jw365.gui.state.AppState;
-import org.alaurie.jw365.auth.OAuthCallback;
-import org.alaurie.jw365.auth.PersistentCookieManager;
 import org.alaurie.jw365.config.XdgPaths;
+import org.alaurie.jw365.gui.state.AppState;
 
-import java.net.CookieHandler;
-import java.net.URI;
-import java.util.Objects;
 /**
  * JavaFX WebView dialog for Entra ID OAuth 2.0 PKCE sign-in.
  */
 public final class AuthDialog extends Stage {
 
     public static final String BROWSER_USER_AGENT =
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
     private static final URI CALLBACK_URI = URI.create(OAuthClient.REDIRECT_URI);
     private final AppState state;
@@ -95,7 +95,8 @@ public final class AuthDialog extends Stage {
 
         // Build Authorize URL with nativeclient redirect
         ClientConfig config = state.getConfigManager().get();
-        URI authUri = state.getOauthClient().buildAuthorizeUrl(config.defaultTenant(), challenge, OAuthClient.REDIRECT_URI, null);
+        URI authUri = state.getOauthClient()
+                .buildAuthorizeUrl(config.defaultTenant(), challenge, OAuthClient.REDIRECT_URI, null);
 
         // Wire WebEngine listeners to auto-intercept redirect
         progressBar.progressProperty().bind(webEngine.getLoadWorker().progressProperty());
@@ -124,10 +125,11 @@ public final class AuthDialog extends Stage {
         webEngine.load(authUri.toString());
 
         Scene scene = new Scene(root, 650, 750);
-        scene.getStylesheets().add(Objects.requireNonNull(
-            getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
-            "Missing stylesheet resource"
-        ).toExternalForm());
+        scene.getStylesheets()
+                .add(Objects.requireNonNull(
+                                getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
+                                "Missing stylesheet resource")
+                        .toExternalForm());
         setScene(scene);
     }
 
@@ -156,6 +158,7 @@ public final class AuthDialog extends Stage {
     private static boolean isExpectedRedirect(String url) {
         return OAuthCallback.isRedirect(url, CALLBACK_URI);
     }
+
     private void showCallbackFailure(String message) {
         Platform.runLater(() -> {
             statusLabel.setText(message);
@@ -163,6 +166,7 @@ public final class AuthDialog extends Stage {
             webView.setDisable(false);
         });
     }
+
     private void handleAuthorizationCode(String code) {
         if (code == null || code.isBlank()) return;
 
@@ -172,19 +176,21 @@ public final class AuthDialog extends Stage {
             webView.setDisable(true);
         });
 
-        state.signInWithCode(code, challenge.codeVerifier(), OAuthClient.REDIRECT_URI, () -> {
-            if (CookieHandler.getDefault() instanceof PersistentCookieManager pcm) {
-                pcm.persistCookies();
-            }
-            Platform.runLater(this::close);
-        }, error -> {
-            Platform.runLater(() -> {
-                codeIntercepted = false;
-                statusLabel.setText("Authentication failed: " + error);
-                progressBar.setVisible(false);
-                webView.setDisable(false);
-            });
-        });
+        state.signInWithCode(
+                code,
+                challenge.codeVerifier(),
+                OAuthClient.REDIRECT_URI,
+                () -> {
+                    if (CookieHandler.getDefault() instanceof PersistentCookieManager pcm) {
+                        pcm.persistCookies();
+                    }
+                    Platform.runLater(this::close);
+                },
+                error -> Platform.runLater(() -> {
+                    codeIntercepted = false;
+                    statusLabel.setText("Authentication failed: " + error);
+                    progressBar.setVisible(false);
+                    webView.setDisable(false);
+                }));
     }
-
 }

@@ -10,8 +10,7 @@ public final class AppVersion {
 
     public static final String VERSION = loadVersion();
 
-    private AppVersion() {
-    }
+    private AppVersion() {}
 
     private static String loadVersion() {
         try (InputStream is = AppVersion.class.getResourceAsStream("/org/alaurie/jw365/version.properties")) {
@@ -26,9 +25,11 @@ public final class AppVersion {
         } catch (Exception _) {
         }
         Package pkg = AppVersion.class.getPackage();
-        if (pkg != null && pkg.getImplementationVersion() != null && !pkg.getImplementationVersion().isBlank()) {
+        if (pkg != null
+                && pkg.getImplementationVersion() != null
+                && !pkg.getImplementationVersion().isBlank()) {
             return pkg.getImplementationVersion().trim();
         }
-        return "0.2.5";
+        return "development";
     }
 }
