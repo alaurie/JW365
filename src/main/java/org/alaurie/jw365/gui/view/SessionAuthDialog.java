@@ -80,7 +80,7 @@ public final class SessionAuthDialog extends Stage {
                 .orElse(null);
         this.expectedRedirectUri = extractRedirectUri(this.authUrl).orElse(CALLBACK_URI);
         if (owner != null) initOwner(owner);
-        initModality(Modality.APPLICATION_MODAL);
+        initModality(Modality.NONE);
         setTitle("Authorizing " + this.resourceTitle);
         this.webView = new WebView();
         this.webEngine = webView.getEngine();
@@ -236,6 +236,10 @@ public final class SessionAuthDialog extends Stage {
                 }
             }
             Platform.runLater(() -> {
+                if (webEngine.getLoadWorker().isRunning()) {
+                    webEngine.getLoadWorker().cancel();
+                }
+                webEngine.load("about:blank");
                 if (isShowing()) close();
             });
         }
@@ -311,6 +315,10 @@ public final class SessionAuthDialog extends Stage {
                 }
             }
             Platform.runLater(() -> {
+                if (webEngine.getLoadWorker().isRunning()) {
+                    webEngine.getLoadWorker().cancel();
+                }
+                webEngine.load("about:blank");
                 if (isShowing()) close();
             });
         }
