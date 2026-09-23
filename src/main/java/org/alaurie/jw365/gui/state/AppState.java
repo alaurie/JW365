@@ -13,15 +13,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
@@ -34,6 +37,8 @@ import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.scene.image.Image;
 import org.alaurie.jw365.auth.AuthResult;
+import org.alaurie.jw365.auth.AuthResult.Failure;
+import org.alaurie.jw365.auth.AuthResult.Success;
 import org.alaurie.jw365.auth.JwtClaimsParser;
 import org.alaurie.jw365.auth.OAuthClient;
 import org.alaurie.jw365.auth.TokenResponse;
@@ -47,15 +52,23 @@ import org.alaurie.jw365.feed.TenantFeed;
 import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceFeedClient;
 import org.alaurie.jw365.feed.WorkspaceResource;
+import org.alaurie.jw365.gui.view.AuthDialog;
+import org.alaurie.jw365.gui.view.SessionAuthDialog;
+import org.alaurie.jw365.rdp.ActiveSession;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
 import org.alaurie.jw365.rdp.FreeRdpLocator;
 import org.alaurie.jw365.rdp.RdpProcessSupervisor;
 import org.alaurie.jw365.rdp.RdpSessionConfig;
-import org.alaurie.jw365.rdp.SessionEvent;
+import org.alaurie.jw365.rdp.SessionEvent.AuthRequired;
+import org.alaurie.jw365.rdp.SessionEvent.Exited;
+import org.alaurie.jw365.rdp.SessionEvent.OutputLine;
+import org.alaurie.jw365.rdp.SessionEvent.Started;
+import org.alaurie.jw365.rdp.SessionEvent.StatusChanged;
 import org.alaurie.jw365.rdp.SessionStatus;
 
 /**
- * Reactive state management engine connecting JavaFX UI components to the Core domain services.
+ * Reactive state management engine connecting JavaFX UI components to the Core
+ * domain services.
  */
 public final class AppState {
 
@@ -75,10 +88,8 @@ public final class AppState {
     private final ObjectProperty<Instant> lastSynced = new SimpleObjectProperty<>(null);
     private final ObjectProperty<FreeRdpInfo> detectedFreeRdp = new SimpleObjectProperty<>(null);
     private static final int MAX_ICON_MEMORY_ENTRIES = 256;
-    private final Map<String, Image> iconMemoryCache =
-            Collections.synchronizedMap(new LinkedHashMap<>(MAX_ICON_MEMORY_ENTRIES, 0.75f, true));
-    private final java.util.concurrent.atomic.AtomicBoolean autoConnectTriggered =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final Map<String, Image> iconMemoryCache = Collections.synchronizedMap(new LinkedHashMap<>(MAX_ICON_MEMORY_ENTRIES, 0.75f, true));
+    private final AtomicBoolean autoConnectTriggered = new AtomicBoolean(false);
     private final AtomicBoolean refreshInProgress = new AtomicBoolean(false);
     private final AtomicLong operationGeneration = new AtomicLong();
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -88,14 +99,14 @@ public final class AppState {
         t.setDaemon(true);
         return t;
     });
-    private final ExecutorService iconExecutor = Executors.newThreadPerTaskExecutor(
-            Thread.ofVirtual().name("jw365-icon-", 1).factory());
+    private final ExecutorService iconExecutor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual()
+            .name("jw365-icon-", 1)
+            .factory());
     private final Semaphore iconThrottle = new Semaphore(4);
     private final Set<String> iconJobs = ConcurrentHashMap.newKeySet();
     private final Map<String, List<Consumer<Image>>> iconCallbacks = new ConcurrentHashMap<>();
     private final Set<Future<?>> iconFutures = ConcurrentHashMap.newKeySet();
-    private final Map<String, org.alaurie.jw365.gui.view.SessionAuthDialog> activeAuthDialogs =
-            new ConcurrentHashMap<>();
+    private final Map<String, SessionAuthDialog> activeAuthDialogs = new ConcurrentHashMap<>();
 
     public AppState() {
         this(
@@ -107,13 +118,8 @@ public final class AppState {
                 new RdpProcessSupervisor());
     }
 
-    public AppState(
-            OAuthClient oauthClient,
-            TokenStore tokenStore,
-            ConfigManager configManager,
-            WorkspaceCache workspaceCache,
-            WorkspaceFeedClient feedClient,
-            RdpProcessSupervisor rdpSupervisor) {
+    public AppState(OAuthClient oauthClient, TokenStore tokenStore, ConfigManager configManager,
+                    WorkspaceCache workspaceCache, WorkspaceFeedClient feedClient, RdpProcessSupervisor rdpSupervisor) {
         this.oauthClient = Objects.requireNonNullElseGet(oauthClient, OAuthClient::new);
         this.tokenStore = Objects.requireNonNullElseGet(tokenStore, TokenStore::new);
         this.configManager = Objects.requireNonNullElseGet(configManager, ConfigManager::new);
@@ -122,72 +128,80 @@ public final class AppState {
         this.rdpSupervisor = Objects.requireNonNullElseGet(rdpSupervisor, RdpProcessSupervisor::new);
         this.rdpSupervisor.addGlobalListener(event -> {
             switch (event) {
-                case SessionEvent.StatusChanged sc ->
-                    runOnFxThread(() -> {
-                        if (closed.get() || !authenticated.get()) return;
-                        sessionStatuses.put(sc.sessionId(), sc.newStatus());
-                        switch (sc.newStatus()) {
-                            case CONNECTED -> {
-                                closeAuthDialog(sc.sessionId());
-                                statusMessage.set("Connected to Cloud PC");
-                            }
-                            case DISCONNECTED -> {
-                                closeAuthDialog(sc.sessionId());
-                                statusMessage.set("Session disconnected");
-                            }
-                            case FAILED -> {
-                                closeAuthDialog(sc.sessionId());
-                                statusMessage.set(Objects.requireNonNullElse(sc.message(), "Connection failed"));
-                            }
-                            case CONNECTING, STARTING ->
-                                statusMessage.set(
-                                        Objects.requireNonNullElse(sc.message(), "Connecting to Cloud PC..."));
-                            case RECONNECTING ->
-                                statusMessage.set(
-                                        Objects.requireNonNullElse(sc.message(), "Reconnecting to Cloud PC..."));
-                            case DISCONNECTING -> statusMessage.set("Disconnecting from Cloud PC...");
+                case StatusChanged sc -> runOnFxThread(() -> {
+                    if (closed.get() || !authenticated.get()) {
+                        return;
+                    }
+                    sessionStatuses.put(sc.sessionId(), sc.newStatus());
+                    switch (sc.newStatus()) {
+                        case CONNECTED -> {
+                            closeAuthDialog(sc.sessionId());
+                            statusMessage.set("Connected to Cloud PC");
                         }
-                    });
-                case SessionEvent.Exited ex ->
-                    runOnFxThread(() -> {
-                        if (closed.get() || !authenticated.get()) return;
-                        closeAuthDialog(ex.sessionId());
-                        SessionStatus current = sessionStatuses.get(ex.sessionId());
-                        if (current != SessionStatus.FAILED) {
-                            if (ex.exitCode() != 0
-                                    && ex.exitCode() != 143
-                                    && ex.exitCode() != 130
-                                    && ex.exitCode() != 129) {
-                                sessionStatuses.put(ex.sessionId(), SessionStatus.FAILED);
-                                statusMessage.set(Objects.requireNonNullElse(
-                                        ex.message(), "Session exited with error code " + ex.exitCode()));
-                            } else {
-                                sessionStatuses.put(ex.sessionId(), SessionStatus.DISCONNECTED);
-                                statusMessage.set("Session ended");
-                            }
+                        case DISCONNECTED -> {
+                            closeAuthDialog(sc.sessionId());
+                            statusMessage.set("Session disconnected");
                         }
-                    });
-                case SessionEvent.AuthRequired ar ->
-                    runOnFxThread(() -> {
-                        if (!closed.get() && authenticated.get()) handleSessionAuth(ar);
-                    });
-                case SessionEvent.Started _, SessionEvent.OutputLine _ -> {}
+                        case FAILED -> {
+                            closeAuthDialog(sc.sessionId());
+                            statusMessage.set(Objects.requireNonNullElse(sc.message(), "Connection failed"));
+                        }
+                        case CONNECTING, STARTING -> statusMessage.set(Objects.requireNonNullElse(sc.message(), "Connecting to Cloud PC..."));
+                        case RECONNECTING -> statusMessage.set(Objects.requireNonNullElse(sc.message(), "Reconnecting to Cloud PC..."));
+                        case DISCONNECTING -> statusMessage.set("Disconnecting from Cloud PC...");
+                    }
+                });
+                case Exited ex -> runOnFxThread(() -> {
+                    if (closed.get() || !authenticated.get()) {
+                        return;
+                    }
+                    closeAuthDialog(ex.sessionId());
+                    SessionStatus current = sessionStatuses.get(ex.sessionId());
+                    if (current != SessionStatus.FAILED) {
+                        if (ex.exitCode() != 0
+                                && ex.exitCode() != 143
+                                && ex.exitCode() != 130
+                                && ex.exitCode() != 129) {
+                            sessionStatuses.put(ex.sessionId(), SessionStatus.FAILED);
+                            statusMessage.set(Objects.requireNonNullElse(ex.message(), "Session exited with error code " + ex.exitCode()));
+                        } else {
+                            sessionStatuses.put(ex.sessionId(), SessionStatus.DISCONNECTED);
+                            statusMessage.set("Session ended");
+                        }
+                    }
+                });
+                case AuthRequired ar -> runOnFxThread(() -> {
+                    if (!closed.get() && authenticated.get()) {
+                        handleSessionAuth(ar);
+                    }
+                });
+                case Started _, OutputLine _ -> {}
             }
         });
     }
 
     private void closeAuthDialog(String sessionId) {
-        if (sessionId == null) return;
-        org.alaurie.jw365.gui.view.SessionAuthDialog dialog = activeAuthDialogs.remove(sessionId);
+        if (sessionId == null) {
+            return;
+        }
+        SessionAuthDialog dialog = activeAuthDialogs.remove(sessionId);
         if (dialog != null) {
-            dialog.completeAndClose();
-            Platform.runLater(() -> {
-                if (dialog.isShowing()) dialog.close();
-            });
+            dialog.completeWithoutCancel();
         }
     }
 
-    private void handleSessionAuth(SessionEvent.AuthRequired ar) {
+    private void closeAllAuthDialogs() {
+        for (String id : List.copyOf(activeAuthDialogs.keySet())) {
+            closeAuthDialog(id);
+        }
+    }
+
+    public boolean hasActiveSessions() {
+        return rdpSupervisor.getActiveSessions().values().stream()
+                .anyMatch(ActiveSession::isAlive);
+    }
+
+    private void handleSessionAuth(AuthRequired ar) {
         String title = "Cloud PC";
         for (Workspace ws : workspaces) {
             for (WorkspaceResource res : ws.resources()) {
@@ -204,13 +218,13 @@ public final class AppState {
         }
 
         // Close any existing active dialog for this session (e.g. prior auth prompt)
-        org.alaurie.jw365.gui.view.SessionAuthDialog existing = activeAuthDialogs.remove(ar.sessionId());
+        SessionAuthDialog existing = activeAuthDialogs.remove(ar.sessionId());
         if (existing != null) {
             existing.completeAndClose();
         }
 
         try {
-            org.alaurie.jw365.gui.view.SessionAuthDialog dialog = new org.alaurie.jw365.gui.view.SessionAuthDialog(
+            SessionAuthDialog dialog = new SessionAuthDialog(
                     null,
                     title,
                     ar,
@@ -242,10 +256,11 @@ public final class AppState {
     }
 
     public void initialize() {
-        if (closed.get()) return;
+        if (closed.get()) {
+            return;
+        }
         ClientConfig config = configManager.get();
-        String source =
-                XdgPaths.isFlatpak() ? "BUNDLED" : config.freerdpSource().name();
+        String source = XdgPaths.isFlatpak() ? "BUNDLED" : config.freerdpSource().name();
         Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(source, config.preferredFreeRdpPath());
         runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
 
@@ -272,56 +287,62 @@ public final class AppState {
         }
         // 4. Setup periodic auto-refresh
         int refreshMin = Math.max(config.autoRefreshMinutes(), 5);
-        scheduler.scheduleAtFixedRate(
-                () -> {
-                    if (authenticated.get()) {
-                        refreshWorkspacesAsync(false);
-                    }
-                },
-                refreshMin,
-                refreshMin,
-                TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(() -> {
+            if (authenticated.get() && !hasActiveSessions()) {
+                refreshWorkspacesAsync(false);
+            }
+        },
+                refreshMin, refreshMin, TimeUnit.MINUTES);
     }
 
-    public void signInWithCode(
-            String authorizationCode,
-            String codeVerifier,
-            String redirectUri,
-            Runnable onSuccess,
-            Consumer<String> onError) {
+    public void signInWithCode(String authorizationCode, String codeVerifier, String redirectUri,
+            Runnable onSuccess, Consumer<String> onError) {
         long generation = operationGeneration.get();
         setLoadingIfCurrent(generation, true, "Authenticating with Microsoft Entra ID...");
         Thread.ofVirtual().start(() -> {
-            AuthResult result = oauthClient.exchangeAuthorizationCode(
-                    configManager.get().defaultTenant(), authorizationCode, codeVerifier, redirectUri);
+            AuthResult result = oauthClient.exchangeAuthorizationCode(configManager.get().defaultTenant(), authorizationCode,
+                    codeVerifier, redirectUri);
             switch (result) {
-                case AuthResult.Success(var tokens, var claims) -> {
+                case Success(var tokens, var claims) -> {
                     synchronized (authOperationLock) {
-                        if (generation != operationGeneration.get()) return;
+                        if (generation != operationGeneration.get()) {
+                            return;
+                        }
                         try {
                             tokenStore.save(tokens);
                         } catch (Exception e) {
-                            if (generation != operationGeneration.get()) return;
+                            if (generation != operationGeneration.get()) {
+                                return;
+                            }
                             runIfCurrent(generation, () -> {
                                 setLoading(false, "Authentication failed: " + e.getMessage());
-                                if (onError != null) onError.accept(e.getMessage());
+                                if (onError != null) {
+                                    onError.accept(e.getMessage());
+                                }
                             });
                             return;
                         }
-                        runIfCurrent(generation, () -> {
-                            currentUser.set(claims);
-                            authenticated.set(true);
-                            setLoading(false, "Signed in as " + claims.displayIdentity());
-                            if (onSuccess != null) onSuccess.run();
-                            refreshWorkspacesAsync(false);
-                        });
+                        runIfCurrent(generation,
+                                () -> {
+                                    currentUser.set(claims);
+                                    authenticated.set(true);
+                                    setLoading(false, "Signed in as " + claims.displayIdentity());
+                                    if (onSuccess != null) {
+                                        onSuccess.run();
+                                    }
+                                    refreshWorkspacesAsync(false);
+                                });
                     }
                 }
-                case AuthResult.Failure failure -> {
-                    if (generation != operationGeneration.get()) return;
+                case Failure failure -> {
+                    if (generation != operationGeneration.get()) {
+                        return;
+                    }
                     runIfCurrent(generation, () -> {
                         setLoading(false, "Authentication failed: " + failure.errorMessage());
-                        if (onError != null) onError.accept(failure.errorMessage());
+                        if (onError != null) {
+                            onError.accept(failure.errorMessage());
+                        }
                     });
                 }
             }
@@ -336,15 +357,19 @@ public final class AppState {
     public void signInWithEmbeddedWebView() {
         runOnFxThread(() -> {
             setLoading(false, "Opening embedded Microsoft sign-in...");
-            new org.alaurie.jw365.gui.view.AuthDialog(null, this).show();
+            new AuthDialog(null, this).show();
         });
     }
 
-    /** Clears local credentials, MSAL accounts, and in-flight authentication state. */
+    /**
+     * Clears local credentials, MSAL accounts, and in-flight authentication
+     * state.
+     */
     public void signOut() {
+        long generation = operationGeneration.incrementAndGet();
+        closeAllAuthDialogs();
         boolean tokenCleared;
         synchronized (authOperationLock) {
-            operationGeneration.incrementAndGet();
             tokenCleared = tokenStore.clear();
             oauthClient.clearCacheAndAccounts();
             workspaceCache.clear();
@@ -355,7 +380,9 @@ public final class AppState {
             iconFutures.clear();
         }
         refreshInProgress.set(false);
-        rdpSupervisor.stopAllSessions();
+        Thread.ofVirtual()
+                .name("jw365-stop-sessions")
+                .start(rdpSupervisor::stopAllSessions);
         String message = tokenCleared ? "Signed out" : "Signed out locally; secure credential cleanup failed";
         runOnFxThread(() -> {
             authenticated.set(false);
@@ -367,7 +394,9 @@ public final class AppState {
     }
 
     public void shutdown() {
-        if (!closed.compareAndSet(false, true)) return;
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
         synchronized (authOperationLock) {
             operationGeneration.incrementAndGet();
         }
@@ -381,92 +410,122 @@ public final class AppState {
     }
 
     public void refreshWorkspacesAsync(boolean forceTokenRefresh) {
-        if (closed.get() || !authenticated.get() || !refreshInProgress.compareAndSet(false, true)) return;
+        if (closed.get()
+                || !authenticated.get()
+                || (!forceTokenRefresh && hasActiveSessions())
+                || !refreshInProgress.compareAndSet(false, true)) {
+            return;
+        }
         long generation = operationGeneration.get();
-        runIfCurrent(generation, () -> setLoading(true, "Discovering Windows 365 workspaces..."));
-        Thread.ofVirtual().name("jw365-feed-refresh").start(() -> {
-            try {
-                Optional<TokenResponse> tokenOpt = tokenStore.load();
-                if (tokenOpt.isEmpty()) {
-                    if (generation != operationGeneration.get()) return;
-                    long invalidationGeneration;
-                    synchronized (authOperationLock) {
-                        if (generation != operationGeneration.get()) return;
-                        invalidationGeneration = operationGeneration.incrementAndGet();
-                    }
-                    expireAuthentication("Session expired, please sign in again", invalidationGeneration);
-                    return;
-                }
-
-                TokenResponse tokens = tokenOpt.get();
-                ClientConfig config = configManager.get();
-                if (forceTokenRefresh || tokens.isExpiringSoon()) {
-                    AuthResult refreshResult = oauthClient.refreshTokenWithMsal(config.defaultTenant());
-                    switch (refreshResult) {
-                        case AuthResult.Success(var newTokens, var claims) -> {
-                            synchronized (authOperationLock) {
-                                if (generation != operationGeneration.get()) return;
-                                tokens = mergeTokenResponses(tokens, newTokens);
-                                tokenStore.save(tokens);
+        if (!hasActiveSessions()) {
+            runIfCurrent(generation, () -> setLoading(true, "Discovering Windows 365 workspaces..."));
+        }
+        Thread.ofVirtual()
+                .name("jw365-feed-refresh")
+                .start(() -> {
+                    try {
+                        Optional<TokenResponse> tokenOpt = tokenStore.load();
+                        if (tokenOpt.isEmpty()) {
+                            if (generation != operationGeneration.get()) {
+                                return;
                             }
-                            runIfCurrent(generation, () -> currentUser.set(claims));
-                        }
-                        case AuthResult.Failure f -> {
-                            System.err.println("Warning: Token refresh failed: " + f.errorMessage());
-                            if (generation != operationGeneration.get()) return;
                             long invalidationGeneration;
                             synchronized (authOperationLock) {
-                                if (generation != operationGeneration.get()) return;
+                                if (generation != operationGeneration.get()) {
+                                    return;
+                                }
                                 invalidationGeneration = operationGeneration.incrementAndGet();
                             }
                             expireAuthentication("Session expired, please sign in again", invalidationGeneration);
                             return;
                         }
-                    }
-                }
 
-                if (!isCurrentGeneration(generation) || closed.get()) return;
-                String accessToken = tokens.accessToken();
-                List<TenantFeed> feeds = feedClient.discoverTenantFeeds(accessToken);
-                if (!isCurrentGeneration(generation) || closed.get()) return;
-                List<Workspace> newWorkspaces = feedClient.fetchAllWorkspaces(accessToken, feeds);
-                synchronized (authOperationLock) {
-                    if (!isCurrentGeneration(generation) || closed.get()) return;
-                    workspaceCache.saveWorkspaces(newWorkspaces);
-                }
-                runIfCurrent(generation, () -> {
-                    workspaces.setAll(newWorkspaces);
-                    lastSynced.set(Instant.now());
-                    int totalResources = newWorkspaces.stream()
-                            .mapToInt(w -> w.resources().size())
-                            .sum();
-                    setLoading(
-                            false,
-                            "Discovered " + totalResources + " resources across " + newWorkspaces.size()
-                                    + " workspaces");
-                    if (config.autoConnect() && !autoConnectTriggered.getAndSet(true)) {
-                        List<WorkspaceResource> allDesktops = newWorkspaces.stream()
-                                .flatMap(w -> w.resources().stream())
-                                .filter(r -> r.type().isDesktop())
-                                .toList();
-                        if (allDesktops.size() == 1) connectResource(allDesktops.getFirst(), null);
+                        TokenResponse tokens = tokenOpt.get();
+                        ClientConfig config = configManager.get();
+                        if (forceTokenRefresh || tokens.isExpiringSoon()) {
+                            AuthResult refreshResult = oauthClient.refreshTokenWithMsal(config.defaultTenant());
+                            switch (refreshResult) {
+                                case Success(var newTokens, var claims) -> {
+                                    synchronized (authOperationLock) {
+                                        if (generation != operationGeneration.get()) {
+                                            return;
+                                        }
+                                        tokens = mergeTokenResponses(tokens, newTokens);
+                                        tokenStore.save(tokens);
+                                    }
+                                    runIfCurrent(generation, () -> currentUser.set(claims));
+                                }
+                                case Failure f -> {
+                                    System.err.println("Warning: Token refresh failed: " + f.errorMessage());
+                                    if (generation != operationGeneration.get()) {
+                                        return;
+                                    }
+                                    long invalidationGeneration;
+                                    synchronized (authOperationLock) {
+                                        if (generation != operationGeneration.get()) {
+                                            return;
+                                        }
+                                        invalidationGeneration = operationGeneration.incrementAndGet();
+                                    }
+                                    expireAuthentication("Session expired, please sign in again", invalidationGeneration);
+                                    return;
+                                }
+                            }
+                        }
+
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
+                        }
+                        String accessToken = tokens.accessToken();
+                        List<TenantFeed> feeds = feedClient.discoverTenantFeeds(accessToken);
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
+                        }
+                        List<Workspace> newWorkspaces = feedClient.fetchAllWorkspaces(accessToken, feeds);
+                        synchronized (authOperationLock) {
+                            if (!isCurrentGeneration(generation) || closed.get()) {
+                                return;
+                            }
+                            workspaceCache.saveWorkspaces(newWorkspaces);
+                        }
+                        runIfCurrent(generation,
+                                () -> {
+                                    workspaces.setAll(newWorkspaces);
+                                    lastSynced.set(Instant.now());
+                                    int totalResources = newWorkspaces.stream()
+                                            .mapToInt(w -> w.resources().size())
+                                            .sum();
+                                    if (!hasActiveSessions()) {
+                                        setLoading(false, "Discovered " + totalResources + " resources across " + newWorkspaces.size() + " workspaces");
+                                    } else {
+                                        setLoading(false, null);
+                                    }
+                                    if (config.autoConnect() && !autoConnectTriggered.getAndSet(true)) {
+                                        List<WorkspaceResource> allDesktops = newWorkspaces.stream()
+                                                .flatMap(w -> w.resources().stream())
+                                                .filter(r -> r.type().isDesktop())
+                                                .toList();
+                                        if (allDesktops.size() == 1) {
+                                            connectResource(allDesktops.getFirst(), null);
+                                        }
+                                    }
+                                });
+                        for (Workspace ws : newWorkspaces) {
+                            for (WorkspaceResource res : ws.resources()) {
+                                if (res.iconUrl() != null && !workspaceCache.hasCachedIcon(res)) {
+                                    enqueueIconJob(res, accessToken, generation);
+                                }
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        runIfCurrent(generation, () -> setLoading(false, "Feed refresh cancelled"));
+                    } catch (Exception e) {
+                        runIfCurrent(generation, () -> setLoading(false, "Feed refresh error: " + e.getMessage()));
+                    } finally {
+                        refreshInProgress.set(false);
                     }
                 });
-                for (Workspace ws : newWorkspaces) {
-                    for (WorkspaceResource res : ws.resources()) {
-                        if (res.iconUrl() != null && !workspaceCache.hasCachedIcon(res))
-                            enqueueIconJob(res, accessToken, generation);
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                runIfCurrent(generation, () -> setLoading(false, "Feed refresh cancelled"));
-            } catch (Exception e) {
-                runIfCurrent(generation, () -> setLoading(false, "Feed refresh error: " + e.getMessage()));
-            } finally {
-                refreshInProgress.set(false);
-            }
-        });
     }
 
     private static TokenResponse mergeTokenResponses(TokenResponse previous, TokenResponse refreshed) {
@@ -495,7 +554,9 @@ public final class AppState {
     }
 
     public void connectResource(WorkspaceResource resource, DisplayMode displayMode, Consumer<String> onError) {
-        if (resource == null || closed.get()) return;
+        if (resource == null || closed.get()) {
+            return;
+        }
         long generation = operationGeneration.get();
         Optional<FreeRdpInfo> rdpOpt = Optional.ofNullable(detectedFreeRdp.get());
         if (rdpOpt.isEmpty()) {
@@ -503,92 +564,112 @@ public final class AppState {
                 sessionStatuses.put(resource.identityKey(), SessionStatus.FAILED);
                 statusMessage.set("FreeRDP is not installed or detected");
             });
-            if (onError != null)
-                onError.accept(
-                        "FreeRDP is not installed or detected on your system. Please install FreeRDP or configure a custom binary in Settings.");
+            if (onError != null) {
+                onError.accept("FreeRDP is not installed or detected on your system. Please install FreeRDP or configure a custom binary in Settings.");
+            }
             return;
         }
         FreeRdpInfo freeRdp = rdpOpt.get();
         runIfCurrent(generation, () -> sessionStatuses.put(resource.identityKey(), SessionStatus.STARTING));
-        Thread.ofVirtual().name("jw365-connect-" + resource.sanitizedFileName()).start(() -> {
-            try {
-                if (!isCurrentGeneration(generation) || closed.get()) return;
-                Optional<TokenResponse> tokenOpt = tokenStore.load();
-                if (tokenOpt.isEmpty()) {
-                    runIfCurrent(generation, () -> {
-                        sessionStatuses.put(resource.identityKey(), SessionStatus.FAILED);
-                        if (onError != null) onError.accept("Not authenticated");
-                    });
-                    return;
-                }
+        Thread.ofVirtual()
+                .name("jw365-connect-" + resource.sanitizedFileName())
+                .start(() -> {
+                    try {
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
+                        }
+                        Optional<TokenResponse> tokenOpt = tokenStore.load();
+                        if (tokenOpt.isEmpty()) {
+                            runIfCurrent(generation, () -> {
+                                sessionStatuses.put(resource.identityKey(), SessionStatus.FAILED);
+                                if (onError != null) {
+                                    onError.accept("Not authenticated");
+                                }
+                            });
+                            return;
+                        }
 
-                if (!isCurrentGeneration(generation) || closed.get()) return;
-                TokenResponse tokens = tokenOpt.get();
-                ClientConfig config = configManager.get();
-                if (!isCurrentGeneration(generation) || closed.get()) return;
-                runIfCurrent(generation, () -> statusMessage.set("Downloading remote desktop profile..."));
-                if (resource.rdpUrl() == null) {
-                    throw new IOException("Workspace resource does not specify an RDP profile URL");
-                }
-                Path rdpFilePath = XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
-                feedClient.downloadRdpFile(tokens.accessToken(), resource.rdpUrl(), rdpFilePath);
-                if (!isCurrentGeneration(generation) || closed.get()) return;
-                // Build session config
-                UserClaims claims = currentUser.get();
-                String username = claims != null ? claims.rdpUsername() : "";
-                DisplayMode effectiveMode = displayMode != null ? displayMode : DisplayMode.DEFAULT;
-                boolean multiMon = (effectiveMode == DisplayMode.MULTIMON)
-                        || (effectiveMode == DisplayMode.DEFAULT && config.multiMonitor());
-                boolean fullscreen = (effectiveMode == DisplayMode.FULLSCREEN)
-                        || (effectiveMode == DisplayMode.DEFAULT && config.fullscreen())
-                        || multiMon;
-                RdpSessionConfig sessionConfig = new RdpSessionConfig(
-                        rdpFilePath,
-                        username,
-                        fullscreen,
-                        config.scalePercent(),
-                        config.sound(),
-                        config.microphone(),
-                        multiMon,
-                        config.ignoreCert(),
-                        config.clipboard(),
-                        config.dynamicResolution(),
-                        config.gfxProgressive(),
-                        config.asyncUpdate(),
-                        config.autoReconnect(),
-                        config.usbRedirection(),
-                        config.smartcard(),
-                        config.preventSessionLock(),
-                        config.extraArgs());
-                synchronized (authOperationLock) {
-                    if (!isCurrentGeneration(generation) || closed.get()) return;
-                    runIfCurrent(generation, () -> statusMessage.set("Starting FreeRDP session..."));
-                    rdpSupervisor.launch(freeRdp, resource, sessionConfig, null);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                closeAuthDialog(resource.identityKey());
-                runIfCurrent(generation, () -> {
-                    sessionStatuses.put(resource.identityKey(), SessionStatus.FAILED);
-                    statusMessage.set("Connection failed: " + e.getMessage());
-                    if (onError != null) onError.accept("Failed to start session: " + e.getMessage());
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
+                        }
+                        TokenResponse tokens = tokenOpt.get();
+                        ClientConfig config = configManager.get();
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
+                        }
+                        runIfCurrent(generation, () -> statusMessage.set("Downloading remote desktop profile..."));
+                        if (resource.rdpUrl() == null) {
+                            throw new IOException("Workspace resource does not specify an RDP profile URL");
+                        }
+                        Path rdpFilePath = XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
+                        feedClient.downloadRdpFile(tokens.accessToken(), resource.rdpUrl(), rdpFilePath);
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
+                        }
+                        // Build session config
+                        UserClaims claims = currentUser.get();
+                        String username = claims != null ? claims.rdpUsername() : "";
+                        DisplayMode effectiveMode = displayMode != null ? displayMode : DisplayMode.DEFAULT;
+                        boolean multiMon = (effectiveMode == DisplayMode.MULTIMON) || (effectiveMode == DisplayMode.DEFAULT && config.multiMonitor());
+                        boolean fullscreen = (effectiveMode == DisplayMode.FULLSCREEN)
+                                || (effectiveMode == DisplayMode.DEFAULT && config.fullscreen())
+                                || multiMon;
+                        RdpSessionConfig sessionConfig = new RdpSessionConfig(
+                                rdpFilePath,
+                                username,
+                                fullscreen,
+                                config.scalePercent(),
+                                config.sound(),
+                                config.microphone(),
+                                multiMon,
+                                config.ignoreCert(),
+                                config.clipboard(),
+                                config.dynamicResolution(),
+                                config.gfxProgressive(),
+                                config.asyncUpdate(),
+                                config.autoReconnect(),
+                                config.usbRedirection(),
+                                config.smartcard(),
+                                config.preventSessionLock(),
+                                config.extraArgs());
+                        synchronized (authOperationLock) {
+                            if (!isCurrentGeneration(generation) || closed.get()) {
+                                return;
+                            }
+                            runIfCurrent(generation, () -> statusMessage.set("Starting FreeRDP session..."));
+                            rdpSupervisor.launch(freeRdp, resource, sessionConfig, null);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } catch (Exception e) {
+                        closeAuthDialog(resource.identityKey());
+                        runIfCurrent(generation,
+                                () -> {
+                                    sessionStatuses.put(resource.identityKey(), SessionStatus.FAILED);
+                                    statusMessage.set("Connection failed: " + e.getMessage());
+                                    if (onError != null) {
+                                        onError.accept("Failed to start session: " + e.getMessage());
+                                    }
+                                });
+                    }
                 });
-            }
-        });
     }
 
     public void disconnectResource(WorkspaceResource resource) {
-        if (resource == null) return;
+        if (resource == null) {
+            return;
+        }
         closeAuthDialog(resource.identityKey());
-        runIfCurrent(
-                operationGeneration.get(),
-                () -> sessionStatuses.put(resource.identityKey(), SessionStatus.DISCONNECTING));
-        rdpSupervisor.stopSession(resource.identityKey());
+        runIfCurrent(operationGeneration.get(), () -> sessionStatuses.put(resource.identityKey(), SessionStatus.DISCONNECTING));
+        Thread.ofVirtual()
+                .name("jw365-disconnect-" + resource.sanitizedFileName())
+                .start(() -> rdpSupervisor.stopSession(resource.identityKey()));
     }
 
     public void loadResourceIcon(WorkspaceResource resource, Consumer<Image> callback) {
-        if (resource == null || callback == null || closed.get()) return;
+        if (resource == null || callback == null || closed.get()) {
+            return;
+        }
         Image cachedImg = iconMemoryCache.get(resource.identityKey());
         if (cachedImg != null && !cachedImg.isError()) {
             runOnFxThread(() -> callback.accept(cachedImg));
@@ -598,40 +679,47 @@ public final class AppState {
     }
 
     public void restartResource(WorkspaceResource resource, Consumer<String> onError) {
-        if (resource == null || closed.get()) return;
+        if (resource == null || closed.get()) {
+            return;
+        }
         long generation = operationGeneration.get();
         disconnectResource(resource);
-        Thread.ofVirtual().name("jw365-restart-" + resource.sanitizedFileName()).start(() -> {
-            try {
-                Thread.sleep(Duration.ofMillis(600));
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-            if (isCurrentGeneration(generation) && !closed.get())
-                connectResource(resource, DisplayMode.DEFAULT, onError);
-        });
+        Thread.ofVirtual()
+                .name("jw365-restart-" + resource.sanitizedFileName())
+                .start(() -> {
+                    try {
+                        Thread.sleep(Duration.ofMillis(600));
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    if (isCurrentGeneration(generation) && !closed.get()) {
+                        connectResource(resource, DisplayMode.DEFAULT, onError);
+                    }
+                });
     }
 
     private void enqueueIconJob(WorkspaceResource resource, String accessToken, long generation) {
         enqueueIconJob(resource, accessToken, generation, null);
     }
 
-    private void enqueueIconJob(
-            WorkspaceResource resource, String accessToken, long generation, Consumer<Image> callback) {
+    private void enqueueIconJob(WorkspaceResource resource, String accessToken, long generation,
+            Consumer<Image> callback) {
         if (callback != null) {
-            iconCallbacks
-                    .computeIfAbsent(resource.identityKey(), k -> new java.util.concurrent.CopyOnWriteArrayList<>())
-                    .add(callback);
+            iconCallbacks.computeIfAbsent(resource.identityKey(), k -> new CopyOnWriteArrayList<>()).add(callback);
         }
-        if (!iconJobs.add(resource.identityKey())) return;
+        if (!iconJobs.add(resource.identityKey())) {
+            return;
+        }
         iconFutures.removeIf(Future::isDone);
         try {
             Future<?> future = iconExecutor.submit(() -> {
                 try {
                     iconThrottle.acquire();
                     try {
-                        if (!isCurrentGeneration(generation)) return;
+                        if (!isCurrentGeneration(generation)) {
+                            return;
+                        }
                         Optional<byte[]> diskBytes = workspaceCache.loadIconBytes(resource);
                         if (diskBytes.isPresent()) {
                             Image img = new Image(new ByteArrayInputStream(diskBytes.get()));
@@ -647,12 +735,13 @@ public final class AppState {
                         }
                         String token = accessToken;
                         if (token == null) {
-                            token = tokenStore
-                                    .load()
-                                    .map(TokenResponse::accessToken)
-                                    .orElse(null);
+                            token = tokenStore.load()
+                                              .map(TokenResponse::accessToken)
+                                              .orElse(null);
                         }
-                        if (!isCurrentGeneration(generation)) return;
+                        if (!isCurrentGeneration(generation)) {
+                            return;
+                        }
                         byte[] downloaded = feedClient.downloadIconBytes(token, resource.iconUrl());
                         if (downloaded == null || downloaded.length == 0 || !isCurrentGeneration(generation)) {
                             notifyIconCallbacks(resource.identityKey(), null, generation);
@@ -676,7 +765,7 @@ public final class AppState {
                 }
             });
             iconFutures.add(future);
-        } catch (java.util.concurrent.RejectedExecutionException e) {
+        } catch (RejectedExecutionException e) {
             iconJobs.remove(resource.identityKey());
             notifyIconCallbacks(resource.identityKey(), null, generation);
         }
@@ -700,7 +789,9 @@ public final class AppState {
         synchronized (iconMemoryCache) {
             iconMemoryCache.put(resourceId, image);
             while (iconMemoryCache.size() > MAX_ICON_MEMORY_ENTRIES) {
-                iconMemoryCache.remove(iconMemoryCache.keySet().iterator().next());
+                iconMemoryCache.remove(iconMemoryCache.keySet()
+                        .iterator()
+                        .next());
             }
         }
     }
@@ -708,8 +799,7 @@ public final class AppState {
     public void updateConfig(ClientConfig newConfig) {
         try {
             configManager.save(newConfig);
-            String source =
-                    XdgPaths.isFlatpak() ? "BUNDLED" : newConfig.freerdpSource().name();
+            String source = XdgPaths.isFlatpak() ? "BUNDLED" : newConfig.freerdpSource().name();
             Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(source, newConfig.preferredFreeRdpPath());
             runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
         } catch (IOException e) {
@@ -743,7 +833,9 @@ public final class AppState {
 
     private void expireAuthentication(String message, long generation) {
         synchronized (authOperationLock) {
-            if (!isCurrentGeneration(generation) || closed.get()) return;
+            if (!isCurrentGeneration(generation) || closed.get()) {
+                return;
+            }
             tokenStore.clear();
             oauthClient.clearCacheAndAccounts();
             workspaceCache.clear();
@@ -754,7 +846,9 @@ public final class AppState {
             authenticated.set(false);
             currentUser.set(null);
             setLoading(false, message);
-            if (!closed.get()) new org.alaurie.jw365.gui.view.AuthDialog(null, this).show();
+            if (!closed.get()) {
+                new AuthDialog(null, this).show();
+            }
         });
     }
 
@@ -804,7 +898,9 @@ public final class AppState {
     }
 
     public static void runOnFxThread(Runnable action) {
-        if (action == null) return;
+        if (action == null) {
+            return;
+        }
         try {
             if (Platform.isFxApplicationThread()) {
                 action.run();

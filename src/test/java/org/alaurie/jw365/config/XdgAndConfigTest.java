@@ -1,7 +1,5 @@
 package org.alaurie.jw365.config;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -9,6 +7,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
 import org.alaurie.jw365.auth.TokenResponse;
 import org.alaurie.jw365.auth.TokenStore;
 import org.alaurie.jw365.feed.ResourceType;
@@ -18,6 +17,8 @@ import org.alaurie.jw365.rdp.FreeRdpSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class XdgAndConfigTest {
 
@@ -39,17 +40,8 @@ class XdgAndConfigTest {
         assertThat(initial.freerdpSource()).isEqualTo(FreeRdpSource.AUTO);
         assertThat(initial.autoConnect()).isFalse();
 
-        ClientConfig custom = new ClientConfig(
-                "custom-tenant-uuid",
-                "/usr/bin/sdl-freerdp",
-                150,
-                true,
-                true,
-                false,
-                true,
-                true,
-                30,
-                List.of("/bpp:24"));
+        ClientConfig custom = new ClientConfig("custom-tenant-uuid", "/usr/bin/sdl-freerdp", 150, true, true, false,
+                true, true, 30, List.of("/bpp:24"));
 
         manager.save(custom);
 
@@ -91,16 +83,8 @@ class XdgAndConfigTest {
 
         WorkspaceCache cache = new WorkspaceCache(cacheFile, iconsDir);
 
-        WorkspaceResource r1 = new WorkspaceResource(
-                "res1",
-                "Cloud PC 1",
-                ResourceType.DESKTOP,
-                "Tenant 1",
-                "t1",
-                "Publisher 1",
-                "/subscriptions/s1",
-                URI.create("https://rdp.wvd.microsoft.com/r1.rdp"),
-                URI.create("https://rdp.wvd.microsoft.com/i1.png"));
+        WorkspaceResource r1 = new WorkspaceResource("res1", "Cloud PC 1", ResourceType.DESKTOP, "Tenant 1", "t1", "Publisher 1",
+                "/subscriptions/s1", URI.create("https://rdp.wvd.microsoft.com/r1.rdp"), URI.create("https://rdp.wvd.microsoft.com/i1.png"));
 
         Workspace ws = new Workspace("Workspace 1", "t1", "Tenant 1", List.of(r1));
 
@@ -109,10 +93,15 @@ class XdgAndConfigTest {
         List<Workspace> loaded = cache.loadWorkspaces();
         assertThat(loaded).hasSize(1);
         assertThat(loaded.getFirst().resources()).hasSize(1);
-        assertThat(loaded.getFirst().resources().getFirst().title()).isEqualTo("Cloud PC 1");
+        assertThat(loaded.getFirst()
+                         .resources()
+                         .getFirst()
+                         .title())
+                         .isEqualTo("Cloud PC 1");
 
         // Test icon caching
-        byte[] fakePngBytes = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+        byte[] fakePngBytes = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D,
+                0x0A, 0x1A, 0x0A};
         cache.saveIcon(r1, fakePngBytes);
 
         assertThat(cache.hasCachedIcon(r1)).isTrue();
@@ -129,13 +118,7 @@ class XdgAndConfigTest {
         assertThat(store.hasCachedToken()).isFalse();
         assertThat(store.load()).isEmpty();
 
-        TokenResponse tokens = new TokenResponse(
-                "access_token_abc",
-                "refresh_token_def",
-                "id_token_ghi",
-                "Bearer",
-                3600,
-                "https://www.wvd.microsoft.com/.default",
+        TokenResponse tokens = new TokenResponse("access_token_abc", "refresh_token_def", "id_token_ghi", "Bearer", 3600, "https://www.wvd.microsoft.com/.default",
                 Instant.now().getEpochSecond());
 
         store.save(tokens);

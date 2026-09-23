@@ -3,7 +3,9 @@ package org.alaurie.jw365.gui.view;
 import java.net.CookieHandler;
 import java.net.URI;
 import java.util.Objects;
+
 import javafx.application.Platform;
+import javafx.concurrent.Worker.State;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -31,8 +33,7 @@ import org.alaurie.jw365.gui.state.AppState;
  */
 public final class AuthDialog extends Stage {
 
-    public static final String BROWSER_USER_AGENT =
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+    public static final String BROWSER_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
     private static final URI CALLBACK_URI = URI.create(OAuthClient.REDIRECT_URI);
     private final AppState state;
@@ -87,7 +88,8 @@ public final class AuthDialog extends Stage {
         webEngine.setJavaScriptEnabled(true);
         webEngine.setUserAgent(BROWSER_USER_AGENT);
         try {
-            webEngine.setUserDataDirectory(XdgPaths.webViewDataDir().toFile());
+            webEngine.setUserDataDirectory(XdgPaths.webViewDataDir()
+                    .toFile());
         } catch (Exception e) {
             System.err.println("Warning: Could not configure WebEngine userDataDirectory: " + e.getMessage());
         }
@@ -95,11 +97,11 @@ public final class AuthDialog extends Stage {
 
         // Build Authorize URL with nativeclient redirect
         ClientConfig config = state.getConfigManager().get();
-        URI authUri = state.getOauthClient()
-                .buildAuthorizeUrl(config.defaultTenant(), challenge, OAuthClient.REDIRECT_URI, null);
+        URI authUri = state.getOauthClient().buildAuthorizeUrl(config.defaultTenant(), challenge, OAuthClient.REDIRECT_URI, null);
 
         // Wire WebEngine listeners to auto-intercept redirect
-        progressBar.progressProperty().bind(webEngine.getLoadWorker().progressProperty());
+        progressBar.progressProperty().bind(webEngine.getLoadWorker()
+                .progressProperty());
 
         webEngine.locationProperty().addListener((obs, oldLoc, newLoc) -> {
             if (newLoc != null) {
@@ -107,37 +109,40 @@ public final class AuthDialog extends Stage {
             }
         });
 
-        webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
-            if (newState == javafx.concurrent.Worker.State.SUCCEEDED) {
-                progressBar.setVisible(false);
-                if (!codeIntercepted) {
-                    statusLabel.setText("Please enter your work or school credentials");
-                }
-            } else if (newState == javafx.concurrent.Worker.State.RUNNING) {
-                progressBar.setVisible(true);
-            } else if (newState == javafx.concurrent.Worker.State.FAILED) {
-                progressBar.setVisible(false);
-                statusLabel.setText("Connection failed. Retrying...");
-            }
-        });
+        webEngine.getLoadWorker()
+                 .stateProperty()
+                 .addListener((obs, oldState, newState) -> {
+                     if (newState == State.SUCCEEDED) {
+                         progressBar.setVisible(false);
+                         if (!codeIntercepted) {
+                             statusLabel.setText("Please enter your work or school credentials");
+                         }
+                     } else if (newState == State.RUNNING) {
+                         progressBar.setVisible(true);
+                     } else if (newState == State.FAILED) {
+                         progressBar.setVisible(false);
+                         statusLabel.setText("Connection failed. Retrying...");
+                     }
+                 });
 
         // Load auth URL
         webEngine.load(authUri.toString());
 
         Scene scene = new Scene(root, 650, 750);
-        scene.getStylesheets()
-                .add(Objects.requireNonNull(
-                                getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
-                                "Missing stylesheet resource")
-                        .toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css"), "Missing stylesheet resource")
+                .toExternalForm());
         setScene(scene);
     }
 
     private void checkLocationForAuthCode(String url) {
-        if (codeIntercepted || !isExpectedRedirect(url)) return;
+        if (codeIntercepted || !isExpectedRedirect(url)) {
+            return;
+        }
 
         OAuthCallback callback = OAuthCallback.parse(url).orElse(null);
-        if (callback == null) return;
+        if (callback == null) {
+            return;
+        }
 
         if (!callback.matchesState(challenge.state())) {
             codeIntercepted = true;
@@ -168,7 +173,9 @@ public final class AuthDialog extends Stage {
     }
 
     private void handleAuthorizationCode(String code) {
-        if (code == null || code.isBlank()) return;
+        if (code == null || code.isBlank()) {
+            return;
+        }
 
         Platform.runLater(() -> {
             statusLabel.setText("Authentication confirmed! Retrieving your workspaces...");

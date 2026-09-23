@@ -1,11 +1,13 @@
 package org.alaurie.jw365.rdp;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.alaurie.jw365.rdp.SessionEvent.AuthRequired;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class RdpProcessSupervisorLifecycleTest {
 
@@ -44,8 +46,8 @@ class RdpProcessSupervisorLifecycleTest {
         AtomicBoolean authHandled = new AtomicBoolean(false);
         AtomicReference<String> passedUrl = new AtomicReference<>();
 
-        SessionEvent.AuthRequired event = new SessionEvent.AuthRequired(
-                "session-abc", "https://login.microsoftonline.com/authorize?foo=bar", url -> {
+        AuthRequired event = new AuthRequired("session-abc", "https://login.microsoftonline.com/authorize?foo=bar",
+                url -> {
                     passedUrl.set(url);
                     authHandled.set(true);
                 });
@@ -62,17 +64,22 @@ class RdpProcessSupervisorLifecycleTest {
     @Test
     @DisplayName("Connected status requires a known positive marker")
     void connectedMarkerValidation() {
-        assertThat(RdpProcessSupervisor.isConnectedMarker("channelConnected: RDPDR"))
-                .isTrue();
-        assertThat(
-                        RdpProcessSupervisor.isConnectedMarker(
-                                "[11:43:18:631] [701252:000ab344] [INFO][com.freerdp.core] - Successfully connected to 10.0.0.1:3389"))
-                .isTrue();
-        assertThat(RdpProcessSupervisor.isConnectedMarker("[INFO][com.freerdp.client.SDL] - postConnect: completed"))
-                .isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("channelConnected: RDPDR")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("[11:43:18:631] [701252:000ab344] [INFO][com.freerdp.core] - Successfully connected to 10.0.0.1:3389")).isTrue();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("[INFO][com.freerdp.client.SDL] - postConnect: completed")).isTrue();
         assertThat(RdpProcessSupervisor.isConnectedMarker("Activated")).isTrue();
-        assertThat(RdpProcessSupervisor.isConnectedMarker("connection established to hostile text"))
-                .isFalse();
+        assertThat(RdpProcessSupervisor.isConnectedMarker("connection established to hostile text")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Reconnecting status requires specific reconnecting marker")
+    void reconnectingMarkerValidation() {
+        assertThat(RdpProcessSupervisor.isReconnectingMarker("[INFO] auto-reconnect in progress")).isTrue();
+        assertThat(RdpProcessSupervisor.isReconnectingMarker("connection state: reconnecting")).isTrue();
+        assertThat(RdpProcessSupervisor.isReconnectingMarker("reconnecting to gateway...")).isTrue();
+        assertThat(RdpProcessSupervisor.isReconnectingMarker("client_reconnect_started")).isTrue();
+        assertThat(RdpProcessSupervisor.isReconnectingMarker("cmdline option +auto-reconnect enabled")).isFalse();
+        assertThat(RdpProcessSupervisor.isReconnectingMarker("checking reconnection policy")).isFalse();
     }
 
     @Test

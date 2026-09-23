@@ -1,15 +1,17 @@
 package org.alaurie.jw365.feed;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.net.URI;
 import java.util.List;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 class WorkspaceFeedParserTest {
 
-    private static final String SAMPLE_DISCOVERY_XML = """
+    private static final String SAMPLE_DISCOVERY_XML =
+            """
         <?xml version="1.0" encoding="utf-8"?>
         <FeedDiscoveryResult xmlns="http://schemas.microsoft.com/2008/11/msts/radc">
             <TenantFeedURL FeedURL="https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"
@@ -21,7 +23,8 @@ class WorkspaceFeedParserTest {
         </FeedDiscoveryResult>
         """;
 
-    private static final String SAMPLE_WORKSPACE_XML = """
+    private static final String SAMPLE_WORKSPACE_XML =
+            """
         <?xml version="1.0" encoding="utf-8"?>
         <ResourceCollection xmlns="http://schemas.microsoft.com/2008/11/msts/radc">
             <Publisher Name="Contoso Enterprise">
@@ -55,23 +58,18 @@ class WorkspaceFeedParserTest {
         TenantFeed f1 = feeds.getFirst();
         assertThat(f1.tenantId()).isEqualTo("00000000-0000-0000-0000-000000000001");
         assertThat(f1.tenantDisplayName()).isEqualTo("Contoso Cloud PCs");
-        assertThat(f1.feedUrl())
-                .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
+        assertThat(f1.feedUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
 
         TenantFeed f2 = feeds.get(1);
         assertThat(f2.tenantId()).isEqualTo("00000000-0000-0000-0000-000000000002");
         assertThat(f2.tenantDisplayName()).isEqualTo("Fabrikam Desktops");
-        assertThat(f2.feedUrl())
-                .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t2"));
+        assertThat(f2.feedUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t2"));
     }
 
     @Test
     @DisplayName("parseFeedXml parses workspaces, publishers, resources, RDP URLs and icons")
     void testWorkspaceFeedXmlParsing() {
-        TenantFeed tenant = new TenantFeed(
-                "00000000-0000-0000-0000-000000000001",
-                "Contoso Cloud PCs",
-                URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
+        TenantFeed tenant = new TenantFeed("00000000-0000-0000-0000-000000000001", "Contoso Cloud PCs", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
 
         Workspace ws = WorkspaceFeedParser.parseFeedXml(SAMPLE_WORKSPACE_XML, tenant);
 
@@ -124,7 +122,8 @@ class WorkspaceFeedParserTest {
     @Test
     @DisplayName("parseFeedXml resolves relative icon and RDP URLs against tenant feed URL")
     void testRelativeUrlResolution() {
-        String xml = """
+        String xml =
+                """
             <?xml version="1.0" encoding="utf-8"?>
             <ResourceCollection xmlns="http://schemas.microsoft.com/2008/11/msts/radc">
                 <Publisher Name="Contoso Enterprise">
@@ -137,8 +136,7 @@ class WorkspaceFeedParserTest {
                 </Publisher>
             </ResourceCollection>
             """;
-        TenantFeed tenant = new TenantFeed(
-                "t1", "Contoso", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
+        TenantFeed tenant = new TenantFeed("t1", "Contoso", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
         Workspace ws = WorkspaceFeedParser.parseFeedXml(xml, tenant);
         assertThat(ws.resources()).hasSize(1);
         WorkspaceResource r = ws.resources().getFirst();
@@ -149,7 +147,8 @@ class WorkspaceFeedParserTest {
     @Test
     @DisplayName("parseFeedXml parses nested Icons and prefers higher resolution icon tags")
     void testNestedIconsAndResolutionPreference() {
-        String xml = """
+        String xml =
+                """
             <?xml version="1.0" encoding="utf-8"?>
             <ResourceCollection xmlns="http://schemas.microsoft.com/2008/11/msts/radc">
                 <Publisher Name="Contoso Enterprise">
@@ -173,19 +172,24 @@ class WorkspaceFeedParserTest {
                 </Publisher>
             </ResourceCollection>
             """;
-        TenantFeed tenant = new TenantFeed(
-                "t1", "Contoso", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
+        TenantFeed tenant = new TenantFeed("t1", "Contoso", URI.create("https://rdweb.wvd.microsoft.com/api/arm/feeddiscovery/tenant/t1"));
         Workspace ws = WorkspaceFeedParser.parseFeedXml(xml, tenant);
         assertThat(ws.resources()).hasSize(3);
 
         // Prefers Icon64 over Icon32 and IconRaw
-        assertThat(ws.resources().getFirst().iconUrl())
-                .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/app64.png"));
+        assertThat(ws.resources()
+                     .getFirst()
+                     .iconUrl())
+                     .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/app64.png"));
         // Parses text content of icon tag
-        assertThat(ws.resources().get(1).iconUrl())
-                .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/text32.png"));
+        assertThat(ws.resources()
+                     .get(1)
+                     .iconUrl())
+                     .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/text32.png"));
         // Parses IconUrl attribute directly on Resource element
-        assertThat(ws.resources().get(2).iconUrl())
-                .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/attr.png"));
+        assertThat(ws.resources()
+                     .get(2)
+                     .iconUrl())
+                     .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/attr.png"));
     }
 }

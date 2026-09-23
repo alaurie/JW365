@@ -11,7 +11,8 @@ public sealed interface SessionEvent {
 
     record Started(String sessionId, ProcessHandle processHandle) implements SessionEvent {}
 
-    record StatusChanged(String sessionId, SessionStatus oldStatus, SessionStatus newStatus, String message)
+    record StatusChanged(String sessionId, SessionStatus oldStatus, SessionStatus newStatus,
+                         String message)
             implements SessionEvent {}
 
     record OutputLine(String sessionId, String line, boolean isError) implements SessionEvent {}

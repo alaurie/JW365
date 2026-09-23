@@ -18,21 +18,27 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.alaurie.jw365.config.XdgPaths;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Accepts WebView session cookies for the sign-in flow; only Microsoft cookies are persisted. */
+/**
+ * Accepts WebView session cookies for the sign-in flow; only Microsoft cookies
+ * are persisted.
+ */
 public final class PersistentCookieManager extends CookieManager {
-    private static final ObjectMapper MAPPER =
-            JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .build();
     private final Path storageFile;
     private final AtomicBoolean autoPersistPending = new AtomicBoolean(false);
 
     public PersistentCookieManager() {
-        this(XdgPaths.dataDir().resolve("webview-cookies.enc"));
+        this(XdgPaths.dataDir()
+                .resolve("webview-cookies.enc"));
     }
 
     public PersistentCookieManager(Path storageFile) {
@@ -46,7 +52,9 @@ public final class PersistentCookieManager extends CookieManager {
     }
 
     static boolean isMicrosoftDomain(String host) {
-        if (host == null || host.isBlank()) return false;
+        if (host == null || host.isBlank()) {
+            return false;
+        }
         String normalized = normalizeDomain(host);
         return normalized.equals("microsoftonline.com")
                 || normalized.endsWith(".microsoftonline.com")
@@ -61,18 +69,25 @@ public final class PersistentCookieManager extends CookieManager {
     }
 
     public synchronized void loadCookies() {
-        if (!Files.exists(storageFile)) return;
+        if (!Files.exists(storageFile)) {
+            return;
+        }
         try {
             byte[] encrypted = Files.readAllBytes(storageFile);
-            if (encrypted.length == 0) return;
+            if (encrypted.length == 0) {
+                return;
+            }
             byte[] json = MachineBoundCrypto.decrypt(encrypted);
             List<SerializableCookie> saved = MAPPER.readValue(json, new TypeReference<>() {});
             CookieStore store = getCookieStore();
             for (SerializableCookie sc : saved) {
-                if (sc.hasExpired() || !isMicrosoftDomain(sc.domain())) continue;
-                URI uri =
-                        sc.uri() == null ? URI.create("https://" + normalizeDomain(sc.domain())) : URI.create(sc.uri());
-                if (!isMicrosoftDomain(uri.getHost()) || !"https".equalsIgnoreCase(uri.getScheme())) continue;
+                if (sc.hasExpired() || !isMicrosoftDomain(sc.domain())) {
+                    continue;
+                }
+                URI uri = sc.uri() == null ? URI.create("https://" + normalizeDomain(sc.domain())) : URI.create(sc.uri());
+                if (!isMicrosoftDomain(uri.getHost()) || !"https".equalsIgnoreCase(uri.getScheme())) {
+                    continue;
+                }
                 HttpCookie cookie = new HttpCookie(sc.name(), sc.value());
                 cookie.setDomain(sc.domain());
                 cookie.setPath(sc.path() != null ? sc.path() : "/");
@@ -80,7 +95,9 @@ public final class PersistentCookieManager extends CookieManager {
                 cookie.setHttpOnly(sc.httpOnly());
                 if (sc.maxAge() > 0) {
                     long remaining = sc.maxAge() - (System.currentTimeMillis() - sc.savedAt()) / 1000;
-                    if (remaining <= 0) continue;
+                    if (remaining <= 0) {
+                        continue;
+                    }
                     cookie.setMaxAge(remaining);
                 } else {
                     cookie.setMaxAge(-1);
@@ -100,7 +117,9 @@ public final class PersistentCookieManager extends CookieManager {
 
             // 1. Process all cookies directly in store
             for (HttpCookie cookie : store.getCookies()) {
-                if (cookie.hasExpired()) continue;
+                if (cookie.hasExpired()) {
+                    continue;
+                }
                 String domain = cookie.getDomain();
                 if (isMicrosoftDomain(domain)) {
                     String normDomain = normalizeDomain(domain);
@@ -124,12 +143,18 @@ public final class PersistentCookieManager extends CookieManager {
             // 2. Process cookies indexed by URI (including host-only cookies where domain might not be explicitly set)
             for (URI uri : store.getURIs()) {
                 String host = uri.getHost();
-                if (!isMicrosoftDomain(host)) continue;
+                if (!isMicrosoftDomain(host)) {
+                    continue;
+                }
                 URI httpsUri = URI.create("https://" + host);
                 for (HttpCookie cookie : store.get(httpsUri)) {
-                    if (cookie.hasExpired()) continue;
+                    if (cookie.hasExpired()) {
+                        continue;
+                    }
                     String domain = cookie.getDomain() != null ? cookie.getDomain() : host;
-                    if (!isMicrosoftDomain(domain)) continue;
+                    if (!isMicrosoftDomain(domain)) {
+                        continue;
+                    }
                     String normDomain = normalizeDomain(domain);
                     String path = cookie.getPath() != null ? cookie.getPath() : "/";
                     String key = cookie.getName() + "|" + normDomain + "|" + path;
@@ -186,18 +211,21 @@ public final class PersistentCookieManager extends CookieManager {
     public void put(URI uri, Map<String, List<String>> responseHeaders) throws IOException {
         super.put(uri, responseHeaders);
         if (uri != null && isMicrosoftDomain(uri.getHost()) && responseHeaders != null) {
-            boolean hasSetCookie = responseHeaders.keySet().stream().anyMatch("Set-Cookie"::equalsIgnoreCase);
+            boolean hasSetCookie = responseHeaders.keySet().stream()
+                    .anyMatch("Set-Cookie"::equalsIgnoreCase);
             if (hasSetCookie && autoPersistPending.compareAndSet(false, true)) {
-                Thread.ofVirtual().name("cookie-auto-persist").start(() -> {
-                    try {
-                        Thread.sleep(Duration.ofMillis(300));
-                    } catch (InterruptedException _) {
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        autoPersistPending.set(false);
-                        persistCookies();
-                    }
-                });
+                Thread.ofVirtual()
+                        .name("cookie-auto-persist")
+                        .start(() -> {
+                            try {
+                                Thread.sleep(Duration.ofMillis(300));
+                            } catch (InterruptedException _) {
+                                Thread.currentThread().interrupt();
+                            } finally {
+                                autoPersistPending.set(false);
+                                persistCookies();
+                            }
+                        });
             }
         }
     }

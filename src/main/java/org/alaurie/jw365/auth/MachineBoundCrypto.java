@@ -84,7 +84,9 @@ public final class MachineBoundCrypto {
 
         PBEKeySpec spec = new PBEKeySpec(secretChars, salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        return new SecretKeySpec(factory.generateSecret(spec).getEncoded(), "AES");
+        return new SecretKeySpec(factory.generateSecret(spec)
+                .getEncoded(),
+                "AES");
     }
 
     private static String readMachineId() {

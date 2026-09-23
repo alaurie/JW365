@@ -1,8 +1,9 @@
 package org.alaurie.jw365.auth;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
 
 /**
  * User claims extracted from Entra ID ID Token or UserInfo.

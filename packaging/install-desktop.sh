@@ -16,7 +16,7 @@ Type=Application
 Name=JW365
 Comment=Linux client for Windows 365 and Azure Virtual Desktop
 GenericName=Windows 365 Client
-Exec=$DIR/bin/jw365
+Exec=env GDK_BACKEND=x11 $DIR/bin/jw365
 Icon=$ICONS/jw365.png
 Terminal=false
 Categories=Network;RemoteAccess;

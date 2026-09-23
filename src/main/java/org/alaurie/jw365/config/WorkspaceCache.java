@@ -1,12 +1,14 @@
 package org.alaurie.jw365.config;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
 import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceResource;
 import tools.jackson.core.type.TypeReference;
@@ -15,12 +17,14 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Caches discovered workspace lists and resource icons on local storage for instant application startup.
+ * Caches discovered workspace lists and resource icons on local storage for
+ * instant application startup.
  */
 public final class WorkspaceCache {
 
-    private static final ObjectMapper MAPPER =
-            JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .build();
 
     private final Path cacheFile;
     private final Path iconsDirectory;
@@ -72,7 +76,7 @@ public final class WorkspaceCache {
             MAPPER.writeValue(tempFile.toFile(), workspaces);
             try {
                 Files.move(tempFile, cacheFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            } catch (AtomicMoveNotSupportedException e) {
                 Files.move(tempFile, cacheFile, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
@@ -135,7 +139,7 @@ public final class WorkspaceCache {
             Files.write(temp, iconBytes);
             try {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+            } catch (AtomicMoveNotSupportedException e) {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {

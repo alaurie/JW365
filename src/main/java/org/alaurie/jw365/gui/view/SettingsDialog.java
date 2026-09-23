@@ -7,10 +7,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
@@ -107,24 +109,20 @@ public final class SettingsDialog extends Stage {
         rdpSection.getStyleClass().add("brand-title");
 
         FreeRdpInfo detected = state.detectedFreeRdpProperty().get();
-        Label detectedLabel = new Label(
-                "Detected: " + (detected != null ? detected.displayName() : "None found (please install FreeRDP)"));
+        Label detectedLabel = new Label("Detected: " + (detected != null ? detected.displayName() : "None found (please install FreeRDP)"));
         detectedLabel.getStyleClass().add("status-bar-text");
         Label sourceLabel = new Label("Source:");
         sourceLabel.getStyleClass().add("form-label");
         freerdpSourceChoice = new ChoiceBox<>();
         boolean flatpakRuntime = XdgPaths.isFlatpak();
-        freerdpSourceChoice.setValue(
-                flatpakRuntime
-                        ? "Bundled FreeRDP"
-                        : sourceCodeToLabel(currentConfig.freerdpSource().name()));
+        freerdpSourceChoice.setValue(flatpakRuntime ? "Bundled FreeRDP" : sourceCodeToLabel(currentConfig.freerdpSource()
+                .name()));
         freerdpSourceChoice.setDisable(flatpakRuntime);
         HBox sourceBox = new HBox(12, sourceLabel, freerdpSourceChoice);
         sourceBox.setAlignment(Pos.CENTER_LEFT);
 
         HBox customRdpBox = new HBox(8);
-        customRdpPathField =
-                new TextField(currentConfig.preferredFreeRdpPath() != null ? currentConfig.preferredFreeRdpPath() : "");
+        customRdpPathField = new TextField(currentConfig.preferredFreeRdpPath() != null ? currentConfig.preferredFreeRdpPath() : "");
         customRdpPathField.setDisable(flatpakRuntime);
         HBox.setHgrow(customRdpPathField, Priority.ALWAYS);
 
@@ -152,7 +150,8 @@ public final class SettingsDialog extends Stage {
         scaleLabel.getStyleClass().add("form-label");
 
         scalingChoice = new ChoiceBox<>();
-        scalingChoice.getItems().addAll("Auto (100%)", "100%", "125%", "150%", "175%", "200%", "250%", "300%");
+        scalingChoice.getItems().addAll("Auto (100%)", "100%", "125%", "150%", "175%", "200%",
+                "250%", "300%");
         scalingChoice.setValue(scalePercentToString(currentConfig.scalePercent()));
 
         displayGrid.addRow(0, scaleLabel, scalingChoice);
@@ -168,8 +167,7 @@ public final class SettingsDialog extends Stage {
         dynamicResCheck = new CheckBox("Dynamic Desktop Resizing (+dynamic-resolution)");
         dynamicResCheck.setSelected(currentConfig.dynamicResolution());
 
-        gfxProgressiveCheck =
-                new CheckBox("H.264 / AVC420 & Progressive Graphics Acceleration (/gfx:AVC420,progressive)");
+        gfxProgressiveCheck = new CheckBox("H.264 / AVC420 & Progressive Graphics Acceleration (/gfx:AVC420,progressive)");
         gfxProgressiveCheck.setSelected(currentConfig.gfxProgressive());
 
         asyncUpdateCheck = new CheckBox("Asynchronous Channel Processing (+async-channels)");
@@ -222,37 +220,35 @@ public final class SettingsDialog extends Stage {
 
         advGrid.addRow(1, extraArgsLabel, extraArgsField);
 
-        contentBox
-                .getChildren()
-                .addAll(
-                        tenantSection,
-                        tenantGrid,
-                        authHint,
-                        rdpSection,
-                        detectedLabel,
-                        sourceBox,
-                        customRdpBox,
-                        new Separator(),
-                        displaySection,
-                        displayGrid,
-                        fullscreenCheck,
-                        multiMonCheck,
-                        multiMonHint,
-                        dynamicResCheck,
-                        gfxProgressiveCheck,
-                        asyncUpdateCheck,
-                        autoReconnectCheck,
-                        preventSessionLockCheck,
-                        usbCheck,
-                        smartcardCheck,
-                        clipboardCheck,
-                        soundCheck,
-                        micCheck,
-                        ignoreCertCheck,
-                        new Separator(),
-                        advancedSection,
-                        autoConnectCheck,
-                        advGrid);
+        contentBox.getChildren().addAll(
+                tenantSection,
+                tenantGrid,
+                authHint,
+                rdpSection,
+                detectedLabel,
+                sourceBox,
+                customRdpBox,
+                new Separator(),
+                displaySection,
+                displayGrid,
+                fullscreenCheck,
+                multiMonCheck,
+                multiMonHint,
+                dynamicResCheck,
+                gfxProgressiveCheck,
+                asyncUpdateCheck,
+                autoReconnectCheck,
+                preventSessionLockCheck,
+                usbCheck,
+                smartcardCheck,
+                clipboardCheck,
+                soundCheck,
+                micCheck,
+                ignoreCertCheck,
+                new Separator(),
+                advancedSection,
+                autoConnectCheck,
+                advGrid);
 
         ScrollPane scrollPane = new ScrollPane(contentBox);
         scrollPane.setFitToWidth(true);
@@ -280,17 +276,13 @@ public final class SettingsDialog extends Stage {
         root.setBottom(buttonBar);
 
         Scene scene = new Scene(root, 600, 700);
-        scene.getStylesheets()
-                .add(Objects.requireNonNull(
-                                getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
-                                "Missing stylesheet resource")
-                        .toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css"), "Missing stylesheet resource")
+                .toExternalForm());
         setScene(scene);
     }
 
     private void handleSave() {
-        String tenant =
-                tenantField.getText() == null ? "" : tenantField.getText().trim();
+        String tenant = tenantField.getText() == null ? "" : tenantField.getText().trim();
         if (tenant.isBlank()) {
             showValidationError("Default tenant cannot be empty.");
             return;
@@ -299,7 +291,8 @@ public final class SettingsDialog extends Stage {
         int scale = parseScaleString(scalingChoice.getValue());
         int autoRefresh;
         try {
-            autoRefresh = Integer.parseInt(autoRefreshField.getText().trim());
+            autoRefresh = Integer.parseInt(autoRefreshField.getText()
+                    .trim());
         } catch (NumberFormatException e) {
             showValidationError("Auto refresh must be a whole number between 5 and 1440 minutes.");
             return;
@@ -358,37 +351,58 @@ public final class SettingsDialog extends Stage {
     }
 
     private static String sourceCodeToLabel(String source) {
-        if ("SYSTEM".equalsIgnoreCase(source)) return "System FreeRDP";
-        if ("FLATPAK".equalsIgnoreCase(source)) return "Flatpak FreeRDP";
-        if ("BUNDLED".equalsIgnoreCase(source)) return "Bundled FreeRDP";
-        if ("CUSTOM".equalsIgnoreCase(source)) return "Custom executable";
+        if ("SYSTEM".equalsIgnoreCase(source)) {
+            return "System FreeRDP";
+        }
+        if ("FLATPAK".equalsIgnoreCase(source)) {
+            return "Flatpak FreeRDP";
+        }
+        if ("BUNDLED".equalsIgnoreCase(source)) {
+            return "Bundled FreeRDP";
+        }
+        if ("CUSTOM".equalsIgnoreCase(source)) {
+            return "Custom executable";
+        }
         return "Automatic (Flatpak first)";
     }
 
     private static String sourceLabelToCode(String label) {
-        if (label != null && label.startsWith("System")) return "SYSTEM";
-        if (label != null && label.startsWith("Flatpak")) return "FLATPAK";
-        if (label != null && label.startsWith("Bundled")) return "BUNDLED";
-        if (label != null && label.startsWith("Custom")) return "CUSTOM";
+        if (label != null && label.startsWith("System")) {
+            return "SYSTEM";
+        }
+        if (label != null && label.startsWith("Flatpak")) {
+            return "FLATPAK";
+        }
+        if (label != null && label.startsWith("Bundled")) {
+            return "BUNDLED";
+        }
+        if (label != null && label.startsWith("Custom")) {
+            return "CUSTOM";
+        }
         return "AUTO";
     }
 
     private void showValidationError(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        Alert alert = new Alert(AlertType.ERROR, message, ButtonType.OK);
         alert.setTitle("Invalid Settings");
         alert.setHeaderText("Check your settings");
         alert.showAndWait();
     }
 
     private static String scalePercentToString(int scale) {
-        if (scale <= 0 || scale == 100) return "100%";
+        if (scale <= 0 || scale == 100) {
+            return "100%";
+        }
         return scale + "%";
     }
 
     private static int parseScaleString(String s) {
-        if (s == null || s.contains("Auto") || s.contains("100%")) return 0;
+        if (s == null || s.contains("Auto") || s.contains("100%")) {
+            return 0;
+        }
         try {
-            return Integer.parseInt(s.replace("%", "").trim());
+            return Integer.parseInt(s.replace("%", "")
+                    .trim());
         } catch (NumberFormatException e) {
             return 0;
         }

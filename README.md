@@ -112,6 +112,11 @@ Requirements: JDK 25, Linux x86_64.
 # Run unit & integration test suite (55 tests)
 ./gradlew test
 
+# Format Java source code (Netflix jfmt)
+./gradlew format
+
+# Run verification checks and format verification
+./gradlew check
 # Run application in dev mode
 ./gradlew run
 

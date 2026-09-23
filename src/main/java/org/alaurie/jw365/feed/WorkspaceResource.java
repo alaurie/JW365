@@ -1,10 +1,11 @@
 package org.alaurie.jw365.feed;
 
+import java.net.URI;
+import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.net.URI;
-import java.util.Objects;
 
 /**
  * An individual Cloud PC Desktop or RemoteApp resource in a Windows 365 / AVD workspace.
@@ -45,6 +46,7 @@ public record WorkspaceResource(
     public String cacheFileName() {
         return identityKey().replaceAll("[^a-zA-Z0-9._-]", "_");
     }
+
     /**
      * Display label combining title and publisher if available.
      */

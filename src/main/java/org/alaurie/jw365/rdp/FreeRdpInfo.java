@@ -11,8 +11,8 @@ import java.nio.file.Path;
  * @param isFlatpak      true if launched via flatpak
  * @param flatpakAppId   app ID if flatpak (e.g. "com.freerdp.FreeRDP")
  */
-public record FreeRdpInfo(
-        Path binaryPath, FreeRdpFlavor flavor, String versionString, boolean isFlatpak, String flatpakAppId) {
+public record FreeRdpInfo(Path binaryPath, FreeRdpFlavor flavor, String versionString,
+        boolean isFlatpak, String flatpakAppId) {
 
     public String displayName() {
         if (isFlatpak) {

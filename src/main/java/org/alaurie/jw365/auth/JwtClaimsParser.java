@@ -3,18 +3,21 @@ package org.alaurie.jw365.auth;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Base64.Decoder;
 import java.util.Collections;
 import java.util.List;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Utility for extracting user claims from Entra ID JWT ID tokens without external crypto dependencies.
+ * Utility for extracting user claims from Entra ID JWT ID tokens without
+ * external crypto dependencies.
  */
 public final class JwtClaimsParser {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Base64.Decoder URL_DECODER = Base64.getUrlDecoder();
+    private static final Decoder URL_DECODER = Base64.getUrlDecoder();
 
     private JwtClaimsParser() {}
 
@@ -27,7 +30,8 @@ public final class JwtClaimsParser {
      */
     public static UserClaims parseIdToken(String jwtRaw) {
         if (jwtRaw == null || jwtRaw.isBlank()) {
-            return new UserClaims(null, null, null, null, null, null, Collections.emptyList());
+            return new UserClaims(null, null, null, null, null, null,
+                    Collections.emptyList());
         }
 
         String[] parts = jwtRaw.split("\\.");
@@ -78,7 +82,8 @@ public final class JwtClaimsParser {
                 }
             }
 
-            return new UserClaims(upn, name, email, preferredUsername, tid, oid, roles);
+            return new UserClaims(upn, name, email, preferredUsername, tid, oid,
+                    roles);
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to parse JWT claims JSON: " + e.getMessage(), e);
         }
@@ -86,6 +91,8 @@ public final class JwtClaimsParser {
 
     private static String textOrNull(JsonNode node, String fieldName) {
         JsonNode f = node.get(fieldName);
-        return (f != null && !f.isNull()) ? f.asString() : null;
+        return (f != null && !f.isNull())
+                ? f.asString()
+                : null;
     }
 }

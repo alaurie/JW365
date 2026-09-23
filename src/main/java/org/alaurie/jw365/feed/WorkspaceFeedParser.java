@@ -8,6 +8,7 @@ import java.util.function.Predicate;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -22,24 +23,41 @@ public final class WorkspaceFeedParser {
         return parseDiscoveryXml(xml, WorkspaceFeedParser::isProductionAllowedUri);
     }
 
-    /** Parses discovery XML under an explicit endpoint policy (for isolated tests). */
+    /**
+     * Parses discovery XML under an explicit endpoint policy (for isolated
+     * tests).
+     */
     public static List<TenantFeed> parseDiscoveryXml(String xml, Predicate<URI> endpointPolicy) {
         List<TenantFeed> feeds = new ArrayList<>();
-        if (xml == null || xml.isBlank()) return feeds;
-        if (endpointPolicy == null) throw new NullPointerException("endpointPolicy must not be null");
+        if (xml == null || xml.isBlank()) {
+            return feeds;
+        }
+        if (endpointPolicy == null) {
+            throw new NullPointerException("endpointPolicy must not be null");
+        }
         try {
             Document doc = parseSecurely(xml);
             NodeList feedNodes = doc.getElementsByTagNameNS("*", "TenantFeedURL");
             for (int i = 0; i < feedNodes.getLength(); i++) {
-                if (!(feedNodes.item(i) instanceof Element el)) continue;
+                if (!(feedNodes.item(i) instanceof Element el)) {
+                    continue;
+                }
                 String feedUrlStr = getAttributeIgnoreCase(el, "FeedURL", "FeedUrl", "url", "href");
-                if (feedUrlStr == null || feedUrlStr.isBlank()) continue;
+                if (feedUrlStr == null || feedUrlStr.isBlank()) {
+                    continue;
+                }
                 String tenantId = getAttributeIgnoreCase(el, "TenantId", "tenantId", "id");
                 String displayName = getAttributeIgnoreCase(el, "TenantDisplayName", "DisplayName", "name");
-                tenantId = tenantId == null || tenantId.isBlank() ? "tenant-" + (i + 1) : tenantId;
-                displayName = displayName == null || displayName.isBlank() ? tenantId : displayName;
+                tenantId = tenantId == null || tenantId.isBlank()
+                        ? "tenant-" + (i + 1)
+                        : tenantId;
+                displayName = displayName == null || displayName.isBlank()
+                        ? tenantId
+                        : displayName;
                 URI feedUri = parseAllowedUri(feedUrlStr.trim(), endpointPolicy);
-                if (feedUri != null) feeds.add(new TenantFeed(tenantId, displayName, feedUri));
+                if (feedUri != null) {
+                    feeds.add(new TenantFeed(tenantId, displayName, feedUri));
+                }
             }
             return feeds;
         } catch (Exception e) {
@@ -53,12 +71,16 @@ public final class WorkspaceFeedParser {
 
     /** Parses feed XML under an explicit endpoint policy (for isolated tests). */
     public static Workspace parseFeedXml(String xml, TenantFeed tenantFeed, Predicate<URI> endpointPolicy) {
-        if (endpointPolicy == null) throw new NullPointerException("endpointPolicy must not be null");
+        if (endpointPolicy == null) {
+            throw new NullPointerException("endpointPolicy must not be null");
+        }
         String workspaceName = tenantFeed != null ? tenantFeed.tenantDisplayName() : "Workspace";
         String tenantId = tenantFeed != null ? tenantFeed.tenantId() : "default";
         String tenantDisplayName = tenantFeed != null ? tenantFeed.tenantDisplayName() : tenantId;
         List<WorkspaceResource> resources = new ArrayList<>();
-        if (xml == null || xml.isBlank()) return new Workspace(workspaceName, tenantId, tenantDisplayName, resources);
+        if (xml == null || xml.isBlank()) {
+            return new Workspace(workspaceName, tenantId, tenantDisplayName, resources);
+        }
         try {
             Document doc = parseSecurely(xml);
             NodeList publisherNodes = doc.getElementsByTagNameNS("*", "Publisher");
@@ -71,7 +93,9 @@ public final class WorkspaceFeedParser {
                                 resources,
                                 tenantDisplayName,
                                 tenantId,
-                                publisherName == null || publisherName.isBlank() ? workspaceName : publisherName,
+                                publisherName == null || publisherName.isBlank()
+                                        ? workspaceName
+                                        : publisherName,
                                 endpointPolicy,
                                 tenantFeed != null ? tenantFeed.feedUrl() : null);
                     }
@@ -102,35 +126,37 @@ public final class WorkspaceFeedParser {
             URI baseUri) {
         NodeList resourceNodes = parent.getElementsByTagNameNS("*", "Resource");
         for (int r = 0; r < resourceNodes.getLength(); r++) {
-            if (!(resourceNodes.item(r) instanceof Element resource)) continue;
+            if (!(resourceNodes.item(r) instanceof Element resource)) {
+                continue;
+            }
             String id = getAttributeIgnoreCase(resource, "ID", "id", "Id");
             String title = getAttributeIgnoreCase(resource, "Title", "title", "Name", "name");
             String typeStr = getAttributeIgnoreCase(resource, "Type", "type", "ResourceType");
             String armPath = getAttributeIgnoreCase(resource, "ArmPath", "armPath", "ARMPath");
-            if (id == null || id.isBlank()) id = "resource-" + (output.size() + 1);
-            if (title == null || title.isBlank()) title = id;
-            URI rdpUrl =
-                    findChildAttributeOrTextUri(resource, "ResourceFile", policy, baseUri, "URL", "Url", "url", "href");
+            if (id == null || id.isBlank()) {
+                id = "resource-" + (output.size() + 1);
+            }
+            if (title == null || title.isBlank()) {
+                title = id;
+            }
+            URI rdpUrl = findChildAttributeOrTextUri(resource, "ResourceFile", policy, baseUri, "URL", "Url",
+                    "url", "href");
             URI iconUrl = findIconUri(resource, policy, baseUri);
-            output.add(new WorkspaceResource(
-                    id,
-                    title,
-                    ResourceType.fromString(typeStr),
-                    tenantName,
-                    tenantId,
-                    publisherName,
-                    armPath,
-                    rdpUrl,
-                    iconUrl));
+            output.add(new WorkspaceResource(id, title, ResourceType.fromString(typeStr), tenantName, tenantId,
+                    publisherName, armPath, rdpUrl, iconUrl));
         }
     }
 
     private static URI findIconUri(Element resource, Predicate<URI> policy, URI baseUri) {
-        String[] iconTags = {"Icon64", "Icon48", "Icon32", "Icon128", "Icon256", "Icon16", "Icon", "IconRaw"};
-        String[] attrNames = {"FileURL", "FileUrl", "fileUrl", "URL", "Url", "url", "href", "Href", "src", "Src"};
+        String[] iconTags = {"Icon64", "Icon48", "Icon32", "Icon128", "Icon256", "Icon16",
+                "Icon", "IconRaw"};
+        String[] attrNames = {"FileURL", "FileUrl", "fileUrl", "URL", "Url", "url",
+                "href", "Href", "src", "Src"};
         for (String tag : iconTags) {
             URI uri = findChildAttributeOrTextUri(resource, tag, policy, baseUri, attrNames);
-            if (uri != null) return uri;
+            if (uri != null) {
+                return uri;
+            }
         }
         String directAttr = getAttributeIgnoreCase(resource, "IconUrl", "IconURL", "iconUrl", "Icon", "icon");
         if (directAttr != null && !directAttr.isBlank()) {
@@ -139,11 +165,13 @@ public final class WorkspaceFeedParser {
         return null;
     }
 
-    private static URI findChildAttributeOrTextUri(
-            Element parent, String tagName, Predicate<URI> policy, URI baseUri, String... names) {
+    private static URI findChildAttributeOrTextUri(Element parent, String tagName, Predicate<URI> policy,
+            URI baseUri, String... names) {
         NodeList list = parent.getElementsByTagNameNS("*", tagName);
         for (int i = 0; i < list.getLength(); i++) {
-            if (!(list.item(i) instanceof Element el)) continue;
+            if (!(list.item(i) instanceof Element el)) {
+                continue;
+            }
             String value = getAttributeIgnoreCase(el, names);
             if (value == null || value.isBlank()) {
                 String text = el.getTextContent();
@@ -153,14 +181,20 @@ public final class WorkspaceFeedParser {
             }
             if (value != null && !value.isBlank()) {
                 URI uri = parseAllowedUri(value.trim(), policy, baseUri);
-                if (uri != null) return uri;
+                if (uri != null) {
+                    return uri;
+                }
             }
         }
         return null;
     }
 
     private static String getAttributeIgnoreCase(Element el, String... names) {
-        for (String name : names) if (el.hasAttribute(name)) return el.getAttribute(name);
+        for (String name : names) {
+            if (el.hasAttribute(name)) {
+                return el.getAttribute(name);
+            }
+        }
         return null;
     }
 
@@ -174,7 +208,9 @@ public final class WorkspaceFeedParser {
             if (!uri.isAbsolute() && baseUri != null) {
                 uri = baseUri.resolve(uri);
             }
-            return (policy == null || policy.test(uri)) ? uri : null;
+            return (policy == null || policy.test(uri))
+                    ? uri
+                    : null;
         } catch (IllegalArgumentException _) {
             return null;
         }
@@ -189,11 +225,18 @@ public final class WorkspaceFeedParser {
     }
 
     private static Document parseSecurely(String xml) throws Exception {
-        if (xml == null || xml.isBlank()) throw new IllegalArgumentException("XML content is empty");
-        if (xml.length() > 10 * 1024 * 1024) throw new IllegalArgumentException("XML content exceeds 10 MiB limit");
+        if (xml == null || xml.isBlank()) {
+            throw new IllegalArgumentException("XML content is empty");
+        }
+        if (xml.length() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("XML content exceeds 10 MiB limit");
+        }
         int startIdx = xml.indexOf('<');
-        if (startIdx > 0) xml = xml.substring(startIdx);
-        else if (startIdx == -1) throw new IllegalArgumentException("Invalid XML: no opening '<' tag found");
+        if (startIdx > 0) {
+            xml = xml.substring(startIdx);
+        } else if (startIdx == -1) {
+            throw new IllegalArgumentException("Invalid XML: no opening '<' tag found");
+        }
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);

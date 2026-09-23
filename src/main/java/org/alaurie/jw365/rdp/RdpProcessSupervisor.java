@@ -8,19 +8,30 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
 import org.alaurie.jw365.config.XdgPaths;
 import org.alaurie.jw365.feed.WorkspaceResource;
+import org.alaurie.jw365.rdp.SessionEvent.AuthRequired;
+import org.alaurie.jw365.rdp.SessionEvent.Exited;
+import org.alaurie.jw365.rdp.SessionEvent.OutputLine;
+import org.alaurie.jw365.rdp.SessionEvent.Started;
+import org.alaurie.jw365.rdp.SessionEvent.StatusChanged;
 
 /**
  * Supervises the lifecycle, execution, and output logging of FreeRDP processes.
@@ -49,8 +60,9 @@ public final class RdpProcessSupervisor {
     }
 
     /**
-     * Prepares and optimizes an RDP profile file based on user session preferences.
-     * Prevents runaway smartcard polling loops (SCARD_E_NO_SERVICE) and unwanted peripheral forwarding.
+     * Prepares and optimizes an RDP profile file based on user session
+     * preferences. Prevents runaway smartcard polling loops
+     * (SCARD_E_NO_SERVICE) and unwanted peripheral forwarding.
      */
     public static Path prepareRdpProfile(Path sourceRdpFile, RdpSessionConfig config) throws IOException {
         Objects.requireNonNull(sourceRdpFile, "sourceRdpFile must not be null");
@@ -70,7 +82,7 @@ public final class RdpProcessSupervisor {
             }
             int colonIdx = trimmed.indexOf(':');
             if (colonIdx > 0) {
-                String key = trimmed.substring(0, colonIdx).toLowerCase(java.util.Locale.ROOT);
+                String key = trimmed.substring(0, colonIdx).toLowerCase(Locale.ROOT);
                 if (key.equals("redirectsmartcards") && !config.smartcard()) {
                     modifiedLines.add("redirectsmartcards:i:0");
                     continue;
@@ -89,15 +101,15 @@ public final class RdpProcessSupervisor {
         }
 
         Path parent = sourceRdpFile.getParent();
-        Path preparedFile =
-                parent != null ? parent.resolve(sourceRdpFile.getFileName().toString() + ".active.rdp") : sourceRdpFile;
+        Path preparedFile = parent != null ? parent.resolve(sourceRdpFile.getFileName().toString() + ".active.rdp") : sourceRdpFile;
         String output = String.join("\r\n", modifiedLines) + "\r\n";
         Files.writeString(preparedFile, output, StandardCharsets.UTF_8);
         return preparedFile;
     }
 
     /**
-     * Builds the command line argument list for launching FreeRDP with AVD / AAD parameters.
+     * Builds the command line argument list for launching FreeRDP with AVD /
+     * AAD parameters.
      */
     public static List<String> buildCommandLine(FreeRdpInfo freeRdp, RdpSessionConfig config) {
         List<String> cmd = new ArrayList<>();
@@ -108,14 +120,21 @@ public final class RdpProcessSupervisor {
             cmd.add("--file-forwarding");
             cmd.add(freeRdp.flatpakAppId() != null ? freeRdp.flatpakAppId() : "com.freerdp.FreeRDP");
             cmd.add("@@");
-            cmd.add(config.rdpFile().toAbsolutePath().toString());
+            cmd.add(config.rdpFile()
+                          .toAbsolutePath()
+                          .toString());
             cmd.add("@@");
         } else if (freeRdp.binaryPath() != null) {
-            cmd.add(freeRdp.binaryPath().toString());
-            cmd.add(config.rdpFile().toAbsolutePath().toString());
+            cmd.add(freeRdp.binaryPath()
+                           .toString());
+            cmd.add(config.rdpFile()
+                          .toAbsolutePath()
+                          .toString());
         } else {
             cmd.add("sdl-freerdp3");
-            cmd.add(config.rdpFile().toAbsolutePath().toString());
+            cmd.add(config.rdpFile()
+                          .toAbsolutePath()
+                          .toString());
         }
         // AVD Gateway and Entra ID (AAD) authentication flags
         cmd.add("/gateway:type:arm");
@@ -204,7 +223,10 @@ public final class RdpProcessSupervisor {
         // Custom extra arguments
         if (config.extraArgs() != null) {
             for (String arg : config.extraArgs()) {
-                if (arg == null || arg.indexOf('\u0000') >= 0 || arg.indexOf('\n') >= 0 || arg.indexOf('\r') >= 0) {
+                if (arg == null
+                        || arg.indexOf('\u0000') >= 0
+                        || arg.indexOf('\n') >= 0
+                        || arg.indexOf('\r') >= 0) {
                     throw new IllegalArgumentException("FreeRDP arguments cannot contain control characters");
                 }
             }
@@ -222,8 +244,8 @@ public final class RdpProcessSupervisor {
      * @param config   session parameters
      * @param listener optional session-specific event listener
      */
-    public void launch(
-            FreeRdpInfo freeRdp, WorkspaceResource resource, RdpSessionConfig config, SessionListener listener)
+    public void launch(FreeRdpInfo freeRdp, WorkspaceResource resource, RdpSessionConfig config,
+                       SessionListener listener)
             throws IOException {
         Objects.requireNonNull(freeRdp, "freeRdp must not be null");
         Objects.requireNonNull(resource, "resource must not be null");
@@ -235,7 +257,9 @@ public final class RdpProcessSupervisor {
         ActiveSession session;
         synchronized (sessionLock) {
             ActiveSession existing = activeSessions.get(sessionId);
-            if (existing != null) existing.stop();
+            if (existing != null) {
+                existing.stop();
+            }
             stopSession(sessionId);
 
             Path activeRdpFile = prepareRdpProfile(config.rdpFile(), config);
@@ -249,23 +273,26 @@ public final class RdpProcessSupervisor {
             if (Files.isExecutable(Path.of("/usr/bin/script"))) {
                 String joined = rawCommand.stream()
                         .map(arg -> "'" + arg.replace("'", "'\\''") + "'")
-                        .collect(java.util.stream.Collectors.joining(" "));
+                        .collect(Collectors.joining(" "));
                 processCommand = List.of("/usr/bin/script", "-q", "-c", joined, "/dev/null");
             } else {
                 processCommand = rawCommand;
             }
 
-            logFile = XdgPaths.logsDir()
-                    .resolve("session_" + resource.sanitizedFileName() + "_" + System.currentTimeMillis() + "_"
-                            + java.util.UUID.randomUUID() + ".log");
+            logFile = XdgPaths.logsDir().resolve("session_"
+                    + resource.sanitizedFileName()
+                    + "_"
+                    + System.currentTimeMillis()
+                    + "_"
+                    + UUID.randomUUID()
+                    + ".log");
             ProcessBuilder pb = new ProcessBuilder(processCommand);
             pb.redirectErrorStream(true);
             Path logDir = logFile.getParent();
             if (logDir != null) {
                 Files.createDirectories(logDir);
                 try {
-                    Files.setPosixFilePermissions(
-                            logDir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+                    Files.setPosixFilePermissions(logDir, PosixFilePermissions.fromString("rwx------"));
                 } catch (Exception _) {
                 }
             }
@@ -273,8 +300,7 @@ public final class RdpProcessSupervisor {
                 Files.createFile(logFile);
             }
             try {
-                Files.setPosixFilePermissions(
-                        logFile, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+                Files.setPosixFilePermissions(logFile, PosixFilePermissions.fromString("rw-------"));
             } catch (Exception _) {
             }
             Map<String, String> env = pb.environment();
@@ -285,11 +311,10 @@ public final class RdpProcessSupervisor {
             }
             if (waylandDisplay != null && !waylandDisplay.isBlank()) {
                 env.put("WAYLAND_DISPLAY", waylandDisplay);
-                boolean isFlatpakEnv = freeRdp.isFlatpak() || System.getenv("FLATPAK_ID") != null;
                 if (display != null && !display.isBlank()) {
-                    // In Flatpak or when XWayland is available, SDL3 client on X11 avoids the Wayland buffer-swap
-                    // tearing and double-buffering flickering anomalies.
-                    env.put("SDL_VIDEODRIVER", isFlatpakEnv ? "x11" : "wayland,x11");
+                    // Under Wayland when XWayland/X11 is available, SDL3 client on X11 avoids the Wayland buffer-swap
+                    // tearing, double-buffering flickering, and off-screen / workspace switch freeze anomalies.
+                    env.put("SDL_VIDEODRIVER", "x11");
                 } else {
                     env.put("SDL_VIDEODRIVER", "wayland,x11");
                 }
@@ -307,9 +332,7 @@ public final class RdpProcessSupervisor {
             String pulseServer = System.getenv("PULSE_SERVER");
             if (pulseServer != null && !pulseServer.isBlank()) {
                 env.put("PULSE_SERVER", pulseServer);
-            } else if (xdgRuntime != null
-                    && !xdgRuntime.isBlank()
-                    && Files.exists(Path.of(xdgRuntime, "pulse", "native"))) {
+            } else if (xdgRuntime != null && !xdgRuntime.isBlank() && Files.exists(Path.of(xdgRuntime, "pulse", "native"))) {
                 env.put("PULSE_SERVER", "unix:" + xdgRuntime + "/pulse/native");
             }
             process = pb.start();
@@ -320,122 +343,119 @@ public final class RdpProcessSupervisor {
         }
 
         // Notify started
-        emitEvent(listener, new SessionEvent.Started(sessionId, process.toHandle()));
+        emitEvent(listener, new Started(sessionId, process.toHandle()));
         updateStatus(session, listener, SessionStatus.CONNECTING, "Connecting to " + resource.title() + "...");
 
         // Start Virtual Thread to monitor output and lifecycle
-        Thread.ofVirtual().name("rdp-watcher-" + resource.sanitizedFileName()).start(() -> {
-            Object logLock = LOG_LOCKS.computeIfAbsent(logFile.toAbsolutePath(), _ -> new Object());
-            try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
-                    BufferedWriter logWriter = Files.newBufferedWriter(
-                            logFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+        Thread.ofVirtual()
+                .name("rdp-watcher-" + resource.sanitizedFileName())
+                .start(() -> {
+                    Object logLock = LOG_LOCKS.computeIfAbsent(logFile.toAbsolutePath(), _ -> new Object());
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+                         BufferedWriter logWriter = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 
-                long[] logBytes;
-                synchronized (logLock) {
-                    logBytes = new long[] {Files.size(logFile)};
-                }
-                writeLogLine(logWriter, logBytes, "=== JW365 Session Log for " + resource.title() + " ===", logLock);
-                writeLogLine(logWriter, logBytes, "Started: " + Instant.now(), logLock);
-                writeLogLine(logWriter, logBytes, "", logLock);
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    writeLogLine(logWriter, logBytes, redactLogLine(line), logLock);
-                    emitEvent(listener, new SessionEvent.OutputLine(sessionId, line, false));
-
-                    if (line.contains("Browse to: ")) {
-                        String rawAuth = line.substring(line.indexOf("Browse to: ") + "Browse to: ".length())
-                                .trim();
-                        String authUrl = rawAuth.replaceAll("\u001B\\[[;?0-9]*[a-zA-Z]", "")
-                                .trim();
-                        int spaceIdx = authUrl.indexOf(' ');
-                        if (spaceIdx > 0) {
-                            authUrl = authUrl.substring(0, spaceIdx).trim();
+                        long[] logBytes;
+                        synchronized (logLock) {
+                            logBytes = new long[] {Files.size(logFile)};
                         }
-                        updateStatus(session, listener, SessionStatus.CONNECTING, "Authenticating Cloud PC session...");
-                        final String cleanAuthUrl = authUrl;
-                        emitEvent(listener, new SessionEvent.AuthRequired(sessionId, cleanAuthUrl, redirectUrl -> {
-                            String toSend = redirectUrl != null ? redirectUrl.trim() : "";
-                            session.writeInput(toSend + "\n");
-                        }));
-                    }
+                        writeLogLine(logWriter, logBytes, "=== JW365 Session Log for " + resource.title() + " ===", logLock);
+                        writeLogLine(logWriter, logBytes, "Started: " + Instant.now(), logLock);
+                        writeLogLine(logWriter, logBytes, "", logLock);
 
-                    String lower = line.toLowerCase(java.util.Locale.ROOT);
-                    if (lower.contains("reconnect") || lower.contains("reconnecting")) {
-                        updateStatus(session, listener, SessionStatus.RECONNECTING, "Reconnecting...");
-                    }
-                    if (isConnectedMarker(line) && session.status() != SessionStatus.CONNECTED) {
-                        updateStatus(session, listener, SessionStatus.CONNECTED, "Connected");
-                    }
-                }
-                int exitCode = process.waitFor();
-                writeLogLine(logWriter, logBytes, "", logLock);
-                writeLogLine(
-                        logWriter,
-                        logBytes,
-                        "=== Process exited with code " + exitCode + " at " + Instant.now() + " ===",
-                        logLock);
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            writeLogLine(logWriter, logBytes, redactLogLine(line), logLock);
+                            emitEvent(listener, new OutputLine(sessionId, line, false));
 
-                if (session.isUserInitiatedStop()
-                        || exitCode == 0
-                        || exitCode == 143
-                        || exitCode == 130
-                        || exitCode == 129) {
-                    updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
-                } else {
-                    updateStatus(session, listener, SessionStatus.FAILED, "Session exited with error code " + exitCode);
-                }
-                emitEvent(
-                        listener,
-                        new SessionEvent.Exited(
-                                sessionId,
-                                exitCode,
-                                session.isUserInitiatedStop()
-                                        ? "Session disconnected"
-                                        : "Session exited with error code " + exitCode));
-            } catch (InterruptedException e) {
-                destroyAndAwait(process);
-                Thread.currentThread().interrupt();
-                updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session monitoring interrupted");
-                emitEvent(listener, new SessionEvent.Exited(sessionId, -1, "Session monitoring interrupted"));
-            } catch (Exception e) {
-                destroyAndAwait(process);
-                if (session.isUserInitiatedStop()) {
-                    updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
-                    emitEvent(listener, new SessionEvent.Exited(sessionId, 0, "Session disconnected"));
-                } else {
-                    updateStatus(
-                            session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
-                    emitEvent(
-                            listener,
-                            new SessionEvent.Exited(sessionId, -1, "Session monitoring error: " + e.getMessage()));
-                }
-            } finally {
-                LOG_LOCKS.remove(logFile.toAbsolutePath(), logLock);
-                XdgPaths.pruneOldLogs(10);
-                activeSessions.remove(sessionId, session);
-            }
-        });
+                            if (line.contains("Browse to: ")) {
+                                String rawAuth = line.substring(line.indexOf("Browse to: ") + "Browse to: ".length()).trim();
+                                String authUrl = rawAuth.replaceAll("\u001B\\[[;?0-9]*[a-zA-Z]", "").trim();
+                                int spaceIdx = authUrl.indexOf(' ');
+                                if (spaceIdx > 0) {
+                                    authUrl = authUrl.substring(0, spaceIdx).trim();
+                                }
+                                updateStatus(session, listener, SessionStatus.CONNECTING, "Authenticating Cloud PC session...");
+                                final String cleanAuthUrl = authUrl;
+                                emitEvent(
+                                        listener,
+                                        new AuthRequired(sessionId, cleanAuthUrl,
+                                                redirectUrl -> {
+                                                    String toSend = redirectUrl != null ? redirectUrl.trim() : "";
+                                                    session.writeInput(toSend + "\n");
+                                                }));
+                            }
+
+                            if (isReconnectingMarker(line)) {
+                                updateStatus(session, listener, SessionStatus.RECONNECTING, "Reconnecting...");
+                            }
+                            if (isConnectedMarker(line) && session.status() != SessionStatus.CONNECTED) {
+                                updateStatus(session, listener, SessionStatus.CONNECTED, "Connected");
+                            }
+                        }
+                        int exitCode = process.waitFor();
+                        writeLogLine(logWriter, logBytes, "", logLock);
+                        writeLogLine(logWriter, logBytes, "=== Process exited with code " + exitCode + " at " + Instant.now() + " ===", logLock);
+
+                        if (session.isUserInitiatedStop()
+                                || exitCode == 0
+                                || exitCode == 143
+                                || exitCode == 130
+                                || exitCode == 129) {
+                            updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
+                        } else {
+                            updateStatus(session, listener, SessionStatus.FAILED, "Session exited with error code " + exitCode);
+                        }
+                        emitEvent(
+                                listener,
+                                new Exited(sessionId, exitCode,
+                                        session.isUserInitiatedStop() ? "Session disconnected" : "Session exited with error code " + exitCode));
+                    } catch (InterruptedException e) {
+                        destroyAndAwait(process);
+                        Thread.currentThread().interrupt();
+                        updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session monitoring interrupted");
+                        emitEvent(listener, new Exited(sessionId, -1, "Session monitoring interrupted"));
+                    } catch (Exception e) {
+                        destroyAndAwait(process);
+                        if (session.isUserInitiatedStop()) {
+                            updateStatus(session, listener, SessionStatus.DISCONNECTED, "Session disconnected");
+                            emitEvent(listener, new Exited(sessionId, 0, "Session disconnected"));
+                        } else {
+                            updateStatus(session, listener, SessionStatus.FAILED, "Session monitoring error: " + e.getMessage());
+                            emitEvent(listener, new Exited(sessionId, -1, "Session monitoring error: " + e.getMessage()));
+                        }
+                    } finally {
+                        LOG_LOCKS.remove(logFile.toAbsolutePath(), logLock);
+                        XdgPaths.pruneOldLogs(10);
+                        activeSessions.remove(sessionId, session);
+                    }
+                });
     }
 
     private static boolean hasArg(List<String> extraArgs, String prefix) {
-        if (extraArgs == null) return false;
-        return extraArgs.stream().anyMatch(a -> a != null && (a.equals(prefix) || a.startsWith(prefix + ":")));
+        if (extraArgs == null) {
+            return false;
+        }
+        return extraArgs.stream().anyMatch(a ->
+                a != null && (a.equals(prefix) || a.startsWith(prefix + ":")));
     }
 
     private static void destroyAndAwait(Process process) {
-        if (!process.isAlive()) return;
+        if (!process.isAlive()) {
+            return;
+        }
         process.destroy();
         try {
-            if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly();
+            if (!process.waitFor(3, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+            }
         } catch (InterruptedException e) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
         }
     }
 
-    private static void writeLogLine(BufferedWriter writer, long[] bytes, String line, Object logLock)
+    private static void writeLogLine(BufferedWriter writer, long[] bytes, String line,
+            Object logLock)
             throws IOException {
         synchronized (logLock) {
             if (bytes[0] >= MAX_SESSION_LOG_BYTES) {
@@ -456,7 +476,7 @@ public final class RdpProcessSupervisor {
         if (line == null || line.isBlank()) {
             return false;
         }
-        String lower = line.toLowerCase(java.util.Locale.ROOT);
+        String lower = line.toLowerCase(Locale.ROOT);
         return lower.contains("logon info v2")
                 || lower.contains("logon info")
                 || lower.contains("channelconnected")
@@ -474,9 +494,19 @@ public final class RdpProcessSupervisor {
                 || lower.contains("activated");
     }
 
+    static boolean isReconnectingMarker(String line) {
+        if (line == null || line.isBlank()) {
+            return false;
+        }
+        String lower = line.toLowerCase(Locale.ROOT);
+        return lower.contains("auto-reconnect in progress")
+                || lower.contains("connection state: reconnecting")
+                || lower.contains("reconnecting to ")
+                || lower.contains("client_reconnect_");
+    }
+
     static String redactLogLine(String line) {
-        String redacted =
-                line.replaceAll("(?i)(Authorization\\s*(?:[:=]\\s*|\\s+)Bearer\\s+)[^\\s,]+", "$1" + REDACTED);
+        String redacted = line.replaceAll("(?i)(Authorization\\s*(?:[:=]\\s*|\\s+)Bearer\\s+)[^\\s,]+", "$1" + REDACTED);
         redacted = redacted.replaceAll(
                 "(?i)(password|passwd|token|secret|authorization|bearer)([=:]\\s*|\\s+)(?!Bearer\\s+\\[REDACTED])[^\\s]+",
                 "$1$2" + REDACTED);
@@ -506,7 +536,9 @@ public final class RdpProcessSupervisor {
      * Stops an active session by resource ID.
      */
     public void stopSession(String resourceId) {
-        if (resourceId == null) return;
+        if (resourceId == null) {
+            return;
+        }
         Object lock = sessionLocks.computeIfAbsent(resourceId, _ -> new Object());
         synchronized (lock) {
             ActiveSession session = activeSessions.remove(resourceId);
@@ -519,17 +551,19 @@ public final class RdpProcessSupervisor {
 
     /** Stops all active sessions. */
     public void stopAllSessions() {
-        for (String id : List.copyOf(activeSessions.keySet())) stopSession(id);
+        for (String id : List.copyOf(activeSessions.keySet())) {
+            stopSession(id);
+        }
     }
 
-    private void updateStatus(
-            ActiveSession session, SessionListener listener, SessionStatus newStatus, String message) {
+    private void updateStatus(ActiveSession session, SessionListener listener, SessionStatus newStatus,
+            String message) {
         SessionStatus old = session.status();
         if (old == newStatus) {
             return;
         }
         session.setStatus(newStatus);
-        emitEvent(listener, new SessionEvent.StatusChanged(session.sessionId(), old, newStatus, message));
+        emitEvent(listener, new StatusChanged(session.sessionId(), old, newStatus, message));
     }
 
     private void emitEvent(SessionListener listener, SessionEvent event) {
@@ -550,17 +584,13 @@ public final class RdpProcessSupervisor {
     }
 
     private static Optional<String> detectMonitorSelection(FreeRdpInfo freeRdp) {
-        String executable = freeRdp.binaryPath() != null
-                ? freeRdp.binaryPath().toString()
-                : freeRdp.flavor().getExecutableName();
+        String executable = freeRdp.binaryPath() != null ? freeRdp.binaryPath().toString() : freeRdp.flavor().getExecutableName();
         Process process = null;
         try {
-            process = new ProcessBuilder(executable, "/list:monitor")
-                    .redirectErrorStream(true)
-                    .start();
-            if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+            process = new ProcessBuilder(executable, "/list:monitor").redirectErrorStream(true).start();
+            if (!process.waitFor(2, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                process.waitFor(1, java.util.concurrent.TimeUnit.SECONDS);
+                process.waitFor(1, TimeUnit.SECONDS);
                 return Optional.empty();
             }
             String output;
@@ -590,7 +620,9 @@ public final class RdpProcessSupervisor {
             Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (Exception e) {
-            if (process.isAlive()) process.destroyForcibly();
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
             return Optional.empty();
         }
     }
@@ -606,7 +638,8 @@ public final class RdpProcessSupervisor {
             baseDirs.add(userHome.resolve(".config"));
             baseDirs.add(userHome.resolve(".var/app/com.freerdp.FreeRDP/config"));
 
-            String content = """
+            String content =
+                    """
                 {
                   "SDL_KeyModMask": ["KMOD_RCTRL"],
                   "SDL_Disconnect": ["SDL_SCANCODE_F12"],

@@ -1,9 +1,11 @@
 package org.alaurie.jw365.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.alaurie.jw365.auth.OAuthClient;
 import org.alaurie.jw365.rdp.FreeRdpSource;
 
@@ -102,7 +104,7 @@ public record ClientConfig(
                 Collections.emptyList());
     }
 
-    @com.fasterxml.jackson.annotation.JsonCreator
+    @JsonCreator
     public static ClientConfig create(
             @JsonProperty("defaultTenant") String defaultTenant,
             @JsonProperty("freerdpSource") FreeRdpSource freerdpSource,

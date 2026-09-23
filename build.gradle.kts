@@ -35,6 +35,7 @@ javafx {
 val jvmFlags =
     listOf(
         "--enable-native-access=ALL-UNNAMED",
+        "-Dprism.vsync=false",
         "-Xms24m",
         "-Xmx192m",
         "-XX:ReservedCodeCacheSize=64m",
@@ -49,8 +50,10 @@ application {
     mainClass.set("org.alaurie.jw365.gui.Jw365Main")
     applicationDefaultJvmArgs = jvmFlags
 }
+val jfmt = configurations.create("jfmt")
 
 dependencies {
+    jfmt("com.netflix:com.netflix.tools.jfmt:0.8.2")
     implementation("tools.jackson.core:jackson-databind:3.2.2")
     implementation("com.microsoft.azure:msal4j:1.26.0")
 
@@ -82,6 +85,76 @@ tasks.named<CreateStartScripts>("startScripts") {
 tasks.withType<JavaExec>().configureEach {
     javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
     jvmArgs = jvmFlags
+}
+
+val jfmtExports =
+    listOf(
+        "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+    )
+
+val allJavaFilesProvider =
+    provider {
+        (sourceSets["main"].allJava.files + sourceSets["test"].allJava.files)
+            .filter { it.extension == "java" }
+            .sortedBy { it.path }
+    }
+
+tasks.register<JavaExec>("jfmtFormat") {
+    group = "formatting"
+    description = "Formats Java source code using Netflix jfmt"
+    classpath = jfmt
+    mainClass.set("com.netflix.tools.jfmt.Jfmt")
+    jvmArgs(jfmtExports)
+    onlyIf { allJavaFilesProvider.get().isNotEmpty() }
+    argumentProviders.add(
+        CommandLineArgumentProvider {
+            val files = allJavaFilesProvider.get().map { it.absolutePath }
+            listOf(
+                "--source-path",
+                "src/main/java:src/test/java",
+                "--class-path",
+                sourceSets["test"].compileClasspath.asPath,
+            ) + files
+        },
+    )
+}
+
+tasks.register<JavaExec>("jfmtCheck") {
+    group = "formatting"
+    description = "Checks Java source code formatting using Netflix jfmt"
+    classpath = jfmt
+    mainClass.set("com.netflix.tools.jfmt.Jfmt")
+    jvmArgs(jfmtExports)
+    inputs.files(allJavaFilesProvider)
+    inputs.files(sourceSets["test"].compileClasspath)
+    onlyIf { allJavaFilesProvider.get().isNotEmpty() }
+    argumentProviders.add(
+        CommandLineArgumentProvider {
+            val files = allJavaFilesProvider.get().map { it.absolutePath }
+            listOf(
+                "--check",
+                "--source-path",
+                "src/main/java:src/test/java",
+                "--class-path",
+                sourceSets["test"].compileClasspath.asPath,
+            ) + files
+        },
+    )
+}
+
+tasks.register("format") {
+    group = "formatting"
+    description = "Alias for jfmtFormat"
+    dependsOn("jfmtFormat")
+}
+
+tasks.named("check") {
+    dependsOn("jfmtCheck")
 }
 // --------------------------------------------------------------------------
 // Packaging: jlink minimal runtime + jpackage .deb, .rpm & portable tarball

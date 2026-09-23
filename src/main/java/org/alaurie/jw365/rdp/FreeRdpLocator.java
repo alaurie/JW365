@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+
 import org.alaurie.jw365.util.ExecutableLocator;
 
 /**
@@ -13,19 +15,20 @@ import org.alaurie.jw365.util.ExecutableLocator;
  */
 public final class FreeRdpLocator {
 
-    private static final List<String> CANDIDATE_NAMES =
-            List.of("sdl-freerdp3", "sdl-freerdp", "xfreerdp3", "xfreerdp", "wlfreerdp3", "wlfreerdp");
+    private static final List<String> CANDIDATE_NAMES = List.of("sdl-freerdp3", "sdl-freerdp", "xfreerdp3", "xfreerdp", "wlfreerdp3", "wlfreerdp");
 
-    private static final java.util.regex.Pattern VERSION_PATTERN = java.util.regex.Pattern.compile(
-            "(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", java.util.regex.Pattern.CASE_INSENSITIVE);
+    private static final Pattern VERSION_PATTERN = Pattern.compile("(?:version\\s+)?v?(\\d+\\.\\d+(?:\\.\\d+)?)", Pattern.CASE_INSENSITIVE);
 
     private FreeRdpLocator() {}
 
     /**
-     * Locates FreeRDP according to source preference: AUTO, SYSTEM, FLATPAK, or CUSTOM.
+     * Locates FreeRDP according to source preference: AUTO, SYSTEM, FLATPAK, or
+     * CUSTOM.
      */
     public static Optional<FreeRdpInfo> locate(String source, String customPath) {
-        String preference = source == null || source.isBlank() ? "AUTO" : source.toUpperCase();
+        String preference = source == null || source.isBlank()
+                ? "AUTO"
+                : source.toUpperCase();
         return switch (preference) {
             case "BUNDLED" -> locateBundled();
             case "FLATPAK" -> checkFlatpak();
@@ -61,8 +64,8 @@ public final class FreeRdpLocator {
         try {
             Path p = Path.of(customPath);
             if (Files.isExecutable(p)) {
-                return Optional.of(inspectBinary(
-                        p, FreeRdpFlavor.fromBinaryName(p.getFileName().toString())));
+                return Optional.of(inspectBinary(p, FreeRdpFlavor.fromBinaryName(p.getFileName()
+                        .toString())));
             }
         } catch (RuntimeException _) {
         }
@@ -92,7 +95,8 @@ public final class FreeRdpLocator {
         if (version == null) {
             version = extractVersion(List.of(path.toString(), "/version"));
         }
-        return new FreeRdpInfo(path, flavor, version != null ? version : "FreeRDP", false, null);
+        return new FreeRdpInfo(path, flavor, version != null ? version : "FreeRDP",
+                false, null);
     }
 
     private static Optional<FreeRdpInfo> checkFlatpak() {
@@ -142,7 +146,9 @@ public final class FreeRdpLocator {
                     }
                 }
                 if (!out.isBlank()) {
-                    return out.lines().findFirst().orElse(null);
+                    return out.lines()
+                              .findFirst()
+                              .orElse(null);
                 }
             } else {
                 process.destroyForcibly();

@@ -13,7 +13,8 @@ import java.util.Optional;
  * <p>The embedded sign-in flow deliberately requests {@code response_mode=query};
  * form-post responses are not exposed as a navigated URL by JavaFX WebView.</p>
  */
-public record OAuthCallback(String code, String state, String error, String errorDescription) {
+public record OAuthCallback(String code, String state, String error,
+        String errorDescription) {
     public static boolean isRedirect(String callbackUrl, URI expected) {
         try {
             URI candidate = URI.create(callbackUrl);
@@ -26,7 +27,10 @@ public record OAuthCallback(String code, String state, String error, String erro
         }
     }
 
-    /** Parses an OAuth response URL, returning empty for malformed or parameterless URLs. */
+    /**
+     * Parses an OAuth response URL, returning empty for malformed or
+     * parameterless URLs.
+     */
     public static Optional<OAuthCallback> parse(String callbackUrl) {
         if (callbackUrl == null || callbackUrl.isBlank()) {
             return Optional.empty();
@@ -42,7 +46,10 @@ public record OAuthCallback(String code, String state, String error, String erro
         }
     }
 
-    /** Parses an already extracted URL query. Package-private for focused callback tests. */
+    /**
+     * Parses an already extracted URL query. Package-private for focused
+     * callback tests.
+     */
     static Optional<OAuthCallback> parseQuery(String rawQuery) {
         try {
             Map<String, String> values = new LinkedHashMap<>();
@@ -61,8 +68,8 @@ public record OAuthCallback(String code, String state, String error, String erro
             if (values.isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(new OAuthCallback(
-                    values.get("code"), values.get("state"), values.get("error"), values.get("error_description")));
+            return Optional.of(new OAuthCallback(values.get("code"), values.get("state"), values.get("error"),
+                    values.get("error_description")));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
@@ -84,7 +91,9 @@ public record OAuthCallback(String code, String state, String error, String erro
         if (errorDescription != null && !errorDescription.isBlank()) {
             return errorDescription;
         }
-        return error == null || error.isBlank() ? "Microsoft sign-in failed" : error;
+        return error == null || error.isBlank()
+                ? "Microsoft sign-in failed"
+                : error;
     }
 
     private static String decode(String value) {

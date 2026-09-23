@@ -1,16 +1,20 @@
 package org.alaurie.jw365.auth;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.net.CookieStore;
 import java.net.HttpCookie;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class PersistentCookieManagerTest {
 
@@ -102,7 +106,7 @@ class PersistentCookieManagerTest {
 
         // Reload from disk
         PersistentCookieManager manager2 = new PersistentCookieManager(cookieFile);
-        var requestHeaders = manager2.get(uri, java.util.Collections.emptyMap());
+        var requestHeaders = manager2.get(uri, Collections.emptyMap());
         List<String> cookieHeaders = requestHeaders.get("Cookie");
         assertThat(cookieHeaders).isNotNull().isNotEmpty();
         String joined = String.join("; ", cookieHeaders);
@@ -118,17 +122,17 @@ class PersistentCookieManagerTest {
         PersistentCookieManager manager = new PersistentCookieManager(cookieFile);
 
         URI uri = URI.create("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
-        manager.put(uri, java.util.Map.of("Set-Cookie", List.of("ESTSAUTH=auto_val_999; path=/; secure; HttpOnly")));
+        manager.put(uri, Map.of("Set-Cookie", List.of("ESTSAUTH=auto_val_999; path=/; secure; HttpOnly")));
 
         long deadline = System.currentTimeMillis() + 2000;
         while ((!Files.exists(cookieFile) || Files.size(cookieFile) == 0) && System.currentTimeMillis() < deadline) {
-            Thread.sleep(java.time.Duration.ofMillis(50));
+            Thread.sleep(Duration.ofMillis(50));
         }
         assertThat(Files.exists(cookieFile)).isTrue();
         assertThat(Files.size(cookieFile)).isGreaterThan(0);
 
         PersistentCookieManager reloaded = new PersistentCookieManager(cookieFile);
-        var headers = reloaded.get(uri, java.util.Collections.emptyMap());
+        var headers = reloaded.get(uri, Collections.emptyMap());
         String joined = String.join("; ", headers.get("Cookie"));
         assertThat(joined).contains("ESTSAUTH=").contains("auto_val_999");
     }

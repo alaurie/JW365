@@ -1,9 +1,16 @@
 package org.alaurie.jw365.gui.view;
 
+import java.net.CookieHandler;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -24,7 +31,9 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 import org.alaurie.jw365.auth.OAuthCallback;
 import org.alaurie.jw365.auth.OAuthClient;
-import org.alaurie.jw365.rdp.SessionEvent;
+import org.alaurie.jw365.auth.PersistentCookieManager;
+import org.alaurie.jw365.config.XdgPaths;
+import org.alaurie.jw365.rdp.SessionEvent.AuthRequired;
 
 /** Resolves FreeRDP Entra ID redirects using a persistent SSO WebView session. */
 public final class SessionAuthDialog extends Stage {
@@ -43,34 +52,25 @@ public final class SessionAuthDialog extends Stage {
     private Timeline displayFallbackTimer;
     private boolean isUiConstructed = false;
 
-    public SessionAuthDialog(Window owner, String resourceTitle, SessionEvent.AuthRequired authReq) {
+    public SessionAuthDialog(Window owner, String resourceTitle, AuthRequired authReq) {
         this(owner, resourceTitle, authReq, null, null, null);
     }
 
-    public SessionAuthDialog(Window owner, String resourceTitle, SessionEvent.AuthRequired authReq, Runnable onCancel) {
+    public SessionAuthDialog(Window owner, String resourceTitle, AuthRequired authReq,
+            Runnable onCancel) {
         this(owner, resourceTitle, authReq, onCancel, null, null);
     }
 
-    public SessionAuthDialog(
-            Window owner,
-            String resourceTitle,
-            SessionEvent.AuthRequired authReq,
-            Runnable onCancel,
-            String loginHint) {
+    public SessionAuthDialog(Window owner, String resourceTitle, AuthRequired authReq,
+            Runnable onCancel, String loginHint) {
         this(owner, resourceTitle, authReq, onCancel, loginHint, null);
     }
 
-    public SessionAuthDialog(
-            Window owner,
-            String resourceTitle,
-            SessionEvent.AuthRequired authReq,
-            Runnable onCancel,
-            String loginHint,
-            Runnable onComplete) {
+    public SessionAuthDialog(Window owner, String resourceTitle, AuthRequired authReq,
+            Runnable onCancel, String loginHint, Runnable onComplete) {
         Objects.requireNonNull(authReq, "authReq must not be null");
         this.authUrl = appendLoginHintIfMissing(validateInitialAuthUrl(authReq.authUrl()), loginHint);
-        this.submitRedirectUrl =
-                Objects.requireNonNull(authReq.submitRedirectUrl(), "submitRedirectUrl must not be null");
+        this.submitRedirectUrl = Objects.requireNonNull(authReq.submitRedirectUrl(), "submitRedirectUrl must not be null");
         this.resourceTitle = resourceTitle == null ? "Cloud PC" : resourceTitle;
         this.onCancel = onCancel;
         this.onComplete = onComplete;
@@ -79,7 +79,9 @@ public final class SessionAuthDialog extends Stage {
                 .filter(state -> !state.isBlank())
                 .orElse(null);
         this.expectedRedirectUri = extractRedirectUri(this.authUrl).orElse(CALLBACK_URI);
-        if (owner != null) initOwner(owner);
+        if (owner != null) {
+            initOwner(owner);
+        }
         initModality(Modality.NONE);
         setTitle("Authorizing " + this.resourceTitle);
         this.webView = new WebView();
@@ -87,13 +89,15 @@ public final class SessionAuthDialog extends Stage {
         this.webEngine.setJavaScriptEnabled(true);
         this.webEngine.setUserAgent(AuthDialog.BROWSER_USER_AGENT);
         try {
-            this.webEngine.setUserDataDirectory(
-                    org.alaurie.jw365.config.XdgPaths.webViewDataDir().toFile());
+            this.webEngine.setUserDataDirectory(XdgPaths.webViewDataDir()
+                    .toFile());
         } catch (Exception e) {
             System.err.println("Warning: Could not configure WebEngine userDataDirectory: " + e.getMessage());
         }
         this.webEngine.locationProperty().addListener((obs, oldLoc, newLoc) -> {
-            if (newLoc != null) checkLocationForRedirect(newLoc);
+            if (newLoc != null) {
+                checkLocationForRedirect(newLoc);
+            }
         });
         setOnCloseRequest(e -> completeAndClose());
         setOnHidden(e -> completeAndClose());
@@ -105,8 +109,9 @@ public final class SessionAuthDialog extends Stage {
             if (!"https".equalsIgnoreCase(uri.getScheme())
                     || uri.getUserInfo() != null
                     || uri.getHost() == null
-                    || (!uri.getHost().equalsIgnoreCase("login.microsoftonline.com")
-                            && !uri.getHost().toLowerCase(java.util.Locale.ROOT).endsWith(".microsoftonline.com"))
+                    || (!uri.getHost().equalsIgnoreCase("login.microsoftonline.com") && !uri.getHost()
+                            .toLowerCase(Locale.ROOT)
+                            .endsWith(".microsoftonline.com"))
                     || (uri.getPort() != -1 && uri.getPort() != 443)) {
                 throw new IllegalArgumentException("Refusing non-Microsoft OAuth authorization URL");
             }
@@ -122,7 +127,9 @@ public final class SessionAuthDialog extends Stage {
     }
 
     static String appendLoginHintIfMissing(String authUrl, String loginHint) {
-        if (authUrl == null || authUrl.isBlank()) return authUrl;
+        if (authUrl == null || authUrl.isBlank()) {
+            return authUrl;
+        }
         try {
             URI uri = URI.create(authUrl);
             String rawQuery = uri.getRawQuery();
@@ -144,15 +151,14 @@ public final class SessionAuthDialog extends Stage {
             String result = authUrl;
             if (hasSelectAccount && loginHint != null && !loginHint.isBlank()) {
                 result = result.replace("prompt=select_account&", "")
-                        .replace("&prompt=select_account", "")
-                        .replace("?prompt=select_account", "?");
+                               .replace("&prompt=select_account", "")
+                               .replace("?prompt=select_account", "?");
                 if (result.endsWith("?")) {
                     result = result.substring(0, result.length() - 1);
                 }
             }
             if (!hasLoginHint && loginHint != null && !loginHint.isBlank()) {
-                String encodedHint =
-                        java.net.URLEncoder.encode(loginHint.trim(), java.nio.charset.StandardCharsets.UTF_8);
+                String encodedHint = URLEncoder.encode(loginHint.trim(), StandardCharsets.UTF_8);
                 int hashIdx = result.indexOf('#');
                 String beforeHash = hashIdx >= 0 ? result.substring(0, hashIdx) : result;
                 String fragment = hashIdx >= 0 ? result.substring(hashIdx) : "";
@@ -165,36 +171,41 @@ public final class SessionAuthDialog extends Stage {
         }
     }
 
-    static java.util.Optional<URI> extractRedirectUri(String authUrl) {
+    static Optional<URI> extractRedirectUri(String authUrl) {
         try {
             URI uri = URI.create(authUrl);
             String query = uri.getRawQuery();
-            if (query == null) return java.util.Optional.empty();
+            if (query == null) {
+                return Optional.empty();
+            }
             for (String pair : query.split("&")) {
                 int eq = pair.indexOf('=');
                 if (eq > 0) {
-                    String key =
-                            java.net.URLDecoder.decode(pair.substring(0, eq), java.nio.charset.StandardCharsets.UTF_8);
+                    String key = URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8);
                     if ("redirect_uri".equalsIgnoreCase(key)) {
-                        String val = java.net.URLDecoder.decode(
-                                pair.substring(eq + 1), java.nio.charset.StandardCharsets.UTF_8);
-                        return java.util.Optional.of(URI.create(val.trim()));
+                        String val = URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
+                        return Optional.of(URI.create(val.trim()));
                     }
                 }
             }
         } catch (Exception _) {
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     /**
-     * Starts the authorization flow: silent first, with fallback to visible window only if needed.
+     * Starts the authorization flow: silent first, with fallback to visible
+     * window only if needed.
      */
     public void startSilentOrShow() {
         Platform.runLater(() -> {
-            if (completed.get()) return;
+            if (completed.get()) {
+                return;
+            }
             displayFallbackTimer = new Timeline(new KeyFrame(Duration.seconds(3), e -> {
-                if (!completed.get() && !isShowing()) constructAndShowWindow();
+                if (!completed.get() && !isShowing()) {
+                    constructAndShowWindow();
+                }
             }));
             displayFallbackTimer.setCycleCount(1);
             displayFallbackTimer.play();
@@ -203,7 +214,9 @@ public final class SessionAuthDialog extends Stage {
     }
 
     static boolean isCallbackAcceptable(String url, String expectedState, URI expectedRedirectUri) {
-        if (url == null || url.isBlank()) return false;
+        if (url == null || url.isBlank()) {
+            return false;
+        }
         boolean matchesExpected = expectedRedirectUri != null && OAuthCallback.isRedirect(url, expectedRedirectUri);
         boolean matchesDefault = OAuthCallback.isRedirect(url, CALLBACK_URI);
         if (!matchesExpected && !matchesDefault) {
@@ -211,12 +224,16 @@ public final class SessionAuthDialog extends Stage {
         }
 
         OAuthCallback callback = OAuthCallback.parse(url).orElse(null);
-        if (callback == null || (!callback.isSuccess() && !callback.hasError())) return false;
+        if (callback == null || (!callback.isSuccess() && !callback.hasError())) {
+            return false;
+        }
         return expectedState == null || expectedState.isBlank() || expectedState.equals(callback.state());
     }
 
     private void checkLocationForRedirect(String url) {
-        if (completed.get() || !isCallbackAcceptable(url, expectedState, expectedRedirectUri)) return;
+        if (completed.get() || !isCallbackAcceptable(url, expectedState, expectedRedirectUri)) {
+            return;
+        }
 
         if (completed.compareAndSet(false, true)) {
             cancelTimer();
@@ -225,7 +242,7 @@ public final class SessionAuthDialog extends Stage {
             } catch (RuntimeException e) {
                 System.err.println("Warning: Could not submit OAuth redirect: " + e.getMessage());
             }
-            if (java.net.CookieHandler.getDefault() instanceof org.alaurie.jw365.auth.PersistentCookieManager pcm) {
+            if (CookieHandler.getDefault() instanceof PersistentCookieManager pcm) {
                 pcm.persistCookies();
             }
             if (onComplete != null) {
@@ -235,18 +252,14 @@ public final class SessionAuthDialog extends Stage {
                     System.err.println("Warning: Error in SessionAuthDialog onComplete: " + e.getMessage());
                 }
             }
-            Platform.runLater(() -> {
-                if (webEngine.getLoadWorker().isRunning()) {
-                    webEngine.getLoadWorker().cancel();
-                }
-                webEngine.load("about:blank");
-                if (isShowing()) close();
-            });
+            cleanupWebEngine();
         }
     }
 
     private void constructAndShowWindow() {
-        if (isUiConstructed || completed.get()) return;
+        if (isUiConstructed || completed.get()) {
+            return;
+        }
         isUiConstructed = true;
 
         BorderPane root = new BorderPane();
@@ -270,7 +283,8 @@ public final class SessionAuthDialog extends Stage {
 
         ProgressBar progressBar = new ProgressBar();
         progressBar.setMaxWidth(Double.MAX_VALUE);
-        progressBar.progressProperty().bind(webEngine.getLoadWorker().progressProperty());
+        progressBar.progressProperty().bind(webEngine.getLoadWorker()
+                .progressProperty());
 
         Label statusLabel = new Label("Please complete any sign-in prompt below...");
         statusLabel.getStyleClass().add("status-bar-text");
@@ -282,11 +296,8 @@ public final class SessionAuthDialog extends Stage {
         root.setCenter(webView);
 
         Scene scene = new Scene(root, 620, 680);
-        scene.getStylesheets()
-                .add(Objects.requireNonNull(
-                                getClass().getResource("/org/alaurie/jw365/gui/styles.css"),
-                                "Missing stylesheet resource")
-                        .toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css"), "Missing stylesheet resource")
+                .toExternalForm());
         setScene(scene);
 
         setMinWidth(580);
@@ -301,12 +312,15 @@ public final class SessionAuthDialog extends Stage {
         }
     }
 
+    public void completeWithoutCancel() {
+        if (completed.compareAndSet(false, true)) {
+            cleanupWebEngine();
+        }
+    }
+
     public void completeAndClose() {
         if (completed.compareAndSet(false, true)) {
-            cancelTimer();
-            if (webEngine.getLoadWorker().isRunning()) {
-                webEngine.getLoadWorker().cancel();
-            }
+            cleanupWebEngine();
             if (onCancel != null) {
                 try {
                     onCancel.run();
@@ -314,13 +328,23 @@ public final class SessionAuthDialog extends Stage {
                     System.err.println("Warning: Error in SessionAuthDialog onCancel: " + e.getMessage());
                 }
             }
-            Platform.runLater(() -> {
+        }
+    }
+
+    private void cleanupWebEngine() {
+        cancelTimer();
+        Platform.runLater(() -> {
+            try {
                 if (webEngine.getLoadWorker().isRunning()) {
                     webEngine.getLoadWorker().cancel();
                 }
                 webEngine.load("about:blank");
-                if (isShowing()) close();
-            });
-        }
+            } catch (Exception _) {
+            }
+            try {
+                close();
+            } catch (Exception _) {
+            }
+        });
     }
 }

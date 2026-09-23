@@ -4,7 +4,8 @@ import java.io.InputStream;
 import java.util.Properties;
 
 /**
- * Provides the application version string loaded from embedded build properties or package metadata.
+ * Provides the application version string loaded from embedded build properties
+ * or package metadata.
  */
 public final class AppVersion {
 
@@ -25,9 +26,7 @@ public final class AppVersion {
         } catch (Exception _) {
         }
         Package pkg = AppVersion.class.getPackage();
-        if (pkg != null
-                && pkg.getImplementationVersion() != null
-                && !pkg.getImplementationVersion().isBlank()) {
+        if (pkg != null && pkg.getImplementationVersion() != null && !pkg.getImplementationVersion().isBlank()) {
             return pkg.getImplementationVersion().trim();
         }
         return "development";

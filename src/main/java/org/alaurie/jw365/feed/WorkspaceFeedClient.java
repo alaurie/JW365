@@ -4,8 +4,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpClient.Redirect;
+import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -15,6 +19,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -38,7 +43,10 @@ public final class WorkspaceFeedClient {
         return WorkspaceFeedClient::isMicrosoftEndpoint;
     }
 
-    /** Explicit localhost policy for deterministic test servers; never used by production constructors. */
+    /**
+     * Explicit localhost policy for deterministic test servers; never used by
+     * production constructors.
+     */
     public static EndpointPolicy localTestEndpointPolicy() {
         return uri -> isMicrosoftEndpoint(uri) || isLocalHttp(uri);
     }
@@ -61,9 +69,9 @@ public final class WorkspaceFeedClient {
         this(
                 URI.create(DEFAULT_DISCOVERY_URL),
                 HttpClient.newBuilder()
-                        .version(HttpClient.Version.HTTP_2)
+                        .version(Version.HTTP_2)
                         .connectTimeout(Duration.ofSeconds(20))
-                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .followRedirects(Redirect.NEVER)
                         .build(),
                 microsoftEndpointPolicy());
     }
@@ -76,7 +84,7 @@ public final class WorkspaceFeedClient {
         this.discoveryUri = Objects.requireNonNull(discoveryUri, "discoveryUri must not be null");
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient must not be null");
         this.endpointPolicy = Objects.requireNonNull(endpointPolicy, "endpointPolicy must not be null");
-        if (httpClient.followRedirects() != HttpClient.Redirect.NEVER) {
+        if (httpClient.followRedirects() != Redirect.NEVER) {
             throw new IllegalArgumentException("WorkspaceFeedClient requires redirects to be disabled");
         }
         requireAllowedEndpoint(discoveryUri);
@@ -90,11 +98,9 @@ public final class WorkspaceFeedClient {
      */
     public List<TenantFeed> discoverTenantFeeds(String accessToken) throws IOException, InterruptedException {
         Objects.requireNonNull(accessToken, "accessToken must not be null");
-        Response response = send(
-                discoveryUri, accessToken, "application/x-msts-radc-discovery+xml,text/xml", MAX_XML_RESPONSE_BYTES);
+        Response response = send(discoveryUri, accessToken, "application/x-msts-radc-discovery+xml,text/xml", MAX_XML_RESPONSE_BYTES);
         if (response.statusCode() != 200) {
-            throw new IOException(
-                    "Workspace feed discovery failed with HTTP " + response.statusCode() + ": " + response.text());
+            throw new IOException("Workspace feed discovery failed with HTTP " + response.statusCode() + ": " + response.text());
         }
         return WorkspaceFeedParser.parseDiscoveryXml(response.text(), endpointPolicy::isAllowed);
     }
@@ -102,33 +108,34 @@ public final class WorkspaceFeedClient {
     /**
      * Fetches the workspace feed for a specific tenant.
      */
-    public Workspace fetchTenantWorkspace(String accessToken, TenantFeed tenantFeed)
-            throws IOException, InterruptedException {
+    public Workspace fetchTenantWorkspace(String accessToken, TenantFeed tenantFeed) throws IOException, InterruptedException {
         Objects.requireNonNull(accessToken, "accessToken must not be null");
         Objects.requireNonNull(tenantFeed, "tenantFeed must not be null");
-        Response response = send(
-                tenantFeed.feedUrl(),
-                accessToken,
-                "application/x-msts-radc+xml;radc_schema_version=2.0,text/xml",
-                MAX_XML_RESPONSE_BYTES);
+        Response response = send(tenantFeed.feedUrl(), accessToken, "application/x-msts-radc+xml;radc_schema_version=2.0,text/xml", MAX_XML_RESPONSE_BYTES);
         if (response.statusCode() != 200) {
-            throw new IOException("Failed to fetch feed for tenant " + tenantFeed.tenantDisplayName() + " (HTTP "
-                    + response.statusCode() + "): " + response.text());
+            throw new IOException("Failed to fetch feed for tenant "
+                    + tenantFeed.tenantDisplayName()
+                    + " (HTTP "
+                    + response.statusCode()
+                    + "): "
+                    + response.text());
         }
         return WorkspaceFeedParser.parseFeedXml(response.text(), tenantFeed, endpointPolicy::isAllowed);
     }
 
     /**
-     * Fetches all workspaces concurrently using Java Virtual Threads. A failed tenant does not discard
-     * workspaces that were fetched successfully.
+     * Fetches all workspaces concurrently using Java Virtual Threads. A failed
+     * tenant does not discard workspaces that were fetched successfully.
      */
     public List<Workspace> fetchAllWorkspaces(String accessToken, List<TenantFeed> tenantFeeds) {
-        if (tenantFeeds == null || tenantFeeds.isEmpty()) return Collections.emptyList();
+        if (tenantFeeds == null || tenantFeeds.isEmpty()) {
+            return Collections.emptyList();
+        }
         if (tenantFeeds.size() > MAX_TENANT_FEEDS) {
             throw new IllegalArgumentException("Tenant feed count exceeds " + MAX_TENANT_FEEDS);
         }
-        try (ExecutorService executor = Executors.newFixedThreadPool(
-                MAX_FEED_CONCURRENCY, Thread.ofVirtual().factory())) {
+        try (ExecutorService executor = Executors.newFixedThreadPool(MAX_FEED_CONCURRENCY, Thread.ofVirtual()
+                .factory())) {
             List<Future<Workspace>> futures = tenantFeeds.stream()
                     .map(feed -> (Callable<Workspace>) () -> fetchTenantWorkspace(accessToken, feed))
                     .map(executor::submit)
@@ -140,7 +147,9 @@ public final class WorkspaceFeedClient {
                 for (Future<Workspace> future : futures) {
                     try {
                         long remaining = deadline - System.nanoTime();
-                        if (remaining <= 0) throw new TimeoutException("aggregate feed timeout");
+                        if (remaining <= 0) {
+                            throw new TimeoutException("aggregate feed timeout");
+                        }
                         workspaces.add(future.get(remaining, TimeUnit.NANOSECONDS));
                     } catch (InterruptedException e) {
                         futures.forEach(candidate -> candidate.cancel(true));
@@ -154,7 +163,9 @@ public final class WorkspaceFeedClient {
                         System.err.println("Warning: Failed to fetch workspace feed: " + e.getCause());
                     }
                 }
-                if (workspaces.isEmpty() && failed) throw new IllegalStateException("All workspace feeds failed");
+                if (workspaces.isEmpty() && failed) {
+                    throw new IllegalStateException("All workspace feeds failed");
+                }
                 return workspaces;
             } finally {
                 executor.shutdownNow();
@@ -165,17 +176,18 @@ public final class WorkspaceFeedClient {
     /**
      * Downloads an RDP configuration file from a resource's RDP URL.
      */
-    public void downloadRdpFile(String accessToken, URI rdpUrl, Path targetPath)
-            throws IOException, InterruptedException {
+    public void downloadRdpFile(String accessToken, URI rdpUrl, Path targetPath) throws IOException, InterruptedException {
         Objects.requireNonNull(accessToken, "accessToken must not be null");
         Objects.requireNonNull(rdpUrl, "rdpUrl must not be null");
         Objects.requireNonNull(targetPath, "targetPath must not be null");
         Response response = send(rdpUrl, accessToken, null, MAX_RDP_RESPONSE_BYTES);
-        if (response.statusCode() != 200)
-            throw new IOException(
-                    "Failed to download RDP file from " + rdpUrl + " (HTTP " + response.statusCode() + ")");
+        if (response.statusCode() != 200) {
+            throw new IOException("Failed to download RDP file from " + rdpUrl + " (HTTP " + response.statusCode() + ")");
+        }
         Path parent = targetPath.getParent();
-        if (parent != null) Files.createDirectories(parent);
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
         Path tempFile = targetPath.resolveSibling(targetPath.getFileName() + ".tmp." + System.nanoTime());
         try {
             Files.write(tempFile, response.body());
@@ -197,7 +209,9 @@ public final class WorkspaceFeedClient {
             return null;
         }
         try {
-            String token = (accessToken == null || accessToken.isBlank()) ? null : accessToken;
+            String token = (accessToken == null || accessToken.isBlank())
+                    ? null
+                    : accessToken;
             Response response = send(iconUrl, token, null, MAX_ICON_BYTES);
             if (response.statusCode() == 200 && response.body().length > 0) {
                 return response.body();
@@ -219,13 +233,14 @@ public final class WorkspaceFeedClient {
         }
     }
 
-    private Response send(URI initialUri, String accessToken, String accept, int maxBytes)
+    private Response send(URI initialUri, String accessToken, String accept,
+                          int maxBytes)
             throws IOException, InterruptedException {
         requireAllowedEndpoint(initialUri);
         URI currentUri = initialUri;
         boolean crossedOrigin = false;
         for (int redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
-            HttpRequest.Builder builder = HttpRequest.newBuilder()
+            Builder builder = HttpRequest.newBuilder()
                     .uri(currentUri)
                     .header("User-Agent", USER_AGENT)
                     .header("X-MS-User-Agent", USER_AGENT)
@@ -238,8 +253,7 @@ public final class WorkspaceFeedClient {
                 builder.header("Authorization", "Bearer " + accessToken);
             }
 
-            HttpResponse<InputStream> response =
-                    httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<InputStream> response = httpClient.send(builder.build(), BodyHandlers.ofInputStream());
             byte[] body;
             try (InputStream input = response.body()) {
                 body = readLimited(input, maxBytes);
@@ -248,7 +262,9 @@ public final class WorkspaceFeedClient {
             if (status < 300 || status >= 400) {
                 return new Response(status, body);
             }
-            String location = response.headers().firstValue("Location").orElse(null);
+            String location = response.headers()
+                    .firstValue("Location")
+                    .orElse(null);
             if (location == null || redirect == MAX_REDIRECTS) {
                 return new Response(status, body);
             }
@@ -279,8 +295,10 @@ public final class WorkspaceFeedClient {
                 || uri.getUserInfo() != null
                 || uri.getHost() == null
                 || !"https".equalsIgnoreCase(uri.getScheme())
-                || (uri.getPort() != -1 && uri.getPort() != 443)) return false;
-        String host = uri.getHost().toLowerCase(java.util.Locale.ROOT);
+                || (uri.getPort() != -1 && uri.getPort() != 443)) {
+            return false;
+        }
+        String host = uri.getHost().toLowerCase(Locale.ROOT);
         return host.equals("wvd.microsoft.com")
                 || host.endsWith(".wvd.microsoft.com")
                 || host.equals("microsoft.com")
@@ -310,15 +328,15 @@ public final class WorkspaceFeedClient {
     }
 
     private static boolean isLocalHttp(URI uri) {
-        if (uri == null || !"http".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return false;
+        if (uri == null || !"http".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
+            return false;
+        }
         String host = uri.getHost();
         return host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.equals("::1");
     }
 
     private static boolean sameOrigin(URI first, URI second) {
-        return first.getScheme().equalsIgnoreCase(second.getScheme())
-                && first.getHost().equalsIgnoreCase(second.getHost())
-                && effectivePort(first) == effectivePort(second);
+        return first.getScheme().equalsIgnoreCase(second.getScheme()) && first.getHost().equalsIgnoreCase(second.getHost()) && effectivePort(first) == effectivePort(second);
     }
 
     private static boolean isSecureEndpoint(URI uri) {

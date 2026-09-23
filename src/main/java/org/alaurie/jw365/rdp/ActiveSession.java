@@ -1,7 +1,11 @@
 package org.alaurie.jw365.rdp;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -13,10 +17,10 @@ public final class ActiveSession {
     private final String resourceTitle;
     private final Process process;
     private final AtomicReference<SessionStatus> status;
-    private final java.util.concurrent.atomic.AtomicBoolean userInitiatedStop =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final AtomicBoolean userInitiatedStop = new AtomicBoolean(false);
 
-    public ActiveSession(String sessionId, String resourceTitle, Process process, SessionStatus initialStatus) {
+    public ActiveSession(String sessionId, String resourceTitle, Process process,
+                         SessionStatus initialStatus) {
         this.sessionId = Objects.requireNonNull(sessionId, "sessionId must not be null");
         this.resourceTitle = Objects.requireNonNull(resourceTitle, "resourceTitle must not be null");
         this.process = Objects.requireNonNull(process, "process must not be null");
@@ -42,6 +46,7 @@ public final class ActiveSession {
     public boolean isAlive() {
         return process.isAlive();
     }
+
     /**
      * Writes input to the active session process's standard input stream.
      */
@@ -50,10 +55,10 @@ public final class ActiveSession {
             return;
         }
         try {
-            java.io.OutputStream os = process.getOutputStream();
-            os.write(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            OutputStream os = process.getOutputStream();
+            os.write(text.getBytes(StandardCharsets.UTF_8));
             os.flush();
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             System.err.println("Warning: Failed to write to process stdin: " + e.getMessage());
         }
     }

@@ -1,13 +1,23 @@
 package org.alaurie.jw365.gui.view;
 
+import java.awt.Desktop;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
 import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
+import javafx.collections.MapChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
@@ -25,9 +35,11 @@ import org.alaurie.jw365.feed.Workspace;
 import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
+import org.alaurie.jw365.rdp.SessionStatus;
 
 /**
- * Main application view showing the workspace grid, search bar, header, and status bar.
+ * Main application view showing the workspace grid, search bar, header, and
+ * status bar.
  */
 public final class MainView extends BorderPane {
 
@@ -38,7 +50,7 @@ public final class MainView extends BorderPane {
     private final Label resourceCountLabel;
     private final Label rdpEngineLabel;
     private final Label lastSyncedLabel;
-    private final java.util.Map<String, ResourceCard> cardCache = new java.util.HashMap<>();
+    private final Map<String, ResourceCard> cardCache = new HashMap<>();
 
     public MainView(AppState state) {
         this.state = state;
@@ -92,19 +104,8 @@ public final class MainView extends BorderPane {
         signOutBtn.getStyleClass().add("btn-icon");
         signOutBtn.setOnAction(e -> handleSignOut());
 
-        headerBar
-                .getChildren()
-                .addAll(
-                        brandTitle,
-                        brandBadge,
-                        searchField,
-                        refreshBtn,
-                        helpBtn,
-                        refreshIndicator,
-                        spacer,
-                        userPill,
-                        settingsBtn,
-                        signOutBtn);
+        headerBar.getChildren().addAll(brandTitle, brandBadge, searchField, refreshBtn, helpBtn, refreshIndicator,
+                spacer, userPill, settingsBtn, signOutBtn);
         setTop(headerBar);
 
         // 2. Center Workspace Grid
@@ -133,16 +134,14 @@ public final class MainView extends BorderPane {
 
         Runnable updateSessionProgress = () -> {
             boolean hasActiveProgress = state.getSessionStatuses().values().stream()
-                    .anyMatch(s -> s == org.alaurie.jw365.rdp.SessionStatus.STARTING
-                            || s == org.alaurie.jw365.rdp.SessionStatus.CONNECTING
-                            || s == org.alaurie.jw365.rdp.SessionStatus.RECONNECTING
-                            || s == org.alaurie.jw365.rdp.SessionStatus.DISCONNECTING);
+                    .anyMatch(s -> s == SessionStatus.STARTING
+                            || s == SessionStatus.CONNECTING
+                            || s == SessionStatus.RECONNECTING
+                            || s == SessionStatus.DISCONNECTING);
             sessionProgressIndicator.setVisible(hasActiveProgress);
             sessionProgressIndicator.setManaged(hasActiveProgress);
         };
-        state.getSessionStatuses()
-                .addListener((javafx.collections.MapChangeListener<String, org.alaurie.jw365.rdp.SessionStatus>)
-                        change -> updateSessionProgress.run());
+        state.getSessionStatuses().addListener((MapChangeListener<String, SessionStatus>) change -> updateSessionProgress.run());
         updateSessionProgress.run();
 
         Label statusMessageLabel = new Label();
@@ -187,27 +186,21 @@ public final class MainView extends BorderPane {
         Label appVersionLabel = new Label("v" + AppVersion.VERSION);
         appVersionLabel.getStyleClass().add("status-bar-text");
 
-        statusBar
-                .getChildren()
-                .addAll(
-                        appVersionLabel,
-                        resourceCountLabel,
-                        statusMessageBox,
-                        footerSpacer,
-                        rdpEngineLabel,
-                        lastSyncedLabel);
+        statusBar.getChildren().addAll(appVersionLabel, resourceCountLabel, statusMessageBox,
+                footerSpacer, rdpEngineLabel, lastSyncedLabel);
         setBottom(statusBar);
 
         // Wire State Listeners
         state.currentUserProperty().addListener((obs, oldVal, newVal) -> updateUserInfo(newVal));
-        updateUserInfo(state.currentUserProperty().get());
+        updateUserInfo(state.currentUserProperty()
+                            .get());
 
-        state.getWorkspaces()
-                .addListener((javafx.collections.ListChangeListener<Workspace>) c -> updateWorkspaceGrid());
+        state.getWorkspaces().addListener((ListChangeListener<Workspace>) c -> updateWorkspaceGrid());
         updateWorkspaceGrid();
 
         state.detectedFreeRdpProperty().addListener((obs, oldVal, newVal) -> updateFreeRdpLabel(newVal));
-        updateFreeRdpLabel(state.detectedFreeRdpProperty().get());
+        updateFreeRdpLabel(state.detectedFreeRdpProperty()
+                                .get());
 
         state.lastSyncedProperty().addListener((obs, oldVal, newVal) -> updateLastSyncedLabel(newVal));
     }
@@ -248,99 +241,102 @@ public final class MainView extends BorderPane {
     }
 
     private void updateWorkspaceGrid() {
-        Platform.runLater(() -> {
-            workspaceContainer.getChildren().clear();
+        Platform.runLater(
+                () -> {
+                    workspaceContainer.getChildren().clear();
 
-            String query =
-                    searchField.getText() != null ? searchField.getText().trim().toLowerCase(Locale.ROOT) : "";
-            List<Workspace> allWorkspaces = state.getWorkspaces();
+                    String query = searchField.getText() != null ? searchField.getText()
+                            .trim()
+                            .toLowerCase(Locale.ROOT)
+                            : "";
+                    List<Workspace> allWorkspaces = state.getWorkspaces();
 
-            // Collect active resource IDs to clean up orphaned cards
-            java.util.Set<String> activeIds = new java.util.HashSet<>();
-            for (Workspace ws : allWorkspaces) {
-                for (WorkspaceResource r : ws.resources()) {
-                    activeIds.add(r.identityKey());
-                }
-            }
-            cardCache.entrySet().removeIf(entry -> {
-                if (!activeIds.contains(entry.getKey())) {
-                    entry.getValue().cleanup();
-                    return true;
-                }
-                return false;
-            });
+                    // Collect active resource IDs to clean up orphaned cards
+                    Set<String> activeIds = new HashSet<>();
+                    for (Workspace ws : allWorkspaces) {
+                        for (WorkspaceResource r : ws.resources()) {
+                            activeIds.add(r.identityKey());
+                        }
+                    }
+                    cardCache.entrySet().removeIf(entry -> {
+                        if (!activeIds.contains(entry.getKey())) {
+                            entry.getValue().cleanup();
+                            return true;
+                        }
+                        return false;
+                    });
 
-            int matchedResources = 0;
+                    int matchedResources = 0;
 
-            for (Workspace ws : allWorkspaces) {
-                List<WorkspaceResource> filtered = ws.resources().stream()
-                        .filter(res -> query.isEmpty()
-                                || res.title().toLowerCase(Locale.ROOT).contains(query)
-                                || res.displaySubtitle()
-                                        .toLowerCase(Locale.ROOT)
-                                        .contains(query)
-                                || res.id().toLowerCase(Locale.ROOT).contains(query))
-                        .toList();
+                    for (Workspace ws : allWorkspaces) {
+                        List<WorkspaceResource> filtered = ws.resources().stream()
+                                .filter(res ->
+                                        query.isEmpty()
+                                                || res.title()
+                                                      .toLowerCase(Locale.ROOT)
+                                                      .contains(query)
+                                                || res.displaySubtitle()
+                                                      .toLowerCase(Locale.ROOT)
+                                                      .contains(query)
+                                                || res.id()
+                                                      .toLowerCase(Locale.ROOT)
+                                                      .contains(query))
+                                .toList();
 
-                if (!filtered.isEmpty()) {
-                    matchedResources += filtered.size();
+                        if (!filtered.isEmpty()) {
+                            matchedResources += filtered.size();
 
-                    VBox section = new VBox(12);
+                            VBox section = new VBox(12);
 
-                    Label sectionHeading = new Label(ws.tenantDisplayName());
-                    sectionHeading.getStyleClass().add("workspace-heading");
+                            Label sectionHeading = new Label(ws.tenantDisplayName());
+                            sectionHeading.getStyleClass().add("workspace-heading");
 
-                    FlowPane flowPane = new FlowPane();
-                    flowPane.setHgap(16);
-                    flowPane.setVgap(16);
-                    flowPane.setPrefWrapLength(800);
+                            FlowPane flowPane = new FlowPane();
+                            flowPane.setHgap(16);
+                            flowPane.setVgap(16);
+                            flowPane.setPrefWrapLength(800);
 
-                    for (WorkspaceResource res : filtered) {
-                        ResourceCard card =
-                                cardCache.computeIfAbsent(res.identityKey(), id -> new ResourceCard(res, state));
-                        flowPane.getChildren().add(card);
+                            for (WorkspaceResource res : filtered) {
+                                ResourceCard card = cardCache.computeIfAbsent(res.identityKey(), id -> new ResourceCard(res, state));
+                                if (card.getParent() instanceof FlowPane oldParent) {
+                                    oldParent.getChildren().remove(card);
+                                }
+                                flowPane.getChildren().add(card);
+                            }
+
+                            section.getChildren().addAll(sectionHeading, flowPane);
+                            workspaceContainer.getChildren().add(section);
+                        }
                     }
 
-                    section.getChildren().addAll(sectionHeading, flowPane);
-                    workspaceContainer.getChildren().add(section);
-                }
-            }
+                    resourceCountLabel.setText(matchedResources + (matchedResources == 1 ? " resource" : " resources"));
 
-            resourceCountLabel.setText(matchedResources + (matchedResources == 1 ? " resource" : " resources"));
+                    if (matchedResources == 0) {
+                        VBox emptyBox = new VBox(12);
+                        emptyBox.setAlignment(Pos.CENTER);
+                        emptyBox.setPadding(new Insets(60, 20, 60, 20));
 
-            if (matchedResources == 0) {
-                VBox emptyBox = new VBox(12);
-                emptyBox.setAlignment(Pos.CENTER);
-                emptyBox.setPadding(new Insets(60, 20, 60, 20));
+                        Label emptyTitle = new Label(query.isEmpty() ? "No Cloud PCs or Apps Found" : "No matches for \"" + query + "\"");
+                        emptyTitle.getStyleClass().add("signin-title");
+                        Label emptySubtitle = new Label(query.isEmpty() ? "Click Refresh to check for available Windows 365 or AVD resources." : "Try adjusting your search terms.");
+                        emptySubtitle.getStyleClass().add("signin-subtitle");
 
-                Label emptyTitle =
-                        new Label(query.isEmpty() ? "No Cloud PCs or Apps Found" : "No matches for \"" + query + "\"");
-                emptyTitle.getStyleClass().add("signin-title");
-                Label emptySubtitle = new Label(
-                        query.isEmpty()
-                                ? "Click Refresh to check for available Windows 365 or AVD resources."
-                                : "Try adjusting your search terms.");
-                emptySubtitle.getStyleClass().add("signin-subtitle");
+                        Button emptyRefreshBtn = new Button("Refresh Workspaces");
+                        emptyRefreshBtn.getStyleClass().add("btn-primary");
+                        emptyRefreshBtn.setOnAction(e -> state.refreshWorkspacesAsync(true));
 
-                Button emptyRefreshBtn = new Button("Refresh Workspaces");
-                emptyRefreshBtn.getStyleClass().add("btn-primary");
-                emptyRefreshBtn.setOnAction(e -> state.refreshWorkspacesAsync(true));
-
-                if (query.isEmpty()) {
-                    emptyBox.getChildren().addAll(emptyTitle, emptySubtitle, emptyRefreshBtn);
-                } else {
-                    emptyBox.getChildren().addAll(emptyTitle, emptySubtitle);
-                }
-            }
-        });
+                        if (query.isEmpty()) {
+                            emptyBox.getChildren().addAll(emptyTitle, emptySubtitle, emptyRefreshBtn);
+                        } else {
+                            emptyBox.getChildren().addAll(emptyTitle, emptySubtitle);
+                        }
+                    }
+                });
     }
 
     private void handleSignOut() {
-        Alert alert = new Alert(
-                Alert.AlertType.CONFIRMATION,
-                "Are you sure you want to sign out of Windows 365 / AVD?",
-                ButtonType.YES,
-                ButtonType.NO);
+        Alert alert = new Alert(AlertType.CONFIRMATION, "Are you sure you want to sign out of Windows 365 / AVD?",
+                ButtonType.YES, ButtonType.NO);
         alert.setTitle("Sign Out");
         alert.setHeaderText("Sign Out Confirmation");
         alert.showAndWait().ifPresent(btn -> {
@@ -354,19 +350,17 @@ public final class MainView extends BorderPane {
         FreeRdpInfo engine = state.detectedFreeRdpProperty().get();
         String engineText = engine != null ? engine.displayName() : "Not detected";
         ButtonType aboutButton = new ButtonType("About");
-        Alert alert = new Alert(
-                Alert.AlertType.INFORMATION,
-                "RDP session shortcuts:\n\n"
-                        + "F12  Disconnect session\n"
-                        + "F11  Minimize session\n"
-                        + "F10  Toggle fullscreen\n"
-                        + "Ctrl + Alt + Enter  Toggle FreeRDP fullscreen when supported\n\n"
-                        + "Teams optimization:\n"
-                        + "Teams media optimization is not available through generic Linux FreeRDP. "
-                        + "Use Teams locally for meetings.\n\n"
-                        + "FreeRDP engine: " + engineText,
-                aboutButton,
-                ButtonType.OK);
+        Alert alert = new Alert(AlertType.INFORMATION, "RDP session shortcuts:\n\n"
+                + "F12  Disconnect session\n"
+                + "F11  Minimize session\n"
+                + "F10  Toggle fullscreen\n"
+                + "Ctrl + Alt + Enter  Toggle FreeRDP fullscreen when supported\n\n"
+                + "Teams optimization:\n"
+                + "Teams media optimization is not available through generic Linux FreeRDP. "
+                + "Use Teams locally for meetings.\n\n"
+                + "FreeRDP engine: "
+                + engineText,
+                aboutButton, ButtonType.OK);
         alert.setTitle("JW365 Help");
         alert.setHeaderText("Shortcuts and connection help");
         if (alert.showAndWait().orElse(ButtonType.OK) == aboutButton) {
@@ -376,19 +370,13 @@ public final class MainView extends BorderPane {
 
     private void showAbout() {
         ButtonType githubButton = new ButtonType("Open GitHub");
-        Alert alert = new Alert(
-                Alert.AlertType.INFORMATION,
-                "JW365\n"
-                        + "Windows 365 and Azure Virtual Desktop client for Linux\n\n"
-                        + "Version " + AppVersion.VERSION + "\n"
-                        + "https://github.com/alaurie/JW365",
-                githubButton,
-                ButtonType.OK);
+        Alert alert = new Alert(AlertType.INFORMATION, "JW365\n" + "Windows 365 and Azure Virtual Desktop client for Linux\n\n" + "Version " + AppVersion.VERSION + "\n" + "https://github.com/alaurie/JW365",
+                githubButton, ButtonType.OK);
         alert.setTitle("About JW365");
         alert.setHeaderText("JW365");
         if (alert.showAndWait().orElse(ButtonType.OK) == githubButton) {
             try {
-                java.awt.Desktop.getDesktop().browse(java.net.URI.create("https://github.com/alaurie/JW365"));
+                Desktop.getDesktop().browse(URI.create("https://github.com/alaurie/JW365"));
             } catch (Exception e) {
                 state.statusMessageProperty().set("GitHub: https://github.com/alaurie/JW365");
             }

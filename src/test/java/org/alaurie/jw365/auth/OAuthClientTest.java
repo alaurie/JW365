@@ -1,7 +1,5 @@
 package org.alaurie.jw365.auth;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -9,9 +7,12 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class OAuthClientTest {
 
@@ -19,13 +20,7 @@ class OAuthClientTest {
     @DisplayName("TokenResponse expiration logic operates accurately")
     void testTokenResponseExpiration() {
         long now = Instant.now().getEpochSecond();
-        TokenResponse validTokens = new TokenResponse(
-                "access_token_123",
-                "refresh_token_456",
-                "id_token_789",
-                "Bearer",
-                3600,
-                "https://www.wvd.microsoft.com/.default",
+        TokenResponse validTokens = new TokenResponse("access_token_123", "refresh_token_456", "id_token_789", "Bearer", 3600, "https://www.wvd.microsoft.com/.default",
                 now);
 
         assertThat(validTokens.isExpired()).isFalse();
@@ -33,26 +28,16 @@ class OAuthClientTest {
         assertThat(validTokens.hasRefreshToken()).isTrue();
         assertThat(validTokens.expiresAt()).isEqualTo(Instant.ofEpochSecond(now + 3600));
 
-        TokenResponse expiringTokens = new TokenResponse(
-                "access_token_123",
-                "refresh_token_456",
-                "id_token_789",
-                "Bearer",
-                120, // 2 minutes left
-                "https://www.wvd.microsoft.com/.default",
+        TokenResponse expiringTokens = new TokenResponse("access_token_123", "refresh_token_456", "id_token_789", "Bearer", 120, // 2 minutes left
+         "https://www.wvd.microsoft.com/.default",
                 now);
 
         assertThat(expiringTokens.isExpired()).isFalse();
         assertThat(expiringTokens.isExpiringSoon()).isTrue();
         assertThat(expiringTokens.isExpiringWithin(Duration.ofMinutes(5))).isTrue();
 
-        TokenResponse expiredTokens = new TokenResponse(
-                "access_token_123",
-                "refresh_token_456",
-                "id_token_789",
-                "Bearer",
-                -10, // already expired
-                "https://www.wvd.microsoft.com/.default",
+        TokenResponse expiredTokens = new TokenResponse("access_token_123", "refresh_token_456", "id_token_789", "Bearer", -10, // already expired
+         "https://www.wvd.microsoft.com/.default",
                 now);
 
         assertThat(expiredTokens.isExpired()).isTrue();
@@ -61,7 +46,8 @@ class OAuthClientTest {
     @Test
     @DisplayName("JwtClaimsParser accurately extracts UPN, names, emails, and tenant ID from JWT payload")
     void testJwtClaimsParser() {
-        String jsonPayload = """
+        String jsonPayload =
+                """
             {
               "aud": "a85cf173-4192-42f8-81fa-777a763e6e2c",
               "iss": "https://login.microsoftonline.com/contoso-tenant-id/v2.0",
@@ -75,8 +61,9 @@ class OAuthClientTest {
             }
             """;
 
-        String base64Payload =
-                Base64.getUrlEncoder().withoutPadding().encodeToString(jsonPayload.getBytes(StandardCharsets.UTF_8));
+        String base64Payload = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(jsonPayload.getBytes(StandardCharsets.UTF_8));
         String syntheticJwt = "eyJhbGciOiJSUzI1NiJ9." + base64Payload + ".signature123";
 
         UserClaims claims = JwtClaimsParser.parseIdToken(syntheticJwt);
@@ -98,13 +85,11 @@ class OAuthClientTest {
     void embeddedAuthorizationUrlUsesQueryResponseMode() {
         PkceChallenge challenge = new PkceChallenge("verifier", PkceChallenge.computeS256("verifier"), "state-value");
 
-        URI authorizeUri = new OAuthClient()
-                .buildAuthorizeUrl(OAuthClient.DEFAULT_TENANT, challenge, OAuthClient.REDIRECT_URI, null);
+        URI authorizeUri = new OAuthClient().buildAuthorizeUrl(OAuthClient.DEFAULT_TENANT, challenge, OAuthClient.REDIRECT_URI, null);
 
-        assertThat(authorizeUri.getRawQuery().split("&"))
-                .as(authorizeUri.toString())
-                .filteredOn(query -> query.startsWith("response_mode="))
-                .containsExactly("response_mode=query");
+        assertThat(authorizeUri.getRawQuery().split("&")).as(authorizeUri.toString())
+                               .filteredOn(query -> query.startsWith("response_mode="))
+                               .containsExactly("response_mode=query");
         assertThat(authorizeUri.getRawQuery()).contains("state=state-value");
     }
 

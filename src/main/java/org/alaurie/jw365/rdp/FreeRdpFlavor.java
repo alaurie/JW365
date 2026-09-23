@@ -33,12 +33,24 @@ public enum FreeRdpFlavor {
             return CUSTOM;
         }
         String lower = name.toLowerCase();
-        if (lower.contains("sdl-freerdp")) return SDL_FREERDP;
-        if (lower.contains("xfreerdp3")) return XFREERDP3;
-        if (lower.contains("xfreerdp")) return XFREERDP;
-        if (lower.contains("wlfreerdp3")) return WLFREERDP3;
-        if (lower.contains("wlfreerdp")) return WLFREERDP;
-        if (lower.contains("flatpak")) return FLATPAK;
+        if (lower.contains("sdl-freerdp")) {
+            return SDL_FREERDP;
+        }
+        if (lower.contains("xfreerdp3")) {
+            return XFREERDP3;
+        }
+        if (lower.contains("xfreerdp")) {
+            return XFREERDP;
+        }
+        if (lower.contains("wlfreerdp3")) {
+            return WLFREERDP3;
+        }
+        if (lower.contains("wlfreerdp")) {
+            return WLFREERDP;
+        }
+        if (lower.contains("flatpak")) {
+            return FLATPAK;
+        }
         return CUSTOM;
     }
 }

@@ -3,6 +3,8 @@ package org.alaurie.jw365.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.List;
 
 /**
  * Resolves standard XDG Base Directory specification paths on Linux.
@@ -78,21 +80,24 @@ public final class XdgPaths {
         ensureDir(dir);
         return dir;
     }
+
     /**
-     * Path to persistent WebView user data (localStorage, sessionStorage, IndexedDB, WebKit cache).
+     * Path to persistent WebView user data (localStorage, sessionStorage,
+     * IndexedDB, WebKit cache).
      */
     public static Path webViewDataDir() {
         Path dir = dataDir().resolve("webview");
         ensureDir(dir);
         try {
-            Files.setPosixFilePermissions(dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
         } catch (Exception _) {
         }
         return dir;
     }
 
     /**
-     * Retains the most recent log files and prunes older session logs to prevent disk clutter.
+     * Retains the most recent log files and prunes older session logs to
+     * prevent disk clutter.
      */
     public static synchronized void pruneOldLogs(int maxFilesToKeep) {
         pruneOldLogs(logsDir(), maxFilesToKeep);
@@ -100,18 +105,22 @@ public final class XdgPaths {
 
     /** Prunes only the supplied directory; useful for isolated callers and tests. */
     public static synchronized void pruneOldLogs(Path dir, int maxFilesToKeep) {
-        if (dir == null || maxFilesToKeep < 0) return;
+        if (dir == null || maxFilesToKeep < 0) {
+            return;
+        }
         ensureDir(dir);
         try {
             try {
-                Files.setPosixFilePermissions(
-                        dir, java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
+                Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
             } catch (UnsupportedOperationException _) {
             }
             try (var stream = Files.list(dir)) {
-                java.util.List<Path> logFiles = stream.filter(
-                                p -> p.getFileName().toString().startsWith("session_")
-                                        && p.getFileName().toString().endsWith(".log"))
+                List<Path> logFiles = stream.filter(p -> p.getFileName()
+                                .toString()
+                                .startsWith("session_")
+                                && p.getFileName()
+                                    .toString()
+                                    .endsWith(".log"))
                         .sorted((a, b) -> {
                             try {
                                 return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
@@ -124,12 +133,12 @@ public final class XdgPaths {
                 for (int i = 0; i < logFiles.size(); i++) {
                     Path log = logFiles.get(i);
                     long size = Files.size(log);
-                    if (i >= maxFilesToKeep || retainedBytes + size > 32L * 1024 * 1024) Files.deleteIfExists(log);
-                    else {
+                    if (i >= maxFilesToKeep || retainedBytes + size > 32L * 1024 * 1024) {
+                        Files.deleteIfExists(log);
+                    } else {
                         retainedBytes += size;
                         try {
-                            Files.setPosixFilePermissions(
-                                    log, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+                            Files.setPosixFilePermissions(log, PosixFilePermissions.fromString("rw-------"));
                         } catch (UnsupportedOperationException _) {
                         }
                     }

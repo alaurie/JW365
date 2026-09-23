@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -16,19 +17,22 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.alaurie.jw365.config.XdgPaths;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Thread-safe secure token storage supporting Linux Secret Service (GNOME Keyring)
- * with automatic fallback to hardware-bound AES-256-GCM encrypted local storage (POSIX 0600).
+ * Thread-safe secure token storage supporting Linux Secret Service (GNOME
+ * Keyring) with automatic fallback to hardware-bound AES-256-GCM encrypted
+ * local storage (POSIX 0600).
  */
 public final class TokenStore {
 
-    private static final ObjectMapper MAPPER =
-            JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .build();
     private static final Duration SECRET_TOOL_LOOKUP_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration SECRET_TOOL_WRITE_TIMEOUT = Duration.ofSeconds(3);
     private static final Duration SECRET_TOOL_CLEAR_TIMEOUT = Duration.ofSeconds(2);
@@ -52,8 +56,8 @@ public final class TokenStore {
     }
 
     /**
-     * Loads the cached token response.
-     * Checks Secret Service Keyring -> Encrypted machine-bound file -> Legacy plaintext migration.
+     * Loads the cached token response. Checks Secret Service Keyring ->
+     * Encrypted machine-bound file -> Legacy plaintext migration.
      */
     public synchronized Optional<TokenResponse> load() {
         Optional<String> keyringJson = loadFromSecretTool();
@@ -90,8 +94,7 @@ public final class TokenStore {
                 }
             } catch (Exception e) {
                 // Keep the plaintext file so a transient Secret Service/filesystem failure can be retried.
-                System.err.println("Warning: Failed to migrate plaintext token cache; it was retained for retry: "
-                        + e.getMessage());
+                System.err.println("Warning: Failed to migrate plaintext token cache; it was retained for retry: " + e.getMessage());
             }
         }
 
@@ -128,12 +131,8 @@ public final class TokenStore {
                 } catch (UnsupportedOperationException _) {
                 }
                 try {
-                    Files.move(
-                            tempFile,
-                            encryptedFile,
-                            StandardCopyOption.REPLACE_EXISTING,
-                            StandardCopyOption.ATOMIC_MOVE);
-                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(tempFile, encryptedFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException e) {
                     Files.move(tempFile, encryptedFile, StandardCopyOption.REPLACE_EXISTING);
                 }
             } finally {
@@ -165,10 +164,7 @@ public final class TokenStore {
         if (!hasSecretTool()) {
             return true;
         }
-        SecretToolResult result = runSecretTool(
-                List.of("secret-tool", "clear", "service", "jw365", "account", "default"),
-                null,
-                SECRET_TOOL_CLEAR_TIMEOUT);
+        SecretToolResult result = runSecretTool(List.of("secret-tool", "clear", "service", "jw365", "account", "default"), null, SECRET_TOOL_CLEAR_TIMEOUT);
         if (result.timedOut()) {
             System.err.println("Warning: Secret Service clear timed out");
         } else if (!result.success()) {
@@ -196,10 +192,8 @@ public final class TokenStore {
         if (!hasSecretTool()) {
             return Optional.empty();
         }
-        SecretToolResult result = runSecretTool(
-                List.of("secret-tool", "lookup", "service", "jw365", "account", "default"),
-                null,
-                SECRET_TOOL_LOOKUP_TIMEOUT);
+        SecretToolResult result = runSecretTool(List.of("secret-tool", "lookup", "service", "jw365", "account", "default"),
+                null, SECRET_TOOL_LOOKUP_TIMEOUT);
         if (result.success()) {
             String out = new String(result.output(), StandardCharsets.UTF_8).trim();
             if (!out.isBlank()) {
@@ -216,7 +210,8 @@ public final class TokenStore {
             return true;
         }
         SecretToolResult result = runSecretTool(
-                List.of("secret-tool", "store", "--label=JW365 Token", "service", "jw365", "account", "default"),
+                List.of("secret-tool", "store", "--label=JW365 Token", "service", "jw365", "account",
+                        "default"),
                 secret.getBytes(StandardCharsets.UTF_8),
                 SECRET_TOOL_WRITE_TIMEOUT);
         if (result.timedOut()) {
@@ -233,8 +228,7 @@ public final class TokenStore {
         try {
             process = new ProcessBuilder(command).redirectErrorStream(true).start();
             Process activeProcess = process;
-            Thread reader =
-                    Thread.ofVirtual().start(() -> output.set(readProcessOutput(activeProcess.getInputStream())));
+            Thread reader = Thread.ofVirtual().start(() -> output.set(readProcessOutput(activeProcess.getInputStream())));
             try {
                 if (stdin != null) {
                     process.getOutputStream().write(stdin);
