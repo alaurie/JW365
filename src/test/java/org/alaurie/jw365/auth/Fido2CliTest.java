@@ -130,9 +130,9 @@ class Fido2CliTest {
     @Test
     @DisplayName("Device listing strips the trailing colon from hidraw paths")
     void parsesDeviceList() {
-        List<String> devices = Fido2Cli.parseDeviceList("/dev/hidraw9: vendor=0x1050, product=0x0402 (Yubico YubiKey FIDO)\n");
+        List<String> devices = Fido2Cli.parseDeviceList("/dev/hidraw9: vendor=0x1050, product=0x0402 (Yubico YubiKey FIDO)\n" + "/dev/hidraw12: vendor=0x1050, product=0x0407 (Yubico YubiKey OTP+FIDO+CCID)\n");
 
-        assertThat(devices).containsExactly("/dev/hidraw9");
+        assertThat(devices).containsExactly("/dev/hidraw9", "/dev/hidraw12");
     }
 
     @Test

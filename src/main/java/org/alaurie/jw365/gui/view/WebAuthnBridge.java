@@ -31,6 +31,7 @@ import org.alaurie.jw365.auth.Fido2Cli.Assertion;
 import org.alaurie.jw365.auth.Fido2Cli.Failure;
 import org.alaurie.jw365.auth.Fido2Cli.Fido2Exception;
 import org.alaurie.jw365.auth.Fido2Cli.Request;
+import org.alaurie.jw365.auth.Fido2Cli.Target;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -59,9 +60,9 @@ public final class WebAuthnBridge {
      * supplier is read when a prompt is shown, so a window that is not yet
      * showing can pass null until it is.
      */
-    public static void attach(WebEngine engine, Supplier<Window> owner) {
+    public static Runnable attach(WebEngine engine, Supplier<Window> owner) {
         if (!Fido2Cli.isAvailable()) {
-            return;
+            return () -> {};
         }
         // The listener keeps the bridge reachable; the JS side only holds it weakly.
         WebAuthnBridge bridge = new WebAuthnBridge(owner);
@@ -70,6 +71,16 @@ public final class WebAuthnBridge {
                 bridge.inject(engine);
             }
         });
+        return bridge::cancelActive;
+    }
+
+    /** Aborts a ceremony in flight, for the owning dialog's close path. */
+    public void cancelActive() {
+        synchronized (this) {
+            if (active != null) {
+                active.cancel();
+            }
+        }
     }
 
     @SuppressWarnings("removal")
@@ -126,11 +137,12 @@ public final class WebAuthnBridge {
             active = fido2;
         }
         try {
-            String device = fido2.findDevice().orElse(null);
-            if (device == null) {
+            List<String> devices = fido2.findDevices();
+            if (devices.isEmpty()) {
                 return errorJson("NotAllowedError", "No security key found. Plug in your security key and try again.");
             }
-            boolean needsPin = request.requiresUserVerification() || request.allowCredentials().isEmpty();
+            Target target = fido2.selectTarget(request, devices);
+            boolean needsPin = request.requiresUserVerification() || target.credentialIds().isEmpty();
             String pin = null;
             String pinError = null;
             while (true) {
@@ -142,7 +154,7 @@ public final class WebAuthnBridge {
                 }
                 Runnable closeTouchPrompt = showTouchPrompt(fido2);
                 try {
-                    Assertion assertion = fido2.getAssertion(request, device, pin);
+                    Assertion assertion = fido2.getAssertion(request, target, pin);
                     System.err.println("WebAuthn: assertion completed");
                     return assertionJson(assertion);
                 } catch (Fido2Exception e) {
@@ -157,7 +169,7 @@ public final class WebAuthnBridge {
                 }
             }
         } catch (Fido2Exception e) {
-            System.err.println("WebAuthn: device lookup failed: " + e.failure());
+            System.err.println("WebAuthn: key selection failed: " + e.failure());
             return errorJson("NotAllowedError", e.getMessage());
         } finally {
             synchronized (this) {

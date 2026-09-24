@@ -15,7 +15,6 @@ import java.util.Base64.Decoder;
 import java.util.Base64.Encoder;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -94,6 +93,7 @@ public final class Fido2Cli {
 
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private volatile Process current;
+    private volatile long deadline;
 
     /** True when the fido2-tools binaries this class needs are on PATH. */
     public static boolean isAvailable() {
@@ -112,13 +112,13 @@ public final class Fido2Cli {
         }
     }
 
-    /** First connected FIDO2 device path, from {@code fido2-token -L}. */
-    public Optional<String> findDevice() throws Fido2Exception {
+    /** Connected FIDO2 device paths, from {@code fido2-token -L}. */
+    public List<String> findDevices() throws Fido2Exception {
         CliResult result = run(List.of("fido2-token", "-L"), List.of(), null, PROBE_TIMEOUT_MS);
         if (result.exitCode() != 0) {
-            return Optional.empty();
+            return List.of();
         }
-        return parseDeviceList(result.stdout()).stream().findFirst();
+        return parseDeviceList(result.stdout());
     }
 
     static List<String> parseDeviceList(String stdout) {
@@ -133,22 +133,67 @@ public final class Fido2Cli {
     }
 
     /**
-     * Runs the full assertion ceremony on {@code device}. The PIN is only used
-     * when user verification is required or the request has no allowCredentials
-     * (listing resident credentials is PIN gated on every key).
+     * The key to assert with and the credential ids to try on it; an empty list
+     * means discoverable.
      */
-    public Assertion getAssertion(Request request, String device, String pin) throws Fido2Exception {
-        byte[] clientDataJson = clientDataJson(request.challenge(), request.origin());
-        String clientDataHash = Base64.getEncoder().encodeToString(sha256(clientDataJson));
-        String rpId = sanitize(request.rpId());
-        List<String> inputLines = List.of(clientDataHash, rpId);
-        long timeoutMs = request.timeoutMs() > 0 ? Math.max(MIN_TIMEOUT_MS, request.timeoutMs()) : DEFAULT_TIMEOUT_MS;
-        long startedAt = System.currentTimeMillis();
+    public record Target(String device, List<String> credentialIds) {}
 
-        List<String> candidates = request.allowCredentials();
+    /**
+     * Picks the key and credential without user interaction. Silent probes
+     * ({@code -t up=false}) ask each key whether it holds each listed
+     * credential, so the user touches once instead of once per entry, and a
+     * second connected key is used when the first lacks the passkey. Falls
+     * back to every listed credential on the first key when nothing probes
+     * present (credProtect can hide credentials from silent probes). Probes
+     * share the relying party's timeout with the assertion itself.
+     */
+    public Target selectTarget(Request request, List<String> devices) throws Fido2Exception {
+        deadline = System.currentTimeMillis() + timeoutFor(request);
+        List<String> allow = request.allowCredentials();
+        if (allow.isEmpty()) {
+            // ponytail: listing resident credentials is PIN gated and PINs differ per key, so only the first key is tried
+            return new Target(devices.getFirst(), List.of());
+        }
+        if (allow.size() == 1 && devices.size() == 1) {
+            return new Target(devices.getFirst(), allow);
+        }
+        List<String> prefix = stdinPrefix(request);
+        for (String device : devices) {
+            for (String credentialId : allow) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return new Target(devices.getFirst(), allow);
+                }
+                List<String> lines = new ArrayList<>(prefix);
+                lines.add(toStandardBase64(credentialId));
+                CliResult result = run(List.of("fido2-assert", "-G", "-t", "up=false", device),
+                        lines, null, Math.min(PROBE_TIMEOUT_MS, remaining));
+                if (result.exitCode() == 0) {
+                    return new Target(device, List.of(credentialId));
+                }
+            }
+        }
+        return new Target(devices.getFirst(), allow);
+    }
+
+    /**
+     * Runs the assertion on the selected key. The PIN is only used when user
+     * verification is required or the target is discoverable (listing resident
+     * credentials is PIN gated on every key).
+     */
+    public Assertion getAssertion(Request request, Target target, String pin) throws Fido2Exception {
+        if (deadline == 0) {
+            deadline = System.currentTimeMillis() + timeoutFor(request);
+        }
+        byte[] clientDataJson = clientDataJson(request.challenge(), request.origin());
+        String rpId = sanitize(request.rpId());
+        List<String> inputLines = stdinPrefix(request);
+        String device = target.device();
+
+        List<String> candidates = target.credentialIds();
         String residentUserHandle = null;
         if (candidates.isEmpty()) {
-            List<ResidentCredential> resident = listResidentCredentials(rpId, device, pin, timeoutMs);
+            List<ResidentCredential> resident = listResidentCredentials(rpId, device, pin, remainingMs());
             if (resident.isEmpty()) {
                 throw new Fido2Exception(Failure.NO_CREDENTIALS, "No passkey for this site is stored on the security key. Start the sign-in by entering your email address instead.");
             }
@@ -159,8 +204,6 @@ public final class Fido2Cli {
             candidates = List.of(resident.getFirst()
                     .credentialId());
             residentUserHandle = resident.getFirst().userHandle();
-        } else if (candidates.size() > 1) {
-            candidates = narrowCandidates(candidates, inputLines, device);
         }
 
         List<String> args = new ArrayList<>(List.of("fido2-assert", "-G"));
@@ -172,10 +215,9 @@ public final class Fido2Cli {
 
         Fido2Exception lastFailure = null;
         for (String credentialId : candidates) {
-            long remainingMs = Math.max(MIN_TIMEOUT_MS, timeoutMs - (System.currentTimeMillis() - startedAt));
             List<String> lines = new ArrayList<>(inputLines);
             lines.add(toStandardBase64(credentialId));
-            CliResult result = run(args, lines, assertPin, remainingMs);
+            CliResult result = run(args, lines, assertPin, remainingMs());
             if (result.exitCode() == 0) {
                 Assertion assertion = parseAssertionOutput(result.stdout(), rpId, clientDataJson, credentialId);
                 if (assertion.userHandle() == null && residentUserHandle != null) {
@@ -193,23 +235,22 @@ public final class Fido2Cli {
         throw lastFailure != null ? lastFailure : new Fido2Exception(Failure.OTHER, "No credential to assert with");
     }
 
+    private long remainingMs() {
+        return Math.max(MIN_TIMEOUT_MS, deadline - System.currentTimeMillis());
+    }
+
+    private static long timeoutFor(Request request) {
+        return request.timeoutMs() > 0 ? Math.max(MIN_TIMEOUT_MS, request.timeoutMs()) : DEFAULT_TIMEOUT_MS;
+    }
+
     /**
-     * Silent probes ({@code -t up=false}) find the one listed credential that
-     * lives on this key, so the user touches once instead of once per entry.
-     * Falls back to the full list when nothing probes present.
+     * The first two stdin lines every fido2-assert call shares: client data
+     * hash and rpId.
      */
-    private List<String> narrowCandidates(List<String> allowCredentials, List<String> inputLines, String device) throws Fido2Exception {
-        for (String credentialId : allowCredentials) {
-            List<String> lines = new ArrayList<>(inputLines);
-            lines.add(toStandardBase64(credentialId));
-            CliResult result = run(List.of("fido2-assert", "-G", "-t", "up=false", device),
-                    lines, null, PROBE_TIMEOUT_MS);
-            if (result.exitCode() == 0) {
-                return List.of(credentialId);
-            }
-            throwIfCancelled();
-        }
-        return allowCredentials;
+    private static List<String> stdinPrefix(Request request) {
+        byte[] clientDataJson = clientDataJson(request.challenge(), request.origin());
+        return List.of(Base64.getEncoder().encodeToString(sha256(clientDataJson)),
+                sanitize(request.rpId()));
     }
 
     private List<ResidentCredential> listResidentCredentials(String rpId, String device, String pin,
@@ -465,7 +506,7 @@ public final class Fido2Cli {
                 if (!pinWritten && pin != null && sink.toString(StandardCharsets.UTF_8).contains("Enter PIN for")) {
                     pinWritten = true;
                     OutputStream stdin = process.getOutputStream();
-                    stdin.write((pin.trim() + "\n").getBytes(StandardCharsets.UTF_8));
+                    stdin.write((pin + "\n").getBytes(StandardCharsets.UTF_8));
                     stdin.flush();
                     stdin.close();
                 }

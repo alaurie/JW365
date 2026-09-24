@@ -42,6 +42,7 @@ public final class AuthDialog extends Stage {
     private final ProgressBar progressBar;
     private final Label statusLabel;
     private boolean codeIntercepted = false;
+    private final Runnable cancelWebAuthn;
 
     public AuthDialog(Window owner, AppState state) {
         this.state = state;
@@ -94,7 +95,7 @@ public final class AuthDialog extends Stage {
             System.err.println("Warning: Could not configure WebEngine userDataDirectory: " + e.getMessage());
         }
         root.setCenter(webView);
-        WebAuthnBridge.attach(webEngine, () -> this);
+        cancelWebAuthn = WebAuthnBridge.attach(webEngine, () -> this);
 
         // Build Authorize URL with nativeclient redirect
         ClientConfig config = state.getConfigManager().get();
@@ -139,6 +140,7 @@ public final class AuthDialog extends Stage {
     }
 
     private void cleanupWebEngine() {
+        cancelWebAuthn.run();
         Platform.runLater(() -> {
             try {
                 if (webView.getEngine()

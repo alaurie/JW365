@@ -51,6 +51,7 @@ public final class SessionAuthDialog extends Stage {
     private final WebView webView;
     private final WebEngine webEngine;
     private final AtomicBoolean completed = new AtomicBoolean(false);
+    private final Runnable cancelWebAuthn;
     private Timeline displayFallbackTimer;
     private boolean isUiConstructed = false;
 
@@ -101,7 +102,7 @@ public final class SessionAuthDialog extends Stage {
                 checkLocationForRedirect(newLoc);
             }
         });
-        WebAuthnBridge.attach(webEngine, () -> isShowing() ? this : null);
+        cancelWebAuthn = WebAuthnBridge.attach(webEngine, () -> isShowing() ? this : null);
         setOnCloseRequest(e -> completeAndClose());
         setOnHidden(e -> completeAndClose());
     }
@@ -341,6 +342,7 @@ public final class SessionAuthDialog extends Stage {
 
     private void cleanupWebEngine() {
         cancelTimer();
+        cancelWebAuthn.run();
         Platform.runLater(() -> {
             try {
                 if (webEngine.getLoadWorker().isRunning()) {
