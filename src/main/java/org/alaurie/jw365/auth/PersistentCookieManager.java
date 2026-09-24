@@ -69,6 +69,7 @@ public final class PersistentCookieManager extends CookieManager {
     }
 
     public synchronized void loadCookies() {
+        deleteLegacyPlaintextFile();
         if (!Files.exists(storageFile)) {
             return;
         }
@@ -106,6 +107,34 @@ public final class PersistentCookieManager extends CookieManager {
             }
         } catch (Exception e) {
             System.err.println("Warning: Could not load persistent cookies: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Forgets the web session: every cookie in memory, the persisted cookie
+     * file, and the plaintext file older releases wrote. Without this a
+     * sign-out leaves the Microsoft session cookie behind and the next sign-in
+     * completes silently for the same account.
+     */
+    public synchronized void clearSession() {
+        getCookieStore().removeAll();
+        try {
+            Files.deleteIfExists(storageFile);
+        } catch (IOException e) {
+            System.err.println("Warning: Could not delete persisted cookies: " + e.getMessage());
+        }
+        deleteLegacyPlaintextFile();
+    }
+
+    /**
+     * Releases before 0.2.3 stored cookies unencrypted in webview-cookies.json
+     * next to the encrypted file.
+     */
+    private void deleteLegacyPlaintextFile() {
+        try {
+            Files.deleteIfExists(storageFile.resolveSibling("webview-cookies.json"));
+        } catch (IOException e) {
+            System.err.println("Warning: Could not delete legacy plaintext cookie file: " + e.getMessage());
         }
     }
 

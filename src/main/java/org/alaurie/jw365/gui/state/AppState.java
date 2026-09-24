@@ -2,6 +2,7 @@ package org.alaurie.jw365.gui.state;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.CookieHandler;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,6 +44,7 @@ import org.alaurie.jw365.auth.AuthResult.Failure;
 import org.alaurie.jw365.auth.AuthResult.Success;
 import org.alaurie.jw365.auth.JwtClaimsParser;
 import org.alaurie.jw365.auth.OAuthClient;
+import org.alaurie.jw365.auth.PersistentCookieManager;
 import org.alaurie.jw365.auth.TokenResponse;
 import org.alaurie.jw365.auth.TokenStore;
 import org.alaurie.jw365.auth.UserClaims;
@@ -191,6 +193,20 @@ public final class AppState {
         SessionAuthDialog dialog = activeAuthDialogs.remove(sessionId);
         if (dialog != null) {
             dialog.completeWithoutCancel();
+        }
+    }
+
+    /**
+     * The auth dialogs unload their pages on a later FX pulse, so WebKit's local
+     * storage is wiped after that instead of racing it. Cookies, which carry the
+     * session, live in the Java cookie store and are cleared synchronously.
+     */
+    private static void clearWebViewDataAfterDialogsUnload() {
+        try {
+            Platform.runLater(XdgPaths::clearWebViewData);
+        } catch (IllegalStateException _) {
+            // No FX toolkit (tests, headless): nothing is unloading, wipe now.
+            XdgPaths.clearWebViewData();
         }
     }
 
@@ -396,6 +412,10 @@ public final class AppState {
         synchronized (authOperationLock) {
             tokenCleared = tokenStore.clear();
             oauthClient.clearCacheAndAccounts();
+            if (CookieHandler.getDefault() instanceof PersistentCookieManager cookies) {
+                cookies.clearSession();
+            }
+            clearWebViewDataAfterDialogsUnload();
             workspaceCache.clear();
             iconMemoryCache.clear();
             iconCallbacks.clear();
