@@ -2,6 +2,7 @@ package org.alaurie.jw365.gui.state;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.CookieHandler;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,6 +44,7 @@ import org.alaurie.jw365.auth.AuthResult.Failure;
 import org.alaurie.jw365.auth.AuthResult.Success;
 import org.alaurie.jw365.auth.JwtClaimsParser;
 import org.alaurie.jw365.auth.OAuthClient;
+import org.alaurie.jw365.auth.PersistentCookieManager;
 import org.alaurie.jw365.auth.TokenResponse;
 import org.alaurie.jw365.auth.TokenStore;
 import org.alaurie.jw365.auth.UserClaims;
@@ -396,6 +398,10 @@ public final class AppState {
         synchronized (authOperationLock) {
             tokenCleared = tokenStore.clear();
             oauthClient.clearCacheAndAccounts();
+            if (CookieHandler.getDefault() instanceof PersistentCookieManager cookies) {
+                cookies.clearSession();
+            }
+            XdgPaths.clearWebViewData();
             workspaceCache.clear();
             iconMemoryCache.clear();
             iconCallbacks.clear();

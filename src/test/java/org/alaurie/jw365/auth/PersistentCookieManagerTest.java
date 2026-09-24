@@ -136,4 +136,38 @@ class PersistentCookieManagerTest {
         String joined = String.join("; ", headers.get("Cookie"));
         assertThat(joined).contains("ESTSAUTH=").contains("auto_val_999");
     }
+
+    @Test
+    @DisplayName("clearSession forgets cookies in memory and on disk, including the legacy plaintext file")
+    void testClearSession(@TempDir Path tempDir) throws Exception {
+        Path cookieFile = tempDir.resolve("webview-cookies.enc");
+        Path legacyFile = tempDir.resolve("webview-cookies.json");
+        PersistentCookieManager manager = new PersistentCookieManager(cookieFile);
+        URI uri = URI.create("https://login.microsoftonline.com/");
+        HttpCookie cookie = new HttpCookie("ESTSAUTH", "session");
+        cookie.setDomain(".microsoftonline.com");
+        cookie.setPath("/");
+        manager.getCookieStore().add(uri, cookie);
+        manager.persistCookies();
+        Files.writeString(legacyFile, "[]");
+        assertThat(cookieFile).exists();
+
+        manager.clearSession();
+
+        assertThat(manager.getCookieStore().getCookies()).isEmpty();
+        assertThat(cookieFile).doesNotExist();
+        assertThat(legacyFile).doesNotExist();
+        assertThat(new PersistentCookieManager(cookieFile).getCookieStore().getCookies()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Legacy plaintext cookie file is removed on start-up")
+    void testLegacyPlaintextFileRemovedOnLoad(@TempDir Path tempDir) throws Exception {
+        Path legacyFile = tempDir.resolve("webview-cookies.json");
+        Files.writeString(legacyFile, "[]");
+
+        new PersistentCookieManager(tempDir.resolve("webview-cookies.enc"));
+
+        assertThat(legacyFile).doesNotExist();
+    }
 }
