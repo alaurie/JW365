@@ -101,6 +101,7 @@ public final class SessionAuthDialog extends Stage {
                 checkLocationForRedirect(newLoc);
             }
         });
+        WebAuthnBridge.attach(webEngine, () -> isShowing() ? this : null);
         setOnCloseRequest(e -> completeAndClose());
         setOnHidden(e -> completeAndClose());
     }

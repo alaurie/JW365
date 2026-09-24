@@ -94,6 +94,7 @@ public final class AuthDialog extends Stage {
             System.err.println("Warning: Could not configure WebEngine userDataDirectory: " + e.getMessage());
         }
         root.setCenter(webView);
+        WebAuthnBridge.attach(webEngine, () -> this);
 
         // Build Authorize URL with nativeclient redirect
         ClientConfig config = state.getConfigManager().get();
