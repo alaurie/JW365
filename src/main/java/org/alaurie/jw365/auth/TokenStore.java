@@ -40,13 +40,24 @@ public final class TokenStore {
 
     private final Path tokenFile;
     private final Path encryptedFile;
+    private final boolean useSecretService;
 
     public TokenStore() {
         this(XdgPaths.tokenCacheFile());
     }
 
     public TokenStore(Path tokenFile) {
+        this(tokenFile, true);
+    }
+
+    /**
+     * @param useSecretService when false, only the encrypted file store is used
+     *     and secret-tool is never invoked; tests use this so they do not read
+     *     or overwrite the user's real keyring entry
+     */
+    public TokenStore(Path tokenFile, boolean useSecretService) {
         this.tokenFile = tokenFile;
+        this.useSecretService = useSecretService;
         String fileName = tokenFile.getFileName().toString();
         if (fileName.endsWith(".json")) {
             this.encryptedFile = tokenFile.resolveSibling(fileName.substring(0, fileName.length() - 5) + ".enc");
@@ -160,7 +171,7 @@ public final class TokenStore {
         return keyringCleared && filesCleared;
     }
 
-    private static boolean clearSecretTool() {
+    private boolean clearSecretTool() {
         if (!hasSecretTool()) {
             return true;
         }
@@ -184,11 +195,11 @@ public final class TokenStore {
                 || (Files.exists(tokenFile) && tokenFile.toFile().length() > 0);
     }
 
-    private static boolean hasSecretTool() {
-        return ExecutableLocator.findOnPath("secret-tool").isPresent();
+    private boolean hasSecretTool() {
+        return useSecretService && ExecutableLocator.findOnPath("secret-tool").isPresent();
     }
 
-    private static Optional<String> loadFromSecretTool() {
+    private Optional<String> loadFromSecretTool() {
         if (!hasSecretTool()) {
             return Optional.empty();
         }
@@ -205,7 +216,7 @@ public final class TokenStore {
         return Optional.empty();
     }
 
-    private static boolean saveToSecretTool(byte[] secretBytes) {
+    private boolean saveToSecretTool(byte[] secretBytes) {
         if (!hasSecretTool()) {
             return true;
         }
