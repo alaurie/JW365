@@ -52,8 +52,9 @@ public final class TokenStore {
 
     /**
      * @param useSecretService when false, only the encrypted file store is used
-     *     and secret-tool is never invoked; tests use this so they do not read
-     *     or overwrite the user's real keyring entry
+     *     and secret-tool is never invoked by load, save, clear, or
+     *     hasCachedToken; tests use this so they do not read or overwrite the
+     *     user's real keyring entry
      */
     public TokenStore(Path tokenFile, boolean useSecretService) {
         this.tokenFile = tokenFile;
@@ -67,8 +68,8 @@ public final class TokenStore {
     }
 
     /**
-     * Loads the cached token response. Checks Secret Service Keyring ->
-     * Encrypted machine-bound file -> Legacy plaintext migration.
+     * Loads the cached token response. Checks Secret Service Keyring (when
+     * enabled) -> Encrypted machine-bound file -> Legacy plaintext migration.
      */
     public synchronized Optional<TokenResponse> load() {
         Optional<String> keyringJson = loadFromSecretTool();
@@ -156,7 +157,8 @@ public final class TokenStore {
     }
 
     /**
-     * Deletes both Keyring secret and encrypted on-disk token cache.
+     * Deletes the Keyring secret (when enabled) and the encrypted on-disk token
+     * cache.
      */
     public synchronized boolean clear() {
         boolean keyringCleared = clearSecretTool();
@@ -185,7 +187,8 @@ public final class TokenStore {
     }
 
     /**
-     * Checks if a cached token exists in either the Keyring or on-disk store.
+     * Checks if a cached token exists in the Keyring (when enabled) or the
+     * on-disk store.
      */
     public synchronized boolean hasCachedToken() {
         if (hasSecretTool() && loadFromSecretTool().isPresent()) {
