@@ -196,6 +196,20 @@ public final class AppState {
         }
     }
 
+    /**
+     * The auth dialogs unload their pages on a later FX pulse, so WebKit's local
+     * storage is wiped after that instead of racing it. Cookies, which carry the
+     * session, live in the Java cookie store and are cleared synchronously.
+     */
+    private static void clearWebViewDataAfterDialogsUnload() {
+        try {
+            Platform.runLater(XdgPaths::clearWebViewData);
+        } catch (IllegalStateException _) {
+            // No FX toolkit (tests, headless): nothing is unloading, wipe now.
+            XdgPaths.clearWebViewData();
+        }
+    }
+
     private void closeAllAuthDialogs() {
         for (String id : List.copyOf(activeAuthDialogs.keySet())) {
             closeAuthDialog(id);
@@ -401,7 +415,7 @@ public final class AppState {
             if (CookieHandler.getDefault() instanceof PersistentCookieManager cookies) {
                 cookies.clearSession();
             }
-            XdgPaths.clearWebViewData();
+            clearWebViewDataAfterDialogsUnload();
             workspaceCache.clear();
             iconMemoryCache.clear();
             iconCallbacks.clear();
