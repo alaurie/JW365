@@ -132,6 +132,25 @@ public final class AuthDialog extends Stage {
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css"), "Missing stylesheet resource")
                 .toExternalForm());
         setScene(scene);
+
+        setOnHidden(e -> cleanupWebEngine());
+        setOnCloseRequest(e -> cleanupWebEngine());
+    }
+
+    private void cleanupWebEngine() {
+        Platform.runLater(() -> {
+            try {
+                if (webView.getEngine()
+                           .getLoadWorker()
+                           .isRunning()) {
+                    webView.getEngine()
+                           .getLoadWorker()
+                           .cancel();
+                }
+                webView.getEngine().load("about:blank");
+            } catch (Exception _) {
+            }
+        });
     }
 
     private void checkLocationForAuthCode(String url) {

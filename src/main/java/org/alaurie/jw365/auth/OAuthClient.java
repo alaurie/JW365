@@ -9,8 +9,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 
 import com.microsoft.aad.msal4j.AuthorizationCodeParameters;
 import com.microsoft.aad.msal4j.AuthorizationRequestUrlParameters;
@@ -41,6 +45,7 @@ public final class OAuthClient {
     private final String clientId;
     private final String scope;
     private final PublicClientApplication msalApplication;
+    private final Map<String, PublicClientApplication> applications = new ConcurrentHashMap<>();
     private final FileTokenCacheAspect tokenCacheAspect;
     private final Path signedIdentityFile;
 
@@ -59,7 +64,9 @@ public final class OAuthClient {
         this.scope = Objects.requireNonNull(scope, "scope must not be null");
         this.tokenCacheAspect = new FileTokenCacheAspect(Objects.requireNonNull(msalCacheFile, "msalCacheFile must not be null"));
         this.signedIdentityFile = msalCacheFile.resolveSibling(msalCacheFile.getFileName() + ".identity");
-        this.msalApplication = createMsalApplication(clientId, DEFAULT_TENANT, tokenCacheAspect);
+        PublicClientApplication defaultApp = createMsalApplication(clientId, DEFAULT_TENANT, tokenCacheAspect);
+        this.msalApplication = defaultApp;
+        this.applications.put(DEFAULT_TENANT, defaultApp);
     }
 
     public URI buildAuthorizeUrl(String tenant, PkceChallenge challenge, String redirectUri,
@@ -90,7 +97,8 @@ public final class OAuthClient {
             return toAuthResult(applicationFor(tenant).acquireToken(parameters)
                     .join());
         } catch (Exception e) {
-            return new Failure("authorization_code_failed", e.getMessage(), e);
+            Throwable unwrapped = unwrapException(e);
+            return new Failure("authorization_code_failed", unwrapped.getMessage(), unwrapped);
         }
     }
 
@@ -130,15 +138,21 @@ public final class OAuthClient {
             return toAuthResult(app.acquireTokenSilently(parameters)
                                    .join());
         } catch (Exception e) {
-            return new Failure("token_refresh_failed", e.getMessage(), e);
+            Throwable unwrapped = unwrapException(e);
+            return new Failure("token_refresh_failed", unwrapped.getMessage(), unwrapped);
         }
     }
 
     /** Removes all MSAL accounts and the encrypted serialized cache. */
     public synchronized void clearCacheAndAccounts() {
         try {
-            for (IAccount account : msalApplication.getAccounts().join()) {
-                msalApplication.removeAccount(account).join();
+            for (PublicClientApplication app : applications.values()) {
+                try {
+                    for (IAccount account : app.getAccounts().join()) {
+                        app.removeAccount(account).join();
+                    }
+                } catch (Exception _) {
+                }
             }
         } catch (Exception e) {
             System.err.println("Warning: Could not clear Microsoft authentication cache: " + e.getMessage());
@@ -177,7 +191,18 @@ public final class OAuthClient {
     }
 
     private PublicClientApplication applicationFor(String tenant) {
-        return createMsalApplication(clientId, normalizeTenant(tenant), tokenCacheAspect);
+        String normalized = normalizeTenant(tenant);
+        return applications.computeIfAbsent(normalized, t -> createMsalApplication(clientId, t, tokenCacheAspect));
+    }
+
+    private static Throwable unwrapException(Throwable t) {
+        if (t instanceof CompletionException && t.getCause() != null) {
+            return unwrapException(t.getCause());
+        }
+        if (t instanceof ExecutionException && t.getCause() != null) {
+            return unwrapException(t.getCause());
+        }
+        return t;
     }
 
     private static String normalizeTenant(String tenant) {

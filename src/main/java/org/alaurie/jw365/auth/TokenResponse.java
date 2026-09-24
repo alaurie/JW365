@@ -31,7 +31,12 @@ public record TokenResponse(
 
     @JsonIgnore
     public Instant expiresAt() {
-        return Instant.ofEpochSecond(obtainedEpochSec + expiresIn);
+        try {
+            long epochSec = Math.addExact(obtainedEpochSec, expiresIn);
+            return Instant.ofEpochSecond(Math.clamp(epochSec, 0, Instant.MAX.getEpochSecond()));
+        } catch (ArithmeticException _) {
+            return expiresIn > 0 ? Instant.MAX : Instant.EPOCH;
+        }
     }
 
     @JsonIgnore

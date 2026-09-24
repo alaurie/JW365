@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -43,6 +44,7 @@ public final class RdpProcessSupervisor {
     private final Map<String, ActiveSession> activeSessions = new ConcurrentHashMap<>();
     private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
     private static final Map<Path, Object> LOG_LOCKS = new ConcurrentHashMap<>();
+    private static final AtomicBoolean SDL_CONFIGURED = new AtomicBoolean(false);
     private final List<SessionListener> globalListeners = new CopyOnWriteArrayList<>();
 
     public RdpProcessSupervisor() {}
@@ -104,6 +106,10 @@ public final class RdpProcessSupervisor {
         Path preparedFile = parent != null ? parent.resolve(sourceRdpFile.getFileName().toString() + ".active.rdp") : sourceRdpFile;
         String output = String.join("\r\n", modifiedLines) + "\r\n";
         Files.writeString(preparedFile, output, StandardCharsets.UTF_8);
+        try {
+            Files.setPosixFilePermissions(preparedFile, PosixFilePermissions.fromString("rw-------"));
+        } catch (Exception _) {
+        }
         return preparedFile;
     }
 
@@ -253,6 +259,7 @@ public final class RdpProcessSupervisor {
         String sessionId = resource.identityKey();
         Object sessionLock = sessionLocks.computeIfAbsent(sessionId, _ -> new Object());
         Path logFile;
+        Path activeRdpFile;
         Process process;
         ActiveSession session;
         synchronized (sessionLock) {
@@ -262,7 +269,7 @@ public final class RdpProcessSupervisor {
             }
             stopSession(sessionId);
 
-            Path activeRdpFile = prepareRdpProfile(config.rdpFile(), config);
+            activeRdpFile = prepareRdpProfile(config.rdpFile(), config);
             RdpSessionConfig activeConfig = config.withRdpFile(activeRdpFile);
             List<String> rawCommand = buildCommandLine(freeRdp, activeConfig);
             if (config.multiMonitor() && !freeRdp.isFlatpak()) {
@@ -427,6 +434,12 @@ public final class RdpProcessSupervisor {
                         LOG_LOCKS.remove(logFile.toAbsolutePath(), logLock);
                         XdgPaths.pruneOldLogs(10);
                         activeSessions.remove(sessionId, session);
+                        if (!activeRdpFile.equals(config.rdpFile())) {
+                            try {
+                                Files.deleteIfExists(activeRdpFile);
+                            } catch (IOException _) {
+                            }
+                        }
                     }
                 });
     }
@@ -440,15 +453,27 @@ public final class RdpProcessSupervisor {
     }
 
     private static void destroyAndAwait(Process process) {
-        if (!process.isAlive()) {
+        if (process == null || !process.isAlive()) {
             return;
+        }
+        try {
+            process.descendants().forEach(ProcessHandle::destroy);
+        } catch (Exception _) {
         }
         process.destroy();
         try {
             if (!process.waitFor(3, TimeUnit.SECONDS)) {
+                try {
+                    process.descendants().forEach(ProcessHandle::destroyForcibly);
+                } catch (Exception _) {
+                }
                 process.destroyForcibly();
             }
         } catch (InterruptedException e) {
+            try {
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
+            } catch (Exception _) {
+            }
             process.destroyForcibly();
             Thread.currentThread().interrupt();
         }
@@ -510,6 +535,8 @@ public final class RdpProcessSupervisor {
         redacted = redacted.replaceAll(
                 "(?i)(password|passwd|token|secret|authorization|bearer)([=:]\\s*|\\s+)(?!Bearer\\s+\\[REDACTED])[^\\s]+",
                 "$1$2" + REDACTED);
+        redacted = redacted.replaceAll("(?i)(/p:)[^\\s]+", "$1" + REDACTED);
+        redacted = redacted.replaceAll("(?i)(gateway.*token[:=]\\s*)[^\\s]+", "$1" + REDACTED);
         return redacted.replaceAll(
                 "(?i)([?&](?:code|token|access_token|refresh_token|id_token|secret|password)=)[^&\\s]+",
                 "$1" + REDACTED);
@@ -616,11 +643,13 @@ public final class RdpProcessSupervisor {
             }
             return ids.isEmpty() ? Optional.empty() : Optional.of(String.join(",", ids));
         } catch (InterruptedException e) {
-            process.destroyForcibly();
+            if (process != null) {
+                process.destroyForcibly();
+            }
             Thread.currentThread().interrupt();
             return Optional.empty();
         } catch (Exception e) {
-            if (process.isAlive()) {
+            if (process != null && process.isAlive()) {
                 process.destroyForcibly();
             }
             return Optional.empty();
@@ -628,6 +657,9 @@ public final class RdpProcessSupervisor {
     }
 
     private static void ensureSdlConfig() {
+        if (!SDL_CONFIGURED.compareAndSet(false, true)) {
+            return;
+        }
         try {
             List<Path> baseDirs = new ArrayList<>();
             String configHome = System.getenv("XDG_CONFIG_HOME");

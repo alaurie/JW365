@@ -44,7 +44,7 @@ public record WorkspaceResource(
 
     @JsonIgnore
     public String cacheFileName() {
-        return identityKey().replaceAll("[^a-zA-Z0-9._-]", "_");
+        return sanitizedFileName();
     }
 
     /**

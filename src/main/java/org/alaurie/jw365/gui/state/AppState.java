@@ -19,10 +19,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import javafx.application.Platform;
@@ -99,6 +101,7 @@ public final class AppState {
         t.setDaemon(true);
         return t;
     });
+    private ScheduledFuture<?> autoRefreshTask;
     private final ExecutorService iconExecutor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual()
             .name("jw365-icon-", 1)
             .factory());
@@ -107,6 +110,7 @@ public final class AppState {
     private final Map<String, List<Consumer<Image>>> iconCallbacks = new ConcurrentHashMap<>();
     private final Set<Future<?>> iconFutures = ConcurrentHashMap.newKeySet();
     private final Map<String, SessionAuthDialog> activeAuthDialogs = new ConcurrentHashMap<>();
+    private final AtomicReference<AuthDialog> activeAuthDialog = new AtomicReference<>();
 
     public AppState() {
         this(
@@ -286,8 +290,15 @@ public final class AppState {
             }
         }
         // 4. Setup periodic auto-refresh
-        int refreshMin = Math.max(config.autoRefreshMinutes(), 5);
-        scheduler.scheduleAtFixedRate(() -> {
+        scheduleAutoRefresh(config.autoRefreshMinutes());
+    }
+
+    private synchronized void scheduleAutoRefresh(int minutes) {
+        if (autoRefreshTask != null) {
+            autoRefreshTask.cancel(false);
+        }
+        int refreshMin = Math.max(minutes, 5);
+        autoRefreshTask = scheduler.scheduleAtFixedRate(() -> {
             if (authenticated.get() && !hasActiveSessions()) {
                 refreshWorkspacesAsync(false);
             }
@@ -355,10 +366,19 @@ public final class AppState {
      * localhost redirect used by external-browser interactive auth.
      */
     public void signInWithEmbeddedWebView() {
-        runOnFxThread(() -> {
-            setLoading(false, "Opening embedded Microsoft sign-in...");
-            new AuthDialog(null, this).show();
-        });
+        runOnFxThread(
+                () -> {
+                    AuthDialog current = activeAuthDialog.get();
+                    if (current != null && current.isShowing()) {
+                        current.toFront();
+                        return;
+                    }
+                    setLoading(false, "Opening embedded Microsoft sign-in...");
+                    AuthDialog dialog = new AuthDialog(null, this);
+                    activeAuthDialog.set(dialog);
+                    dialog.setOnHidden(e -> activeAuthDialog.compareAndSet(dialog, null));
+                    dialog.show();
+                });
     }
 
     /**
@@ -368,6 +388,10 @@ public final class AppState {
     public void signOut() {
         long generation = operationGeneration.incrementAndGet();
         closeAllAuthDialogs();
+        AuthDialog currentAuth = activeAuthDialog.getAndSet(null);
+        if (currentAuth != null) {
+            runOnFxThread(currentAuth::close);
+        }
         boolean tokenCleared;
         synchronized (authOperationLock) {
             tokenCleared = tokenStore.clear();
@@ -380,33 +404,44 @@ public final class AppState {
             iconFutures.clear();
         }
         refreshInProgress.set(false);
+        autoConnectTriggered.set(false);
         Thread.ofVirtual()
                 .name("jw365-stop-sessions")
                 .start(rdpSupervisor::stopAllSessions);
         String message = tokenCleared ? "Signed out" : "Signed out locally; secure credential cleanup failed";
-        runOnFxThread(() -> {
-            authenticated.set(false);
-            currentUser.set(null);
-            workspaces.clear();
-            sessionStatuses.clear();
-            statusMessage.set(message);
-        });
+        runOnFxThread(
+                () -> {
+                    authenticated.set(false);
+                    currentUser.set(null);
+                    workspaces.clear();
+                    sessionStatuses.clear();
+                    lastSynced.set(null);
+                    statusMessage.set(message);
+                });
     }
 
     public void shutdown() {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        AuthDialog currentAuth = activeAuthDialog.getAndSet(null);
+        if (currentAuth != null) {
+            runOnFxThread(currentAuth::close);
+        }
         synchronized (authOperationLock) {
             operationGeneration.incrementAndGet();
         }
         refreshInProgress.set(false);
         scheduler.shutdownNow();
+        if (autoRefreshTask != null) {
+            autoRefreshTask.cancel(true);
+        }
         iconExecutor.shutdownNow();
         iconFutures.forEach(future -> future.cancel(true));
         iconFutures.clear();
         iconCallbacks.clear();
         iconJobs.clear();
+        rdpSupervisor.stopAllSessions();
     }
 
     public void refreshWorkspacesAsync(boolean forceTokenRefresh) {
@@ -594,6 +629,18 @@ public final class AppState {
                         }
                         TokenResponse tokens = tokenOpt.get();
                         ClientConfig config = configManager.get();
+                        if (tokens.isExpiringSoon()) {
+                            AuthResult refreshResult = oauthClient.refreshTokenWithMsal(config.defaultTenant());
+                            if (refreshResult instanceof Success(var newTokens, var claims)) {
+                                synchronized (authOperationLock) {
+                                    if (isCurrentGeneration(generation)) {
+                                        tokens = mergeTokenResponses(tokens, newTokens);
+                                        tokenStore.save(tokens);
+                                    }
+                                }
+                                runIfCurrent(generation, () -> currentUser.set(claims));
+                            }
+                        }
                         if (!isCurrentGeneration(generation) || closed.get()) {
                             return;
                         }
@@ -632,13 +679,11 @@ public final class AppState {
                                 config.smartcard(),
                                 config.preventSessionLock(),
                                 config.extraArgs());
-                        synchronized (authOperationLock) {
-                            if (!isCurrentGeneration(generation) || closed.get()) {
-                                return;
-                            }
-                            runIfCurrent(generation, () -> statusMessage.set("Starting FreeRDP session..."));
-                            rdpSupervisor.launch(freeRdp, resource, sessionConfig, null);
+                        if (!isCurrentGeneration(generation) || closed.get()) {
+                            return;
                         }
+                        runIfCurrent(generation, () -> statusMessage.set("Starting FreeRDP session..."));
+                        rdpSupervisor.launch(freeRdp, resource, sessionConfig, null);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } catch (Exception e) {
@@ -799,9 +844,8 @@ public final class AppState {
     public void updateConfig(ClientConfig newConfig) {
         try {
             configManager.save(newConfig);
+            scheduleAutoRefresh(newConfig.autoRefreshMinutes());
             String source = XdgPaths.isFlatpak() ? "BUNDLED" : newConfig.freerdpSource().name();
-            Optional<FreeRdpInfo> rdpInfo = FreeRdpLocator.locate(source, newConfig.preferredFreeRdpPath());
-            runOnFxThread(() -> detectedFreeRdp.set(rdpInfo.orElse(null)));
         } catch (IOException e) {
             System.err.println("Warning: Failed to save config: " + e.getMessage());
         }
@@ -847,7 +891,15 @@ public final class AppState {
             currentUser.set(null);
             setLoading(false, message);
             if (!closed.get()) {
-                new AuthDialog(null, this).show();
+                AuthDialog current = activeAuthDialog.get();
+                if (current != null && current.isShowing()) {
+                    current.toFront();
+                    return;
+                }
+                AuthDialog dialog = new AuthDialog(null, this);
+                activeAuthDialog.set(dialog);
+                dialog.setOnHidden(e -> activeAuthDialog.compareAndSet(dialog, null));
+                dialog.show();
             }
         });
     }

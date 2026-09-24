@@ -192,4 +192,20 @@ class WorkspaceFeedParserTest {
                      .iconUrl())
                      .isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/icons/attr.png"));
     }
+
+    @Test
+    @DisplayName("parseDiscoveryXml parses feed elements with case-insensitive attributes")
+    void testCaseInsensitiveAttributes() {
+        String xml =
+                """
+            <FeedDiscovery xmlns="http://schemas.microsoft.com/ts/2010/05/rdweb">
+                <TenantFeedURL feedurl="https://rdweb.wvd.microsoft.com/api/arm/tenantfeed1" tenantid="TENANT-CASE-1" tenantdisplayname="Case Test Tenant" />
+            </FeedDiscovery>
+            """;
+        List<TenantFeed> feeds = WorkspaceFeedParser.parseDiscoveryXml(xml);
+        assertThat(feeds).hasSize(1);
+        assertThat(feeds.getFirst().tenantId()).isEqualTo("TENANT-CASE-1");
+        assertThat(feeds.getFirst().tenantDisplayName()).isEqualTo("Case Test Tenant");
+        assertThat(feeds.getFirst().feedUrl()).isEqualTo(URI.create("https://rdweb.wvd.microsoft.com/api/arm/tenantfeed1"));
+    }
 }

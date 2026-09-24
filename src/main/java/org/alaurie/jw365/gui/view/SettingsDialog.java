@@ -115,8 +115,14 @@ public final class SettingsDialog extends Stage {
         sourceLabel.getStyleClass().add("form-label");
         freerdpSourceChoice = new ChoiceBox<>();
         boolean flatpakRuntime = XdgPaths.isFlatpak();
-        freerdpSourceChoice.setValue(flatpakRuntime ? "Bundled FreeRDP" : sourceCodeToLabel(currentConfig.freerdpSource()
-                .name()));
+        if (flatpakRuntime) {
+            freerdpSourceChoice.getItems().add("Bundled FreeRDP");
+            freerdpSourceChoice.setValue("Bundled FreeRDP");
+        } else {
+            freerdpSourceChoice.getItems().addAll("Automatic (Flatpak first)", "System FreeRDP", "Flatpak FreeRDP", "Custom executable");
+            freerdpSourceChoice.setValue(sourceCodeToLabel(currentConfig.freerdpSource()
+                    .name()));
+        }
         freerdpSourceChoice.setDisable(flatpakRuntime);
         HBox sourceBox = new HBox(12, sourceLabel, freerdpSourceChoice);
         sourceBox.setAlignment(Pos.CENTER_LEFT);
@@ -290,9 +296,9 @@ public final class SettingsDialog extends Stage {
 
         int scale = parseScaleString(scalingChoice.getValue());
         int autoRefresh;
+        String autoRefreshText = autoRefreshField.getText() == null ? "" : autoRefreshField.getText().trim();
         try {
-            autoRefresh = Integer.parseInt(autoRefreshField.getText()
-                    .trim());
+            autoRefresh = Integer.parseInt(autoRefreshText);
         } catch (NumberFormatException e) {
             showValidationError("Auto refresh must be a whole number between 5 and 1440 minutes.");
             return;
@@ -309,7 +315,7 @@ public final class SettingsDialog extends Stage {
                     .toList());
         }
 
-        String customPath = customRdpPathField.getText().trim();
+        String customPath = customRdpPathField.getText() == null ? "" : customRdpPathField.getText().trim();
         if (!customPath.isBlank()) {
             try {
                 if (!Files.isExecutable(Path.of(customPath))) {

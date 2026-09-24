@@ -1,5 +1,7 @@
 package org.alaurie.jw365.rdp;
 
+import java.util.Locale;
+
 /**
  * FreeRDP client binary variant/flavor.
  */
@@ -32,7 +34,7 @@ public enum FreeRdpFlavor {
         if (name == null) {
             return CUSTOM;
         }
-        String lower = name.toLowerCase();
+        String lower = name.toLowerCase(Locale.ROOT);
         if (lower.contains("sdl-freerdp")) {
             return SDL_FREERDP;
         }

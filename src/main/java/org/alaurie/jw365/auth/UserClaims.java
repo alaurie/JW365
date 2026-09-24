@@ -18,6 +18,10 @@ public record UserClaims(
         @JsonProperty("oid") String objectId,
         @JsonProperty("roles") List<String> roles) {
 
+    public UserClaims {
+        roles = roles != null ? List.copyOf(roles) : List.of();
+    }
+
     /**
      * Returns the best available display identity (UPN, preferred_username, or email).
      */

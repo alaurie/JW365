@@ -1,6 +1,5 @@
 package org.alaurie.jw365.gui.view;
 
-import java.awt.Desktop;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -32,6 +31,7 @@ import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.gui.state.AppState.DisplayMode;
 import org.alaurie.jw365.rdp.SessionStatus;
+import org.alaurie.jw365.util.DesktopOpener;
 
 /**
  * Visual tile for a Cloud PC or RemoteApp workspace resource.
@@ -167,7 +167,7 @@ public final class ResourceCard extends VBox {
     }
 
     private void updateStatus(SessionStatus status) {
-        Platform.runLater(() -> {
+        AppState.runOnFxThread(() -> {
             statusBadge.getStyleClass().removeAll("badge-status-idle", "badge-status-connecting", "badge-status-connected", "badge-status-failed");
 
             if (status == null || status == SessionStatus.IDLE || status == SessionStatus.DISCONNECTED) {
@@ -260,6 +260,7 @@ public final class ResourceCard extends VBox {
                 connectMultiMon,
                 new SeparatorMenuItem(),
                 retryItem,
+                restartItem,
                 disconnectItem,
                 new SeparatorMenuItem(),
                 controlsItem,
@@ -329,10 +330,11 @@ public final class ResourceCard extends VBox {
                         return 0L;
                     }
                 }));
-
-                if (latest.isPresent() && Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(latest.get()
-                            .toFile());
+                if (latest.isPresent()) {
+                    if (!DesktopOpener.open(latest.get()
+                            .toFile())) {
+                        showError("Could not launch log file viewer.");
+                    }
                 } else {
                     showError("No session log found yet for this resource.");
                 }
@@ -345,8 +347,10 @@ public final class ResourceCard extends VBox {
     private void openRdpFile() {
         try {
             Path rdpFile = XdgPaths.rdpFeedDir().resolve(resource.sanitizedFileName() + ".rdp");
-            if (Files.exists(rdpFile) && Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().open(rdpFile.toFile());
+            if (Files.exists(rdpFile)) {
+                if (!DesktopOpener.open(rdpFile.toFile())) {
+                    showError("Could not launch RDP file viewer.");
+                }
             } else {
                 showError("RDP file has not been downloaded yet. Connect first.");
             }

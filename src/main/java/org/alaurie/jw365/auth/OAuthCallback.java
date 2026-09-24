@@ -16,15 +16,33 @@ import java.util.Optional;
 public record OAuthCallback(String code, String state, String error,
         String errorDescription) {
     public static boolean isRedirect(String callbackUrl, URI expected) {
-        try {
-            URI candidate = URI.create(callbackUrl);
-            return expected.getScheme().equalsIgnoreCase(candidate.getScheme())
-                    && expected.getHost().equalsIgnoreCase(candidate.getHost())
-                    && expected.getPort() == candidate.getPort()
-                    && expected.getPath().equals(candidate.getPath());
-        } catch (IllegalArgumentException e) {
+        if (callbackUrl == null || callbackUrl.isBlank() || expected == null) {
             return false;
         }
+        try {
+            URI candidate = URI.create(callbackUrl);
+            if (candidate.getScheme() == null
+                    || candidate.getHost() == null
+                    || expected.getScheme() == null
+                    || expected.getHost() == null) {
+                return false;
+            }
+            String expectedPath = expected.getPath() == null ? "" : expected.getPath();
+            String candidatePath = candidate.getPath() == null ? "" : candidate.getPath();
+            return expected.getScheme().equalsIgnoreCase(candidate.getScheme())
+                    && expected.getHost().equalsIgnoreCase(candidate.getHost())
+                    && effectivePort(expected) == effectivePort(candidate)
+                    && expectedPath.equals(candidatePath);
+        } catch (Exception _) {
+            return false;
+        }
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 
     /**
@@ -41,7 +59,7 @@ public record OAuthCallback(String code, String state, String error,
                 return Optional.empty();
             }
             return parseQuery(uri.getRawQuery());
-        } catch (IllegalArgumentException e) {
+        } catch (Exception _) {
             return Optional.empty();
         }
     }

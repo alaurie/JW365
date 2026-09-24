@@ -1,5 +1,7 @@
 package org.alaurie.jw365.auth;
 
+import java.net.URI;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,5 +35,20 @@ class OAuthCallbackTest {
     void rejectsMalformedOrDuplicateParameters() {
         assertThat(OAuthCallback.parse("not a uri")).isEmpty();
         assertThat(OAuthCallback.parse("https://login.microsoftonline.com/common/oauth2/nativeclient?code=a&code=b&state=s")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("isRedirect handles nulls, malformed URLs, and matching ports safely")
+    void testIsRedirectNullSafetyAndPortMatching() {
+        URI expected = URI.create("https://login.microsoftonline.com/common/oauth2/nativeclient");
+        URI expectedWithPort = URI.create("https://login.microsoftonline.com:443/common/oauth2/nativeclient");
+
+        assertThat(OAuthCallback.isRedirect(null, expected)).isFalse();
+        assertThat(OAuthCallback.isRedirect("", expected)).isFalse();
+        assertThat(OAuthCallback.isRedirect("about:blank", expected)).isFalse();
+        assertThat(OAuthCallback.isRedirect("/relative/path", expected)).isFalse();
+        assertThat(OAuthCallback.isRedirect("not a uri", expected)).isFalse();
+        assertThat(OAuthCallback.isRedirect("https://login.microsoftonline.com/common/oauth2/nativeclient?code=123", expected)).isTrue();
+        assertThat(OAuthCallback.isRedirect("https://login.microsoftonline.com/common/oauth2/nativeclient?code=123", expectedWithPort)).isTrue();
     }
 }

@@ -1,7 +1,6 @@
 package org.alaurie.jw365.auth;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.alaurie.jw365.config.XdgPaths;
+import org.alaurie.jw365.util.ExecutableLocator;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -111,7 +111,7 @@ public final class TokenStore {
         }
 
         byte[] jsonBytes = MAPPER.writeValueAsBytes(tokens);
-        if (!saveToSecretTool(new String(jsonBytes, StandardCharsets.UTF_8))) {
+        if (!saveToSecretTool(jsonBytes)) {
             System.err.println("Warning: Secret Service token storage failed; using encrypted file fallback");
         }
 
@@ -185,7 +185,7 @@ public final class TokenStore {
     }
 
     private static boolean hasSecretTool() {
-        return new File("/usr/bin/secret-tool").canExecute() || new File("/bin/secret-tool").canExecute();
+        return ExecutableLocator.findOnPath("secret-tool").isPresent();
     }
 
     private static Optional<String> loadFromSecretTool() {
@@ -205,14 +205,14 @@ public final class TokenStore {
         return Optional.empty();
     }
 
-    private static boolean saveToSecretTool(String secret) {
+    private static boolean saveToSecretTool(byte[] secretBytes) {
         if (!hasSecretTool()) {
             return true;
         }
         SecretToolResult result = runSecretTool(
                 List.of("secret-tool", "store", "--label=JW365 Token", "service", "jw365", "account",
                         "default"),
-                secret.getBytes(StandardCharsets.UTF_8),
+                secretBytes,
                 SECRET_TOOL_WRITE_TIMEOUT);
         if (result.timedOut()) {
             System.err.println("Warning: Secret Service store timed out");
@@ -250,7 +250,9 @@ public final class TokenStore {
             return new SecretToolResult(success, !finished, output.get());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            process.destroyForcibly();
+            if (process != null) {
+                process.destroyForcibly();
+            }
             return new SecretToolResult(false, true, output.get());
         } catch (IOException e) {
             if (process != null) {

@@ -83,11 +83,19 @@ class RdpProcessSupervisorLifecycleTest {
     }
 
     @Test
-    @DisplayName("RDP logs redact Authorization bearer values")
+    @DisplayName("RDP logs redact Authorization bearer values, FreeRDP passwords and gateway tokens")
     void authorizationBearerRedaction() {
         String redacted = RdpProcessSupervisor.redactLogLine("Authorization: Bearer sensitive-token");
         assertThat(redacted).isEqualTo("Authorization: Bearer [REDACTED]");
         assertThat(redacted).doesNotContain("sensitive-token");
+
+        String passRedacted = RdpProcessSupervisor.redactLogLine("command: /u:testuser /p:SuperSecretPassword /v:host");
+        assertThat(passRedacted).contains("/p:[REDACTED]");
+        assertThat(passRedacted).doesNotContain("SuperSecretPassword");
+
+        String tokenRedacted = RdpProcessSupervisor.redactLogLine("connecting with /gateway:access-token:eyJhbGciOiJSUzI1NiIs... endpoint");
+        assertThat(tokenRedacted).contains("/gateway:access-token:[REDACTED]");
+        assertThat(tokenRedacted).doesNotContain("eyJhbGciOiJSUzI1NiIs");
     }
 
     @Test

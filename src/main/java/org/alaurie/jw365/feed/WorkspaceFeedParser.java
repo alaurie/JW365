@@ -11,11 +11,15 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
 /** Secure XML parser for Windows 365 and AVD workspace feed documents. */
 public final class WorkspaceFeedParser {
+    private static final DocumentBuilderFactory SECURE_DBF = createSecureDocumentBuilderFactory();
+
     private WorkspaceFeedParser() {}
 
     /** Parses discovery XML, accepting only HTTPS endpoints by default. */
@@ -190,9 +194,24 @@ public final class WorkspaceFeedParser {
     }
 
     private static String getAttributeIgnoreCase(Element el, String... names) {
+        if (el == null || names == null || names.length == 0) {
+            return null;
+        }
         for (String name : names) {
             if (el.hasAttribute(name)) {
                 return el.getAttribute(name);
+            }
+        }
+        NamedNodeMap attrs = el.getAttributes();
+        if (attrs != null) {
+            for (int i = 0; i < attrs.getLength(); i++) {
+                Node attr = attrs.item(i);
+                String attrName = attr.getNodeName();
+                for (String name : names) {
+                    if (attrName.equalsIgnoreCase(name)) {
+                        return attr.getNodeValue();
+                    }
+                }
             }
         }
         return null;
@@ -237,15 +256,23 @@ public final class WorkspaceFeedParser {
         } else if (startIdx == -1) {
             throw new IllegalArgumentException("Invalid XML: no opening '<' tag found");
         }
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
-        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        factory.setXIncludeAware(false);
-        factory.setExpandEntityReferences(false);
-        DocumentBuilder builder = factory.newDocumentBuilder();
+        DocumentBuilder builder = SECURE_DBF.newDocumentBuilder();
         return builder.parse(new InputSource(new StringReader(xml)));
+    }
+
+    private static DocumentBuilderFactory createSecureDocumentBuilderFactory() {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            return factory;
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to configure secure XML DocumentBuilderFactory", e);
+        }
     }
 }

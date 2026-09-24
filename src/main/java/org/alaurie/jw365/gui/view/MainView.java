@@ -1,6 +1,5 @@
 package org.alaurie.jw365.gui.view;
 
-import java.awt.Desktop;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,7 +10,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.collections.MapChangeListener;
 import javafx.geometry.Insets;
@@ -36,6 +34,7 @@ import org.alaurie.jw365.feed.WorkspaceResource;
 import org.alaurie.jw365.gui.state.AppState;
 import org.alaurie.jw365.rdp.FreeRdpInfo;
 import org.alaurie.jw365.rdp.SessionStatus;
+import org.alaurie.jw365.util.DesktopOpener;
 
 /**
  * Main application view showing the workspace grid, search bar, header, and
@@ -206,7 +205,7 @@ public final class MainView extends BorderPane {
     }
 
     private void updateUserInfo(UserClaims claims) {
-        Platform.runLater(() -> {
+        AppState.runOnFxThread(() -> {
             if (claims != null) {
                 userPillLabel.setText(claims.displayIdentity());
             } else {
@@ -216,7 +215,7 @@ public final class MainView extends BorderPane {
     }
 
     private void updateFreeRdpLabel(FreeRdpInfo info) {
-        Platform.runLater(() -> {
+        AppState.runOnFxThread(() -> {
             if (info != null) {
                 rdpEngineLabel.setText("RDP Engine: " + info.displayName());
             } else {
@@ -226,7 +225,7 @@ public final class MainView extends BorderPane {
     }
 
     private void updateLastSyncedLabel(Instant syncedTime) {
-        Platform.runLater(() -> {
+        AppState.runOnFxThread(() -> {
             if (syncedTime != null) {
                 long minutes = Duration.between(syncedTime, Instant.now()).toMinutes();
                 if (minutes == 0) {
@@ -241,7 +240,7 @@ public final class MainView extends BorderPane {
     }
 
     private void updateWorkspaceGrid() {
-        Platform.runLater(
+        AppState.runOnFxThread(
                 () -> {
                     workspaceContainer.getChildren().clear();
 
@@ -330,6 +329,7 @@ public final class MainView extends BorderPane {
                         } else {
                             emptyBox.getChildren().addAll(emptyTitle, emptySubtitle);
                         }
+                        workspaceContainer.getChildren().add(emptyBox);
                     }
                 });
     }
@@ -375,9 +375,7 @@ public final class MainView extends BorderPane {
         alert.setTitle("About JW365");
         alert.setHeaderText("JW365");
         if (alert.showAndWait().orElse(ButtonType.OK) == githubButton) {
-            try {
-                Desktop.getDesktop().browse(URI.create("https://github.com/alaurie/JW365"));
-            } catch (Exception e) {
+            if (!DesktopOpener.browse(URI.create("https://github.com/alaurie/JW365"))) {
                 state.statusMessageProperty().set("GitHub: https://github.com/alaurie/JW365");
             }
         }

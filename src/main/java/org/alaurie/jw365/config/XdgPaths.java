@@ -3,6 +3,7 @@ package org.alaurie.jw365.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 
@@ -10,8 +11,8 @@ import java.util.List;
  * Resolves standard XDG Base Directory specification paths on Linux.
  */
 public final class XdgPaths {
-
     private static final String APP_NAME = "jw365";
+    private static final boolean IS_FLATPAK = checkFlatpak();
 
     private XdgPaths() {}
 
@@ -69,6 +70,10 @@ public final class XdgPaths {
     public static Path rdpFeedDir() {
         Path dir = dataDir().resolve("feed");
         ensureDir(dir);
+        try {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        } catch (Exception _) {
+        }
         return dir;
     }
 
@@ -78,6 +83,10 @@ public final class XdgPaths {
     public static Path logsDir() {
         Path dir = dataDir().resolve("logs");
         ensureDir(dir);
+        try {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        } catch (Exception _) {
+        }
         return dir;
     }
 
@@ -115,30 +124,30 @@ public final class XdgPaths {
             } catch (UnsupportedOperationException _) {
             }
             try (var stream = Files.list(dir)) {
-                List<Path> logFiles = stream.filter(p -> p.getFileName()
+                List<LogEntry> logFiles = stream.filter(p -> p.getFileName()
                                 .toString()
                                 .startsWith("session_")
                                 && p.getFileName()
                                     .toString()
                                     .endsWith(".log"))
-                        .sorted((a, b) -> {
+                        .map(p -> {
                             try {
-                                return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
-                            } catch (IOException e) {
-                                return 0;
+                                return new LogEntry(p, Files.getLastModifiedTime(p), Files.size(p));
+                            } catch (IOException _) {
+                                return new LogEntry(p, FileTime.fromMillis(0), 0L);
                             }
                         })
+                        .sorted((a, b) -> b.lastModified().compareTo(a.lastModified()))
                         .toList();
                 long retainedBytes = 0;
                 for (int i = 0; i < logFiles.size(); i++) {
-                    Path log = logFiles.get(i);
-                    long size = Files.size(log);
-                    if (i >= maxFilesToKeep || retainedBytes + size > 32L * 1024 * 1024) {
-                        Files.deleteIfExists(log);
+                    LogEntry entry = logFiles.get(i);
+                    if (i >= maxFilesToKeep || retainedBytes + entry.size() > 32L * 1024 * 1024) {
+                        Files.deleteIfExists(entry.path());
                     } else {
-                        retainedBytes += size;
+                        retainedBytes += entry.size();
                         try {
-                            Files.setPosixFilePermissions(log, PosixFilePermissions.fromString("rw-------"));
+                            Files.setPosixFilePermissions(entry.path(), PosixFilePermissions.fromString("rw-------"));
                         } catch (UnsupportedOperationException _) {
                         }
                     }
@@ -170,6 +179,10 @@ public final class XdgPaths {
     }
 
     public static boolean isFlatpak() {
+        return IS_FLATPAK;
+    }
+
+    private static boolean checkFlatpak() {
         return System.getenv("FLATPAK_ID") != null || Files.exists(Path.of("/.flatpak-info"));
     }
 
@@ -182,4 +195,6 @@ public final class XdgPaths {
             System.err.println("Warning: Failed to create directory: " + dir + " (" + e.getMessage() + ")");
         }
     }
+
+    private record LogEntry(Path path, FileTime lastModified, long size) {}
 }

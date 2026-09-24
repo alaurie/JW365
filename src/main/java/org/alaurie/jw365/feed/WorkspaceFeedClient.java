@@ -15,6 +15,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -134,15 +136,22 @@ public final class WorkspaceFeedClient {
         if (tenantFeeds.size() > MAX_TENANT_FEEDS) {
             throw new IllegalArgumentException("Tenant feed count exceeds " + MAX_TENANT_FEEDS);
         }
-        try (ExecutorService executor = Executors.newFixedThreadPool(MAX_FEED_CONCURRENCY, Thread.ofVirtual()
-                .factory())) {
+        var throttle = new Semaphore(MAX_FEED_CONCURRENCY);
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<Workspace>> futures = tenantFeeds.stream()
-                    .map(feed -> (Callable<Workspace>) () -> fetchTenantWorkspace(accessToken, feed))
+                    .map(feed -> (Callable<Workspace>) () -> {
+                        throttle.acquire();
+                        try {
+                            return fetchTenantWorkspace(accessToken, feed);
+                        } finally {
+                            throttle.release();
+                        }
+                    })
                     .map(executor::submit)
                     .toList();
             try {
                 List<Workspace> workspaces = new ArrayList<>();
-                boolean failed = false;
+                Throwable lastFailure = null;
                 long deadline = System.nanoTime() + ALL_FEEDS_TIMEOUT.toNanos();
                 for (Future<Workspace> future : futures) {
                     try {
@@ -159,12 +168,12 @@ public final class WorkspaceFeedClient {
                         futures.forEach(candidate -> candidate.cancel(true));
                         throw new IllegalStateException("Workspace feed fetch timed out", e);
                     } catch (ExecutionException e) {
-                        failed = true;
+                        lastFailure = e.getCause();
                         System.err.println("Warning: Failed to fetch workspace feed: " + e.getCause());
                     }
                 }
-                if (workspaces.isEmpty() && failed) {
-                    throw new IllegalStateException("All workspace feeds failed");
+                if (workspaces.isEmpty() && lastFailure != null) {
+                    throw new IllegalStateException("All workspace feeds failed", lastFailure);
                 }
                 return workspaces;
             } finally {
@@ -192,9 +201,17 @@ public final class WorkspaceFeedClient {
         try {
             Files.write(tempFile, response.body());
             try {
+                Files.setPosixFilePermissions(tempFile, PosixFilePermissions.fromString("rw-------"));
+            } catch (Exception _) {
+            }
+            try {
                 Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.setPosixFilePermissions(targetPath, PosixFilePermissions.fromString("rw-------"));
+            } catch (Exception _) {
             }
         } finally {
             Files.deleteIfExists(tempFile);
@@ -265,8 +282,11 @@ public final class WorkspaceFeedClient {
             String location = response.headers()
                     .firstValue("Location")
                     .orElse(null);
-            if (location == null || redirect == MAX_REDIRECTS) {
+            if (location == null) {
                 return new Response(status, body);
+            }
+            if (redirect == MAX_REDIRECTS) {
+                throw new IOException("Too many redirects while requesting " + initialUri);
             }
             URI next = currentUri.resolve(location);
             requireAllowedEndpoint(next);

@@ -101,6 +101,17 @@ public final class WorkspaceCache {
             } catch (IOException _) {
             }
         }
+        if (Files.exists(iconsDirectory)) {
+            try (var stream = Files.list(iconsDirectory)) {
+                stream.filter(Files::isRegularFile).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException _) {
+                    }
+                });
+            } catch (IOException _) {
+            }
+        }
     }
 
     /**

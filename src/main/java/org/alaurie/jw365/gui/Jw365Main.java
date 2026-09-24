@@ -9,7 +9,7 @@ public final class Jw365Main {
 
     private Jw365Main() {}
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
         // Prevent Prism render thread from blocking in swapBuffers / vsync on inactive Wayland/XWayland surfaces
         if (System.getProperty("prism.vsync") == null) {
             System.setProperty("prism.vsync", "false");

@@ -56,6 +56,7 @@ dependencies {
     jfmt("com.netflix:com.netflix.tools.jfmt:0.8.2")
     implementation("tools.jackson.core:jackson-databind:3.2.2")
     implementation("com.microsoft.azure:msal4j:1.26.0")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
 
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

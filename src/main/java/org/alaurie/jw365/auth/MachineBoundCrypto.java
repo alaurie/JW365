@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -24,6 +25,7 @@ public final class MachineBoundCrypto {
     private static final int PBKDF2_ITERATIONS = 100_000;
     private static final int KEY_LENGTH_BITS = 256;
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String MACHINE_ID = readMachineId();
 
     private MachineBoundCrypto() {}
 
@@ -78,15 +80,19 @@ public final class MachineBoundCrypto {
     }
 
     private static SecretKey deriveKey(byte[] salt) throws Exception {
-        String machineId = readMachineId();
         String user = System.getProperty("user.name", "default");
-        char[] secretChars = (machineId + ":" + user).toCharArray();
+        char[] secretChars = (MACHINE_ID + ":" + user).toCharArray();
 
         PBEKeySpec spec = new PBEKeySpec(secretChars, salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        return new SecretKeySpec(factory.generateSecret(spec)
-                .getEncoded(),
-                "AES");
+        try {
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            return new SecretKeySpec(factory.generateSecret(spec)
+                    .getEncoded(),
+                    "AES");
+        } finally {
+            spec.clearPassword();
+            Arrays.fill(secretChars, '\0');
+        }
     }
 
     private static String readMachineId() {

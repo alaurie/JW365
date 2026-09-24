@@ -139,4 +139,14 @@ class SessionAuthDialogTest {
         String updated = SessionAuthDialog.appendLoginHintIfMissing(url, "user@test.com");
         assertThat(updated).isEqualTo("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=xyz&login_hint=user%40test.com#section");
     }
+
+    @Test
+    @DisplayName("appendLoginHintIfMissing strips prompt=select_account with fragment without malformed delimiters")
+    void testAppendLoginHintStripsSelectAccountWithFragment() {
+        String url = "https://login.microsoftonline.com/oauth2/v2.0/authorize?prompt=select_account#state=123";
+        String updated = SessionAuthDialog.appendLoginHintIfMissing(url, "user@test.com");
+        assertThat(updated).isEqualTo("https://login.microsoftonline.com/oauth2/v2.0/authorize?login_hint=user%40test.com#state=123");
+        assertThat(updated).doesNotContain("?&");
+        assertThat(updated).doesNotContain("?#");
+    }
 }

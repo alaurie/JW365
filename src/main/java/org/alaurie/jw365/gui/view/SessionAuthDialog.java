@@ -5,6 +5,8 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -131,41 +133,46 @@ public final class SessionAuthDialog extends Stage {
             return authUrl;
         }
         try {
-            URI uri = URI.create(authUrl);
-            String rawQuery = uri.getRawQuery();
+            int hashIdx = authUrl.indexOf('#');
+            String beforeHash = hashIdx >= 0 ? authUrl.substring(0, hashIdx) : authUrl;
+            String fragment = hashIdx >= 0 ? authUrl.substring(hashIdx) : "";
+
+            int questionIdx = beforeHash.indexOf('?');
+            String baseUrl = questionIdx >= 0 ? beforeHash.substring(0, questionIdx) : beforeHash;
+            String rawQuery = questionIdx >= 0 ? beforeHash.substring(questionIdx + 1) : "";
+
+            List<String> remainingParams = new ArrayList<>();
             boolean hasLoginHint = false;
-            boolean hasSelectAccount = false;
-            if (rawQuery != null && !rawQuery.isBlank()) {
+            boolean shouldStripSelectAccount = loginHint != null && !loginHint.isBlank();
+
+            if (!rawQuery.isBlank()) {
                 for (String param : rawQuery.split("&")) {
+                    if (param.isBlank()) {
+                        continue;
+                    }
                     int eq = param.indexOf('=');
                     String key = eq > 0 ? param.substring(0, eq) : param;
                     String val = eq > 0 ? param.substring(eq + 1) : "";
                     if ("login_hint".equalsIgnoreCase(key)) {
                         hasLoginHint = true;
-                    }
-                    if ("prompt".equalsIgnoreCase(key) && "select_account".equalsIgnoreCase(val)) {
-                        hasSelectAccount = true;
+                        remainingParams.add(param);
+                    } else if (shouldStripSelectAccount && "prompt".equalsIgnoreCase(key) && "select_account".equalsIgnoreCase(val)) {
+                        // strip prompt=select_account
+                    } else {
+                        remainingParams.add(param);
                     }
                 }
             }
-            String result = authUrl;
-            if (hasSelectAccount && loginHint != null && !loginHint.isBlank()) {
-                result = result.replace("prompt=select_account&", "")
-                               .replace("&prompt=select_account", "")
-                               .replace("?prompt=select_account", "?");
-                if (result.endsWith("?")) {
-                    result = result.substring(0, result.length() - 1);
-                }
-            }
+
             if (!hasLoginHint && loginHint != null && !loginHint.isBlank()) {
                 String encodedHint = URLEncoder.encode(loginHint.trim(), StandardCharsets.UTF_8);
-                int hashIdx = result.indexOf('#');
-                String beforeHash = hashIdx >= 0 ? result.substring(0, hashIdx) : result;
-                String fragment = hashIdx >= 0 ? result.substring(hashIdx) : "";
-                char sep = beforeHash.contains("?") ? '&' : '?';
-                result = beforeHash + sep + "login_hint=" + encodedHint + fragment;
+                remainingParams.add("login_hint=" + encodedHint);
             }
-            return result;
+
+            String newQuery = String.join("&", remainingParams);
+            return baseUrl
+                    + (newQuery.isEmpty() ? "" : "?" + newQuery)
+                    + fragment;
         } catch (Exception e) {
             return authUrl;
         }

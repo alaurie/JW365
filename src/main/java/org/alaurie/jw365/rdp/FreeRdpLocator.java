@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -28,7 +29,7 @@ public final class FreeRdpLocator {
     public static Optional<FreeRdpInfo> locate(String source, String customPath) {
         String preference = source == null || source.isBlank()
                 ? "AUTO"
-                : source.toUpperCase();
+                : source.toUpperCase(Locale.ROOT);
         return switch (preference) {
             case "BUNDLED" -> locateBundled();
             case "FLATPAK" -> checkFlatpak();

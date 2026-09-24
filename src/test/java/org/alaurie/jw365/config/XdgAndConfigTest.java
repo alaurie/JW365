@@ -107,6 +107,10 @@ class XdgAndConfigTest {
         assertThat(cache.hasCachedIcon(r1)).isTrue();
         Optional<byte[]> loadedBytes = cache.loadIconBytes(r1);
         assertThat(loadedBytes).isPresent().contains(fakePngBytes);
+
+        cache.clear();
+        assertThat(cache.loadWorkspaces()).isEmpty();
+        assertThat(cache.hasCachedIcon(r1)).isFalse();
     }
 
     @Test

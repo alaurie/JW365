@@ -41,6 +41,11 @@ class OAuthClientTest {
                 now);
 
         assertThat(expiredTokens.isExpired()).isTrue();
+
+        TokenResponse overflowTokens = new TokenResponse("access_token_123", "refresh_token_456", "id_token_789", "Bearer", Long.MAX_VALUE, "https://www.wvd.microsoft.com/.default",
+                now);
+        assertThat(overflowTokens.isExpired()).isFalse();
+        assertThat(overflowTokens.expiresAt()).isNotNull();
     }
 
     @Test
