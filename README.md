@@ -81,6 +81,21 @@ flatpak install --user flathub com.freerdp.FreeRDP
 
 In **Settings > FreeRDP Client Engine**, choose between system, Flatpak, or custom binaries.
 
+### Passkey / Security Key Sign-In (Optional)
+
+Signing in with a USB security key (FIDO2 passkey) needs `fido2-tools`. JW365 detects it at start-up; without it the Microsoft sign-in page offers your other methods. Not available in the Flatpak yet.
+
+```bash
+# Ubuntu / Debian
+sudo apt install fido2-tools
+
+# Fedora
+sudo dnf install fido2-tools
+
+# Arch Linux
+sudo pacman -S libfido2
+```
+
 ### Shortcuts (SDL FreeRDP)
 
 FreeRDP uses `Right Ctrl` as the local client modifier key:
