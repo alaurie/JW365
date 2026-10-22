@@ -117,7 +117,7 @@ class XdgAndConfigTest {
     @DisplayName("TokenStore saves and loads TokenResponse securely")
     void testTokenStore(@TempDir Path tempDir) throws IOException {
         Path tokenFile = tempDir.resolve("token-cache.json");
-        TokenStore store = new TokenStore(tokenFile);
+        TokenStore store = new TokenStore(tokenFile, false);
 
         assertThat(store.hasCachedToken()).isFalse();
         assertThat(store.load()).isEmpty();

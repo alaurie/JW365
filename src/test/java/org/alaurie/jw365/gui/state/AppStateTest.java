@@ -52,7 +52,7 @@ class AppStateTest {
     @Test
     @DisplayName("Sign-out clears the encrypted TokenStore cache")
     void signOutClearsTokenStore(@TempDir Path tempDir) throws Exception {
-        TokenStore store = new TokenStore(tempDir.resolve("token-cache.json"));
+        TokenStore store = new TokenStore(tempDir.resolve("token-cache.json"), false);
         store.save(new TokenResponse("access-token", null, "id-token", "Bearer", 3600, "scope",
                 Instant.now().getEpochSecond()));
         AppState state = new AppState(null, store, new ConfigManager(tempDir.resolve("config.json")), null, null,

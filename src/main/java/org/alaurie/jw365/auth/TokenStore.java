@@ -40,13 +40,25 @@ public final class TokenStore {
 
     private final Path tokenFile;
     private final Path encryptedFile;
+    private final boolean useSecretService;
 
     public TokenStore() {
         this(XdgPaths.tokenCacheFile());
     }
 
     public TokenStore(Path tokenFile) {
+        this(tokenFile, true);
+    }
+
+    /**
+     * @param useSecretService when false, only the encrypted file store is used
+     *     and secret-tool is never invoked by load, save, clear, or
+     *     hasCachedToken; tests use this so they do not read or overwrite the
+     *     user's real keyring entry
+     */
+    public TokenStore(Path tokenFile, boolean useSecretService) {
         this.tokenFile = tokenFile;
+        this.useSecretService = useSecretService;
         String fileName = tokenFile.getFileName().toString();
         if (fileName.endsWith(".json")) {
             this.encryptedFile = tokenFile.resolveSibling(fileName.substring(0, fileName.length() - 5) + ".enc");
@@ -56,8 +68,8 @@ public final class TokenStore {
     }
 
     /**
-     * Loads the cached token response. Checks Secret Service Keyring ->
-     * Encrypted machine-bound file -> Legacy plaintext migration.
+     * Loads the cached token response. Checks Secret Service Keyring (when
+     * enabled) -> Encrypted machine-bound file -> Legacy plaintext migration.
      */
     public synchronized Optional<TokenResponse> load() {
         Optional<String> keyringJson = loadFromSecretTool();
@@ -145,7 +157,8 @@ public final class TokenStore {
     }
 
     /**
-     * Deletes both Keyring secret and encrypted on-disk token cache.
+     * Deletes the Keyring secret (when enabled) and the encrypted on-disk token
+     * cache.
      */
     public synchronized boolean clear() {
         boolean keyringCleared = clearSecretTool();
@@ -160,7 +173,7 @@ public final class TokenStore {
         return keyringCleared && filesCleared;
     }
 
-    private static boolean clearSecretTool() {
+    private boolean clearSecretTool() {
         if (!hasSecretTool()) {
             return true;
         }
@@ -174,7 +187,8 @@ public final class TokenStore {
     }
 
     /**
-     * Checks if a cached token exists in either the Keyring or on-disk store.
+     * Checks if a cached token exists in the Keyring (when enabled) or the
+     * on-disk store.
      */
     public synchronized boolean hasCachedToken() {
         if (hasSecretTool() && loadFromSecretTool().isPresent()) {
@@ -184,11 +198,11 @@ public final class TokenStore {
                 || (Files.exists(tokenFile) && tokenFile.toFile().length() > 0);
     }
 
-    private static boolean hasSecretTool() {
-        return ExecutableLocator.findOnPath("secret-tool").isPresent();
+    private boolean hasSecretTool() {
+        return useSecretService && ExecutableLocator.findOnPath("secret-tool").isPresent();
     }
 
-    private static Optional<String> loadFromSecretTool() {
+    private Optional<String> loadFromSecretTool() {
         if (!hasSecretTool()) {
             return Optional.empty();
         }
@@ -205,7 +219,7 @@ public final class TokenStore {
         return Optional.empty();
     }
 
-    private static boolean saveToSecretTool(byte[] secretBytes) {
+    private boolean saveToSecretTool(byte[] secretBytes) {
         if (!hasSecretTool()) {
             return true;
         }
