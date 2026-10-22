@@ -26,6 +26,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import org.alaurie.jw365.auth.UserClaims;
 import org.alaurie.jw365.config.AppVersion;
@@ -105,6 +106,10 @@ public final class MainView extends BorderPane {
 
         headerBar.getChildren().addAll(brandTitle, brandBadge, searchField, refreshBtn, helpBtn, refreshIndicator,
                 spacer, userPill, settingsBtn, signOutBtn);
+        // When the window is narrow, let the search field give way instead of truncating button labels
+        for (Region fixed : List.of(brandTitle, brandBadge, refreshBtn, helpBtn, settingsBtn, signOutBtn)) {
+            fixed.setMinWidth(Region.USE_PREF_SIZE);
+        }
         setTop(headerBar);
 
         // 2. Center Workspace Grid

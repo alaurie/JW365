@@ -64,7 +64,7 @@ public final class Jw365App extends Application {
         updateActiveView(state.authenticatedProperty()
                               .get());
 
-        Scene scene = new Scene(rootContainer, 1050, 720);
+        Scene scene = new Scene(rootContainer, 1200, 720);
         String cssPath = Objects.requireNonNull(getClass().getResource("/org/alaurie/jw365/gui/styles.css")).toExternalForm();
         scene.getStylesheets().add(cssPath);
 
