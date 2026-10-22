@@ -272,6 +272,10 @@ public final class RdpProcessSupervisor {
             activeRdpFile = prepareRdpProfile(config.rdpFile(), config);
             RdpSessionConfig activeConfig = config.withRdpFile(activeRdpFile);
             List<String> rawCommand = buildCommandLine(freeRdp, activeConfig);
+            rawCommand.add("/t:" + resource.title());
+            // Give the session window the JW365 window class so the desktop groups it with the app and uses its
+            // icon. The option reaches the SDL and X11 clients alike, and the Flatpak client too, unlike SDL_APP_ID.
+            rawCommand.add("/wm-class:org.alaurie.jw365.gui.Jw365App");
             if (config.multiMonitor() && !freeRdp.isFlatpak()) {
                 detectMonitorSelection(freeRdp).ifPresent(selection -> rawCommand.add("/monitors:" + selection));
             }
