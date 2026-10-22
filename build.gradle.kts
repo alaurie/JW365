@@ -34,7 +34,7 @@ javafx {
 // JVM tuning flags — single source of truth for dev run, jpackage, and JavaExec tasks
 val jvmFlags =
     listOf(
-        "--enable-native-access=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED,javafx.graphics",
         "-Dprism.vsync=false",
         "-Xms24m",
         "-Xmx192m",
@@ -166,7 +166,10 @@ val javaHome: String =
         .launcherFor(java.toolchain)
         .get()
         .metadata.installationPath.asFile.absolutePath
-val jpackageJvmOptions = jvmFlags.flatMap { listOf("--java-options", it) }
+// The packaged app runs from the class path, so put the JavaFX jars on the module path as well;
+// JavaFX refuses to be loaded from the unnamed module and warns at startup otherwise.
+val jpackageModuleOptions = listOf("--module-path=\$APPDIR", "--add-modules=javafx.controls,javafx.web")
+val jpackageJvmOptions = (jvmFlags + jpackageModuleOptions).flatMap { listOf("--java-options", it) }
 val iconFile = file("src/main/resources/org/alaurie/jw365/gui/icon.png")
 val resourceDir = file("packaging")
 val inputDir = layout.buildDirectory.dir("install/jw365/lib")

@@ -5,7 +5,8 @@ set -eu
 export GDK_BACKEND=x11
 
 exec /app/runtime/bin/java \
-  --enable-native-access=ALL-UNNAMED \
+  --enable-native-access=ALL-UNNAMED,javafx.graphics \
+  --module-path /app/lib --add-modules javafx.controls,javafx.web \
   -Xms24m -Xmx192m -XX:ReservedCodeCacheSize=64m -XX:CICompilerCount=2 \
   -XX:+UseSerialGC -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=20 \
   -XX:-UsePerfData \
