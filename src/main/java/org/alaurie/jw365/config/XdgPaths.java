@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -102,6 +103,30 @@ public final class XdgPaths {
         } catch (Exception _) {
         }
         return dir;
+    }
+
+    /**
+     * Deletes the WebView's local storage so a signed-out session leaves no
+     * page state behind.
+     */
+    public static void clearWebViewData() {
+        Path dir = dataDir().resolve("webview");
+        if (!Files.isDirectory(dir)) {
+            return;
+        }
+        try (var paths = Files.walk(dir)) {
+            paths.sorted(Comparator.reverseOrder())
+                 .filter(path -> !path.equals(dir))
+                 .forEach(path -> {
+                     try {
+                         Files.deleteIfExists(path);
+                     } catch (IOException e) {
+                         System.err.println("Warning: Could not delete WebView data " + path + ": " + e.getMessage());
+                     }
+                 });
+        } catch (IOException e) {
+            System.err.println("Warning: Could not clear WebView data: " + e.getMessage());
+        }
     }
 
     /**
